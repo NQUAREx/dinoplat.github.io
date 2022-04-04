@@ -52,8 +52,8 @@ class Game {
 		// this.ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
 		// this.ctx.fillRect(this.player.x2, this.canvas.height - this.scale * 6, this.scale, this.scale)
 		if (this.player.lives <= 0) game.over()
-		if (this.player.x > this.player.x2) this.player.x2 += dt / game.scale * 2
-		if (this.player.x < this.player.x2) this.player.x2 -= dt / game.scale * 2
+		if (this.player.x > this.player.x2) this.player.x2 += dt / game.scale
+		if (this.player.x < this.player.x2) this.player.x2 -= dt / game.scale
 	}
 	
 	render() {
