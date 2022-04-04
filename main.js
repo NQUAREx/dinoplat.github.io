@@ -42,8 +42,8 @@ class Game {
 		// this.ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
 		// this.ctx.fillRect(this.player.x2, this.canvas.height - this.scale * 6, this.scale, this.scale)
 		if (this.player.lives <= 0) game.over()
-		if (this.player.x > this.player.x2) this.player.x2 += dt / game.scale
-		if (this.player.x < this.player.x2) this.player.x2 -= dt / game.scale
+		if (this.player.x > this.player.x2) this.player.x2 += 0.25
+		if (this.player.x < this.player.x2) this.player.x2 -= 0.25
 	}
 	
 	render() {
@@ -56,7 +56,7 @@ class Game {
 		}
 
 		this.ctx.fillStyle = game.theme.player.color
-		this.ctx.fillRect(this.player.x2 * this.scale, this.canvas.height - this.scale * 4, this.scale, this.scale)
+		this.ctx.fillRect((this.player.x2 * this.scale) + 40, (this.canvas.height - this.scale * this.width) + 40, this.scale - 80, this.scale - 80)
 	}
 
 	player = {
@@ -70,7 +70,7 @@ class Game {
 	blocks = []
 }
 
-let game = new Game(loop, canvas, 6, theme_1)
+let game = new Game(loop, canvas, 8, theme_1)
 let time
 
 function loop() {
@@ -125,6 +125,10 @@ document.addEventListener('mousedown', (event) => {
 		if (game.player.x < game.width - 1) ++game.player.x
 	} else {
 		if (game.player.x > 0) --game.player.x
+	}
+	if (game.player.x2 < 0) {
+		game.player.x = 2
+		// game.player.x2 = ((game.width - 1) * game.scale)
 	}
 }, false);
 
