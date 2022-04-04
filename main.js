@@ -47,13 +47,13 @@ class Game {
 	render() {
 		if (this.theme.background.image == "none") {
 			this.ctx.fillStyle = this.theme.background.color
-			this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
+			this.ctx.fillRect(0, (this.canvas.height - this.scale * this.width) + 2, this.canvas.width, this.scale - 5)
 		} else {
 
 		}
 
 		this.ctx.fillStyle = game.theme.player.color
-		this.ctx.fillRect((this.player.x2 * this.scale) + 40, (this.canvas.height - this.scale * this.width) + 40, this.scale - 80, this.scale - 80)
+		this.ctx.fillRect((this.player.x2 * this.scale) + 2, (this.canvas.height - this.scale * this.width) + 2, this.scale - 5, this.scale - 5)
 	}
 
 	player = {
@@ -67,7 +67,7 @@ class Game {
 	blocks = []
 }
 
-let game = new Game(loop, canvas, 8, theme_1)
+let game = new Game(loop, canvas, 6, theme_1)
 let time
 
 function loop() {
