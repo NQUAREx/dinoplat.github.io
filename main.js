@@ -71,7 +71,7 @@ class Game {
 }
 
 
-let game = new Game(loop, canvas, 16, theme_1)
+let game = new Game(loop, canvas, 6, theme_1)
 let time
 
 function loop() {
