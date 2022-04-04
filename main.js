@@ -2,11 +2,11 @@ let canvas = document.getElementById("main_canvas")
 
 let theme_1 = {
 	background: {
-		color: "black",
+		color: "rgb(31.875, 31.875, 31.875, 0.3)",
 		image: "none"
 	},
 	player: {
-		color: "blue",
+		color: "magenta",
 		image: "none"
 	},
 	block: {
@@ -39,8 +39,6 @@ class Game {
 	}
 
 	step(dt) {
-		// this.ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
-		// this.ctx.fillRect(this.player.x2, this.canvas.height - this.scale * 6, this.scale, this.scale)
 		if (this.player.lives <= 0) game.over()
 		if (this.player.x > this.player.x2) this.player.x2 += 0.25
 		if (this.player.x < this.player.x2) this.player.x2 -= 0.25
@@ -48,8 +46,7 @@ class Game {
 	
 	render() {
 		if (this.theme.background.image == "none") {
-			// this.ctx.fillStyle = this.theme.background.color
-			this.ctx.fillStyle = "rgba(255, 255, 255, 0.3)"
+			this.ctx.fillStyle = this.theme.background.color
 			this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 		} else {
 
@@ -131,5 +128,9 @@ document.addEventListener('mousedown', (event) => {
 		// game.player.x2 = ((game.width - 1) * game.scale)
 	}
 }, false);
+
+document.onmousedown = document.onselectstart = function() {
+  return false;
+};
 
 game.start()
