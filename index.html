@@ -102,7 +102,7 @@ function random(min, max) {
 }
 
 
-document.addEventListener("mousedown", (event) => {
+document.addEventListener("touchstart", (event) => {
 	if (event.x > document.documentElement.clientWidth / 2) {
 		if (game.player.x < game.width - 1) ++game.player.x
 	} else {
