@@ -6,7 +6,7 @@ let theme_1 = {
 		image: "none"
 	},
 	player: {
-		color: "green",
+		color: "magenta",
 		image: "none"
 	},
 	block: {
