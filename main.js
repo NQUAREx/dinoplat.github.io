@@ -49,7 +49,7 @@ class Game {
 	render() {
 		if (this.theme.background.image == "none") {
 			// this.ctx.fillStyle = this.theme.background.color
-			this.ctx.fillStyle = "rgba(255, 255, 255, 0.1)"
+			this.ctx.fillStyle = "rgba(255, 255, 255, 0.3)"
 			this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height)
 		} else {
 
@@ -69,7 +69,6 @@ class Game {
 	score = 0
 	blocks = []
 }
-
 
 let game = new Game(loop, canvas, 6, theme_1)
 let time
@@ -101,7 +100,7 @@ function touchHandler(event) {
 		type = "";
 	switch (event.type) {
 		case "touchstart": {
-			type = "mousedown";
+			type = "click";
 			break;
 		}
 		case "touchend": {
