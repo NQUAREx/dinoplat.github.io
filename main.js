@@ -56,7 +56,7 @@ class Game {
 		}
 
 		this.ctx.fillStyle = game.theme.player.color
-		this.ctx.fillRect(this.player.x2 * this.scale, this.canvas.height - this.scale * 3, this.scale, this.scale)
+		this.ctx.fillRect(this.player.x2 * this.scale, this.canvas.height - this.scale * 4, this.scale, this.scale)
 	}
 
 	player = {
