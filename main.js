@@ -6,200 +6,222 @@ let canvas = document.getElementById("main_canvas")
 // "theme_name"_background
 // "theme_name"_enemy_"number"
 
-let pikachu = {
-	name: "pikachu",
-	background: {
-		color: "rgb(31.875, 31.875, 31.875)",
-		image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("pikachu_background"); image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
-	},
-	player: {
-		color: "magenta",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("pikachu_player")
-	},
-	block: {
-		color: "red",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("pikachu_box")
-	},
-	font: {
-		color: "white",
-		style: "20px serif"
-	},
-	icons: {
-		bonuses: {
-			coin: document.getElementById("icon_coin"),
-			diamond: document.getElementById("icon_diamond"),
-			non: document.getElementById("non")
+themes = {
+	pikachu: {
+		name: "pikachu",
+		background: {
+			color: "rgb(31.875, 31.875, 31.875)",
+			image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("pikachu_background"); image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
 		},
-		live: document.getElementById("icon_live"),
-		score: document.getElementById("pikachu_box"),
-		record: document.getElementById("icon_record")
-	}
-}
-
-let hellokitty = {
-	name: "hellokitty",
-	background: {
-		color: "rgb(31.875, 31.875, 31.875)",
-		image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("hellokitty_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-	},
-	player: {
-		color: "magenta",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("hellokitty_player")
-	},
-	block: {
-		color: "red",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("hellokitty_box")
-	},
-	font: {
-		color: "white",
-		style: "20px serif"
-	},
-	icons: {
-		bonuses: {
-			coin: document.getElementById("icon_coin"),
-			diamond: document.getElementById("icon_diamond"),
-			non: document.getElementById("non")
+		player: {
+			color: "magenta",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("pikachu_player")
 		},
-		live: document.getElementById("icon_live"),
-		score: document.getElementById("hellokitty_box"),
-		record: document.getElementById("icon_record")
-	}
-}
-
-let mickeymouse = {
-	name: "mickeymouse",
-	background: {
-		color: "rgb(31.875, 31.875, 31.875)",
-		image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("mickeymouse_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-	},
-	player: {
-		color: "magenta",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("mickeymouse_player")
-	},
-	block: {
-		color: "red",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("mickeymouse_box")
-	},
-	font: {
-		color: "white",
-		style: "20px serif"
-	},
-	icons: {
-		bonuses: {
-			coin: document.getElementById("icon_coin"),
-			diamond: document.getElementById("icon_diamond"),
-			non: document.getElementById("non")
+		block: {
+			color: "red",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("pikachu_box")
 		},
-		live: document.getElementById("icon_live"),
-		score: document.getElementById("mickeymouse_box"),
-		record: document.getElementById("icon_record")
-	}
-}
-
-let sailormoon = {
-	name: "sailormoon",
-	background: {
-		color: "rgb(31.875, 31.875, 31.875)",
-		image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("sailormoon_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-	},
-	player: {
-		color: "magenta",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("sailormoon_player")
-	},
-	block: {
-		color: "red",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("sailormoon_box")
-	},
-	font: {
-		color: "white",
-		style: "20px serif"
-	},
-	icons: {
-		bonuses: {
-			coin: document.getElementById("icon_coin"),
-			diamond: document.getElementById("icon_diamond"),
-			non: document.getElementById("non")
+		font: {
+			color: "white",
+			style: "20px serif"
 		},
-		live: document.getElementById("icon_live"),
-		score: document.getElementById("sailormoon_box"),
-		record: document.getElementById("icon_record")
-	}
-}
-
-let spidermen = {
-	name: "spidermen",
-	background: {
-		color: "rgb(31.875, 31.875, 31.875)",
-		image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("spidermen_background"); image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
-	},
-	player: {
-		color: "magenta",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("spidermen_player")
-	},
-	block: {
-		color: "red",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("spidermen_box")
-	},
-	font: {
-		color: "white",
-		style: "20px serif"
-	},
-	icons: {
-		bonuses: {
-			coin: document.getElementById("icon_coin"),
-			diamond: document.getElementById("icon_diamond"),
-			non: document.getElementById("non")
-		},
-		live: document.getElementById("icon_live"),
-		score: document.getElementById("spidermen_box"),
-		record: document.getElementById("icon_record")
-	}
-}
-
-let stich = {
-	name: "stich",
-	background: {
-		color: "rgb(31.875, 31.875, 31.875)",
-		image: function(ctx, width, height, scale) {ctx.globalAlpha = 1; let image = document.getElementById("stich_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-	},
-	player: {
-		color: "magenta",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("stich_player")
-	},
-	block: {
-		color: "red",
-		background: "rgba(31.875, 31.875, 31.875, 0.3)",
-		image: document.getElementById("stich_box")
-	},
-	font: {
-		color: "white",
-		style: "20px serif"
-	},
-	icons: {
-		bonuses: {
-			coin: document.getElementById("icon_coin"),
-			diamond: document.getElementById("icon_diamond"),
+		icons: {
+			bonuses: {
+				coin: document.getElementById("icon_coin"),
+				diamond: document.getElementById("icon_diamond"),
+				live: document.getElementById("icon_live"),
+				non: document.getElementById("non")
+			},
 			live: document.getElementById("icon_live"),
-			non: document.getElementById("non")
+			score: document.getElementById("pikachu_box"),
+			record: document.getElementById("icon_record")
 		},
-		live: document.getElementById("icon_live"),
-		score: document.getElementById("stich_box"),
-		record: document.getElementById("icon_record")
+		sounds: {
+			coin: document.getElementById("sound_coin"),
+			background: document.getElementById("sound_pikachu_background")
+		}
 	},
-	sounds: {
-		coin: document.getElementById("sound_coin"),
-		background: document.getElementById("sound_stich_background")
+
+	hellokitty: {
+		name: "hellokitty",
+		background: {
+			color: "rgb(31.875, 31.875, 31.875)",
+			image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("hellokitty_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
+		},
+		player: {
+			color: "magenta",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("hellokitty_player")
+		},
+		block: {
+			color: "red",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("hellokitty_box")
+		},
+		font: {
+			color: "rgb(100, 100, 100)",
+			style: "20px serif"
+		},
+		icons: {
+			bonuses: {
+				coin: document.getElementById("icon_coin"),
+				diamond: document.getElementById("icon_diamond"),
+				live: document.getElementById("icon_live"),
+				non: document.getElementById("non")
+			},
+			live: document.getElementById("icon_live"),
+			score: document.getElementById("hellokitty_box"),
+			record: document.getElementById("icon_record")
+		},
+		sounds: {
+			coin: document.getElementById("sound_coin"),
+			background: document.getElementById("sound_hellokitty_background")
+		}
+	},
+	
+	mickeymouse: {
+		name: "mickeymouse",
+		background: {
+			color: "rgb(31.875, 31.875, 31.875)",
+			image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("mickeymouse_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
+		},
+		player: {
+			color: "magenta",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("mickeymouse_player")
+		},
+		block: {
+			color: "red",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("mickeymouse_box")
+		},
+		font: {
+			color: "white",
+			style: "20px serif"
+		},
+		icons: {
+			bonuses: {
+				coin: document.getElementById("icon_coin"),
+				diamond: document.getElementById("icon_diamond"),
+				live: document.getElementById("icon_live"),
+				non: document.getElementById("non")
+			},
+			live: document.getElementById("icon_live"),
+			score: document.getElementById("mickeymouse_box"),
+			record: document.getElementById("icon_record")
+		},
+		sounds: {
+			coin: document.getElementById("sound_coin"),
+			background: document.getElementById("sound_mickeymouse_background")
+		}
+	},
+
+	sailormoon: {
+		name: "sailormoon",
+		background: {
+			color: "rgb(31.875, 31.875, 31.875)",
+			image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("sailormoon_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
+		},
+		player: {
+			color: "magenta",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("sailormoon_player")
+		},
+		block: {
+			color: "red",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("sailormoon_box")
+		},
+		font: {
+			color: "white",
+			style: "20px serif"
+		},
+		icons: {
+			bonuses: {
+				coin: document.getElementById("icon_coin"),
+				diamond: document.getElementById("icon_diamond"),
+				live: document.getElementById("icon_live"),
+				non: document.getElementById("non")
+			},
+			live: document.getElementById("icon_live"),
+			score: document.getElementById("sailormoon_box"),
+			record: document.getElementById("icon_record")
+		},
+		sounds: {
+			coin: document.getElementById("sound_coin"),
+			background: document.getElementById("sound_sailormoon_background")
+		}
+	},
+	
+	spidermen: {
+		name: "spidermen",
+		background: {
+			color: "rgb(31.875, 31.875, 31.875)",
+			image: function(ctx, width, height, scale) {ctx.globalAlpha = 0.5; let image = document.getElementById("spidermen_background"); image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
+		},
+		player: {
+			color: "magenta",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("spidermen_player")
+		},
+		block: {
+			color: "red",
+			background: "rgba(31.875, 31.875, 31.875, 0.3)",
+			image: document.getElementById("spidermen_box")
+		},
+		font: {
+			color: "white",
+			style: "20px serif"
+		},
+		icons: {
+			bonuses: {
+				coin: document.getElementById("icon_coin"),
+				diamond: document.getElementById("icon_diamond"),
+				live: document.getElementById("icon_live"),
+				non: document.getElementById("non")
+			},
+			live: document.getElementById("icon_live"),
+			score: document.getElementById("spidermen_box"),
+			record: document.getElementById("icon_record")
+		},
+		sounds: {
+			coin: document.getElementById("sound_coin"),
+			background: document.getElementById("sound_spidermen_background")
+		}
+	},
+	
+	stich: {
+		name: "stich",
+		background: {
+			image: function(ctx, width, height, scale) {ctx.globalAlpha = 1; let image = document.getElementById("stich_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
+		},
+		player: {
+			image: document.getElementById("stich_player")
+		},
+		block: {
+			image: document.getElementById("stich_box")
+		},
+		font: {
+			color: "white",
+			style: "20px serif"
+		},
+		icons: {
+			bonuses: {
+				coin: document.getElementById("icon_coin"),
+				diamond: document.getElementById("icon_diamond"),
+				live: document.getElementById("icon_live"),
+				non: document.getElementById("non")
+			},
+			live: document.getElementById("icon_live"),
+			score: document.getElementById("stich_box"),
+			record: document.getElementById("icon_record")
+		},
+		sounds: {
+			coin: document.getElementById("sound_coin"),
+			background: document.getElementById("sound_stich_background")
+		}
 	}
 }
 
@@ -235,7 +257,7 @@ class Game {
 		this.scores.diamond = getCookie("dinoplat_diamond")
 		this.scores.record_score = getCookie("dinoplat_record_score")
 
-		this.theme.sounds.background.volume = 0.5
+		this.theme.sounds.background.volume = 0.1
 	}
 
 	over() {
@@ -294,7 +316,7 @@ class Game {
 				this._bonuses[i][3] = true
 				this._bonuses[i][1] = (this.settings.scale * random(0, this.settings.width - 1))
 				let prob = random(0, 100)
-				this._bonuses[i][0] = this._bonuses_id[(prob <= 80 ? 0 : (prob <= 85 ? 1 : (prob <= 86 ? 2 : (0))))]
+				this._bonuses[i][0] = this._bonuses_id[(prob <= this.probs.coin ? this._bonuses_id.indexOf("coin") : (prob <= 85 ? this._bonuses_id.indexOf("diamond") : (prob <= 87 ? this._bonuses_id.indexOf("live") : (0))))]
 			}
 
 			// collision
@@ -313,7 +335,6 @@ class Game {
 				}
 			}
 		}
-
 
 		if (this.settings.speed > this.settings.maxspeed) this.settings.speed -= 0.00005
 	}
@@ -381,15 +402,15 @@ class Game {
 	}
 
 	probs = {
-		diamond: 0,
-		coin: 0,
-		live: 0,
+		diamond: 5,
+		coin: 80,
+		live: 2,
 	}
 
 	// system
 	_blocks = []
 
-	_bonuses = []	// [[id, x, y], ...]
+	_bonuses = []
 	_bonuses_funcs = {
 		coin: function(gamec) {gamec.scores.coin++},
 		diamond: function(gamec) {gamec.scores.diamond++},
@@ -398,7 +419,14 @@ class Game {
 	_bonuses_id = ["coin", "diamond", "live"]
 }
 
-let game = new Game(loop, canvas, 5, stich)
+// pikachu
+// mickeymouse
+// spidermen
+// hellokitty
+// sailormoon
+// stich
+
+let game = new Game(loop, canvas, 5, themes[getGet("theme")])
 let time
 
 // main block
@@ -442,6 +470,12 @@ function setCookie(name, val, expires) {
 function getCookie(name) {
 	var matches = document.cookie.match(new RegExp("(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"))
 	return matches ? decodeURIComponent(matches[1]) : 0
+}
+
+function getGet(name) {
+    var s = window.location.search;
+    s = s.match(new RegExp(name + '=([^&=]+)'));
+    return s ? s[1] : false;
 }
 
 // event handler
