@@ -505,8 +505,8 @@ function touchHandler(event) {
 }
 
 document.addEventListener('mousedown', (event) => {
-	game.theme.sounds.background.autoplay = true
-	game.theme.sounds.background.play()
+// 	game.theme.sounds.background.autoplay = true
+// 	game.theme.sounds.background.play()
 	if (event.x > document.documentElement.clientWidth / 2) {
 		if (game.player.x < game.settings.width - 1) ++game.player.x
 	} else {
