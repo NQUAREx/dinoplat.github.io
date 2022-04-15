@@ -257,7 +257,7 @@ class Game {
 		this.scores.diamond = getCookie("dinoplat_diamond")
 		this.scores.record_score = getCookie("dinoplat_record_score")
 
-		this.theme.sounds.background.volume = 0.1
+// 		this.theme.sounds.background.volume = 0.1
 	}
 
 	over() {
