@@ -1,0 +1,18 @@
+* {
+	-webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+body {
+	display: block;
+	margin: 0px;
+	padding: 0px;
+}
+
+#main_canvas {
+	background-color: rgb(31.875, 31.875, 31.875);
+}
+
+html {
+	overflow: hidden;
+}
