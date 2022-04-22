@@ -1,0 +1,66 @@
+* {
+	-webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+body {
+	display: block;
+	margin: 0px;
+	padding: 0px;
+}
+
+#main_canvas {
+	/*background-color: rgb(31.875, 31.875, 31.875);*/
+	background-size: cover;
+	background-position: center;
+}
+
+html {
+	overflow: hidden;
+}
+
+
+#game_over_background {
+	position: absolute;
+	transition: background-color 1s;
+	background-color: rgba(0, 0, 0, 0.0);
+}
+
+#game_over_window {
+	transition: top 0.5s cubic-bezier(0,1.64,1,1);
+	position: absolute;
+	display: inline-block;
+}
+
+#game_over_text {
+	/*position: absolute;*/
+}
+
+.button {
+	margin-top: 40px;
+	height: 50px;
+	box-shadow: -1px -5px 0px 0px rgba(37, 37, 37, 0.2) inset;
+
+	border-radius: 15px;
+	text-align: center;
+}
+
+.button:active {
+	box-shadow: -1px 5px 0px 0px rgba(37, 37, 37, 0.2) inset;
+}
+
+.button_text {
+	vertical-align: center;
+	text-align: center;
+	padding: 10px;
+}
+
+#menu {
+	color: white;
+	background-color: red;
+}
+
+#restart {
+	color: #606306;
+	background-color: #a6ee28;
+}
