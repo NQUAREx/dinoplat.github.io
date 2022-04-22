@@ -604,7 +604,7 @@ document.onmousedown = document.onselectstart = function() {
 	return false
 }
 
-document.getElementById("restart").addEventListener('mousedown', (event) => {
+document.getElementById("restart").addEventListener('mouseup', (event) => {
 	game.start()
 })
 
