@@ -3,7 +3,7 @@ let canvas = document.getElementById("main_canvas")
 // main game class
 class Game {
 	constructor(mainloop, canvas, width, theme_name) {
-		window.Telegram.WebApp.expand()
+		if (window.Telegram.WebApp.isExpanded !== true) window.Telegram.WebApp.expand()
 		this.mainloop = mainloop
 		this.settings.width = width
 
@@ -25,14 +25,12 @@ class Game {
 		this.theme.font.style = "20px serif"
 
 		this.theme.icons = {}
+		let icons = ['live', 'record']
+		for (let i = 0; i < icons.length; ++i) this.theme.icons[icons[i]] = function () {let img = new Image(); img.src = "resources/images/icons/" + icons[i] + ".png"; return img;}()
+
 		this.theme.icons.bonuses = {}
-		this.theme.icons.bonuses.coin = function () {let img = new Image(); img.src = "resources/images/icons/coin.png"; return img;}()
-		this.theme.icons.bonuses.diamond = function () {let img = new Image(); img.src = "resources/images/icons/diamond.png"; return img;}()
-		this.theme.icons.bonuses.live = function () {let img = new Image(); img.src = "resources/images/icons/live.png"; return img;}()
-		this.theme.icons.bonuses.non = function () {let img = new Image(); img.src = "resources/images/icons/non.png"; return img;}()
-		this.theme.icons.live = function () {let img = new Image(); img.src = "resources/images/icons/live.png"; return img;}()
-		this.theme.icons.record = function () {let img = new Image(); img.src = "resources/images/icons/record.png"; return img;}()
-		this.theme.icons.score = function () {let img = new Image(); img.src = "resources/themes/" + theme_name + "/images/box.png"; return img;}()
+		let bonuses = ['coin', 'diamond', 'live', 'non']
+		for (let i = 0; i < bonuses.length; ++i) this.theme.icons.bonuses[bonuses[i]] = function () {let img = new Image(); img.src = "resources/images/icons/" + bonuses[i] + ".png"; return img;}()
 
 		this.theme.sounds = {}
 		this.theme.sounds.coin = (new Audio("resources/sounds/coin.mp3"))
@@ -68,12 +66,9 @@ class Game {
 
 		this.theme.sounds.background.volume = 0.1
 
-
 		let buttons = document.getElementsByClassName("button")
 
-		for (let i = 0; i < buttons.length; ++i) {
-			buttons[i].style.font = this.ctx.font = this.settings.font_size.toString() + "px publicpixel"
-		}
+		for (let i = 0; i < buttons.length; ++i) buttons[i].style.font = this.ctx.font = this.settings.font_size.toString() + "px publicpixel"
 
 		document.getElementById("game_over_background").style.width = this.canvas.width.toString() + 'px'
 		document.getElementById("game_over_background").style.height = this.canvas.height.toString() + 'px'
@@ -221,7 +216,7 @@ class Game {
 		// score
 		this.ctx.fillStyle = this.theme.font.color
 		
-		this.ctx.drawImage(this.theme.icons.score, 10, 10, this.settings.icon_scale, this.settings.icon_scale)
+		this.ctx.drawImage(this.theme.block.image, 10, 10, this.settings.icon_scale, this.settings.icon_scale)
 		this.ctx.fillText(":" + this.scores.score.toString(), this.settings.icon_scale + 10, 10 + this.settings.font_size)
 
 		// record score
