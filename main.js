@@ -1,299 +1,44 @@
 let canvas = document.getElementById("main_canvas")
-
-// themes
-// "theme_name"_player
-// "theme_name"_box
-// "theme_name"_background
-// "theme_name"_enemy_"number"
-
-themes = {
-	pikachu: {
-		name: "pikachu",
-		background: {
-			color: "rgb(31.875, 31.875, 31.875)",
-			image: function(ctx, width, height) {ctx.globalAlpha = 1; let image = document.getElementById("pikachu_background"); image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
-		},
-		player: {
-			color: "magenta",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("pikachu_player")
-		},
-		block: {
-			color: "red",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("pikachu_box")
-		},
-		font: {
-			color: "white",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("pikachu_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_pikachu_background")
-		}
-	},
-
-	hellokitty: {
-		name: "hellokitty",
-		background: {
-			color: "rgb(31.875, 31.875, 31.875)",
-			image: function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = document.getElementById("hellokitty_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-		},
-		player: {
-			color: "magenta",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("hellokitty_player")
-		},
-		block: {
-			color: "red",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("hellokitty_box")
-		},
-		font: {
-			color: "rgb(100, 100, 100)",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("hellokitty_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_hellokitty_background")
-		}
-	},
-	
-	mickeymouse: {
-		name: "mickeymouse",
-		background: {
-			color: "rgb(31.875, 31.875, 31.875)",
-			image: function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = document.getElementById("mickeymouse_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-		},
-		player: {
-			color: "magenta",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("mickeymouse_player")
-		},
-		block: {
-			color: "red",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("mickeymouse_box")
-		},
-		font: {
-			color: "white",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("mickeymouse_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_mickeymouse_background")
-		}
-	},
-
-	sailormoon: {
-		name: "sailormoon",
-		background: {
-			color: "rgb(31.875, 31.875, 31.875)",
-			image: function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = document.getElementById("sailormoon_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-		},
-		player: {
-			color: "magenta",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("sailormoon_player")
-		},
-		block: {
-			color: "red",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("sailormoon_box")
-		},
-		font: {
-			color: "white",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("sailormoon_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_sailormoon_background")
-		}
-	},
-	
-	spidermen: {
-		name: "spidermen",
-		background: {
-			color: "rgb(31.875, 31.875, 31.875)",
-			image: function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = document.getElementById("spidermen_background"); image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
-		},
-		player: {
-			image: document.getElementById("spidermen_player")
-		},
-		block: {
-			color: "red",
-			background: "rgba(31.875, 31.875, 31.875, 0.3)",
-			image: document.getElementById("spidermen_box")
-		},
-		font: {
-			color: "white",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("spidermen_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_spidermen_background")
-		}
-	},
-	
-	stich: {
-		name: "stich",
-		background: {
-			image: function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = document.getElementById("stich_background"); image.onload = ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}
-		},
-		player: {
-			image: document.getElementById("stich_player")
-		},
-		block: {
-			image: document.getElementById("stich_box")
-		},
-		font: {
-			color: "white",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("stich_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_stich_background")
-		}
-	},
-	
-	coldheart: {
-		name: "coldheart",
-		background: {
-			image: function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = document.getElementById("coldheart_background"); image.onload = function () {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
-		},
-		player: {
-			image: document.getElementById("coldheart_player")
-		},
-		block: {
-			image: document.getElementById("coldheart_box")
-		},
-		font: {
-			color: "rgb(50, 50, 50)",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("coldheart_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_coldheart_background")
-		}
-	},
-	
-	dinosaur: {
-		name: "dinosaur",
-		background: {
-			image: function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = document.getElementById("dinosaur_background"); image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
-		},
-		player: {
-			image: document.getElementById("dinosaur_player")
-		},
-		block: {
-			image: document.getElementById("dinosaur_box")
-		},
-		font: {
-			color: "white",
-			style: "20px serif"
-		},
-		icons: {
-			bonuses: {
-				coin: document.getElementById("icon_coin"),
-				diamond: document.getElementById("icon_diamond"),
-				live: document.getElementById("icon_live"),
-				non: document.getElementById("non")
-			},
-			live: document.getElementById("icon_live"),
-			score: document.getElementById("dinosaur_box"),
-			record: document.getElementById("icon_record")
-		},
-		sounds: {
-			coin: document.getElementById("sound_coin"),
-			background: document.getElementById("sound_dinosaur_background")
-		}
-	},
-}
-
+window.Telegram.WebApp.expand()
 
 // main game class
 class Game {
-	constructor(mainloop, canvas, width, theme) {
+	constructor(mainloop, canvas, width, theme_name) {
 		this.mainloop = mainloop
 		this.settings.width = width
-		this.theme = theme
+
+		// theme generation
+		this.theme = {}
+
+		this.theme.name = theme_name
+		this.theme.background = {}
+		this.theme.background.image = function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = new Image(); image.src = "resources/themes/" + theme_name + "/images/background.png"; image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
+
+		this.theme.player = {}
+		this.theme.player.image = function () {let img = new Image(); img.src = "resources/themes/" + theme_name + "/images/player.png"; return img;}()
+
+		this.theme.block = {}
+		this.theme.block.image = function () {let img = new Image(); img.src = "resources/themes/" + theme_name + "/images/box.png"; return img;}()
+
+		this.theme.font = {}
+		this.theme.font.color = "white"
+		this.theme.font.style = "20px serif"
+
+		this.theme.icons = {}
+		this.theme.icons.bonuses = {}
+		this.theme.icons.bonuses.coin = function () {let img = new Image(); img.src = "resources/images/icons/coin.png"; return img;}()
+		this.theme.icons.bonuses.diamond = function () {let img = new Image(); img.src = "resources/images/icons/diamond.png"; return img;}()
+		this.theme.icons.bonuses.live = function () {let img = new Image(); img.src = "resources/images/icons/live.png"; return img;}()
+		this.theme.icons.bonuses.non = function () {let img = new Image(); img.src = "resources/images/icons/non.png"; return img;}()
+		this.theme.icons.live = function () {let img = new Image(); img.src = "resources/images/icons/live.png"; return img;}()
+		this.theme.icons.record = function () {let img = new Image(); img.src = "resources/images/icons/record.png"; return img;}()
+		this.theme.icons.score = function () {let img = new Image(); img.src = "resources/themes/" + theme_name + "/images/box.png"; return img;}()
+
+		this.theme.sounds = {}
+		this.theme.sounds.coin = (new Audio("resources/sounds/coin.mp3"))
+		this.theme.sounds.background = (new Audio("resources/themes/" + theme_name + "/sounds/background.mp3"))
+		this.theme.sounds.gameover = (new Audio("resources/sounds/gameover.mp3"))
+
 
 		this.canvas = canvas
 		this.ctx = canvas.getContext('2d')
@@ -303,7 +48,7 @@ class Game {
 
 		this.settings.scale = canvas.width / this.settings.width
 
-		this.theme.background.image = renderBuf(this.canvas.width, this.canvas.height, theme.background.image)
+		this.theme.background.image = renderBuf(this.canvas.width, this.canvas.height, this.theme.background.image)
 
 		const font = new FontFace("publicpixel", "url(resources//fonts//publicpixel.ttf)")
 		document.fonts.add(font)
@@ -461,15 +206,16 @@ class Game {
 			this.ctx.drawImage(this.theme.icons.bonuses[this._bonuses[i][0]], this._bonuses[i][1] + this.settings.icon_scale, this._bonuses[i][2] + this.settings.icon_scale, this.settings.icon_scale * 2, this.settings.icon_scale * 2)
 		}
 
-		// player
-		if (this.player.visible === true) {
-			this.ctx.fillStyle = this.theme.player.color
-			this.ctx.drawImage(this.theme.player.image, (this.player.x2 * this.settings.scale), (this.canvas.height - this.settings.scale * 2), this.settings.scale, this.settings.scale)
-		}
 		// blocks
 		this.ctx.fillStyle = this.theme.block.color
 		for (let i = 0; i < this._blocks.length; ++i) {
 			this.ctx.drawImage(this.theme.block.image, this._blocks[i][0], this._blocks[i][1], this.settings.scale, this.settings.scale)
+		}
+
+		// player
+		if (this.player.visible === true) {
+			this.ctx.fillStyle = this.theme.player.color
+			this.ctx.drawImage(this.theme.player.image, (this.player.x2 * this.settings.scale), (this.canvas.height - this.settings.scale * 2), this.settings.scale, this.settings.scale)
 		}
 
 		// score
@@ -513,7 +259,7 @@ class Game {
 	_bonuses_id = ["coin", "diamond", "live"]
 }
 
-let game = new Game(loop, canvas, 5, themes[getGet("theme")])   // game main object
+let game = new Game(loop, canvas, 5, getGet("theme"))   // game main object
 let time
 
 // main loop
