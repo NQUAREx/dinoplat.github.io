@@ -1,9 +1,9 @@
 let canvas = document.getElementById("main_canvas")
-window.Telegram.WebApp.expand()
 
 // main game class
 class Game {
 	constructor(mainloop, canvas, width, theme_name) {
+		window.Telegram.WebApp.expand()
 		this.mainloop = mainloop
 		this.settings.width = width
 
