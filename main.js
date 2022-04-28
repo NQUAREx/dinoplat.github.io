@@ -71,7 +71,9 @@ class Game {
 		// document.getElementById("button_pause").style.width = (this._settings.scale / 2).toString() + 'px'
 
 		let buttons = document.getElementsByClassName("button")
+		let labels = document.getElementsByClassName("text_label")
 		for (let i = 0; i < buttons.length; ++i) buttons[i].style.font = this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
+		for (let i = 0; i < labels.length; ++i) labels[i].style.font = this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
 
 		this._menu.show("main")
 	}
