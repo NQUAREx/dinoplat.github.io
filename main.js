@@ -1,16 +1,17 @@
 let canvas = document.getElementById("main_canvas")
+window.onload = loading;
 
 // main game class
 class Game {
 	constructor(mainloop, canvas, width, theme_name) {
-		if (window.Telegram.WebApp.isExpanded !== true) window.Telegram.WebApp.expand()
+		if (window.Telegram.WebApp.isExpanded == false) window.Telegram.WebApp.expand()
 		this.mainloop = mainloop
-		this.settings.width = width
+		this._settings.width = width
 
 		// theme generation
 		this.theme = {}
-
 		this.theme.name = theme_name
+
 		this.theme.background = {}
 		this.theme.background.image = function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = new Image(); image.src = "resources/themes/" + theme_name + "/images/background.png"; image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
 
@@ -44,55 +45,49 @@ class Game {
 		this.canvas.height = window.innerHeight
 		this.ctx.font = this.theme.font.style
 
-		this.settings.scale = canvas.width / this.settings.width
+		this._settings.scale = canvas.width / this._settings.width
+		document.documentElement.style.setProperty("--scale", this._settings.scale + 'px')
 
 		this.theme.background.image = renderBuf(this.canvas.width, this.canvas.height, this.theme.background.image)
 
 		const font = new FontFace("publicpixel", "url(resources//fonts//publicpixel.ttf)")
 		document.fonts.add(font)
 
-		this.settings.font_size = (this.settings.scale / 4)
-		this.settings.icon_scale = this.settings.font_size
+		this._settings.font_size = (this._settings.scale / 4)
+		this._settings.icon_scale = this._settings.font_size
 
-		this.ctx.font = this.settings.font_size.toString() + "px publicpixel"
-		document.getElementById("game_over_text").style.font = (this.settings.font_size * 1.5).toString() + "px publicpixel"
+		this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
 
-		this._blocks.length = Math.round((this.canvas.height / 4) / this.settings.scale)
+		this._blocks.length = Math.round((this.canvas.height / 4) / this._settings.scale)
 		this._bonuses.length = this._blocks.length
 
-		this.scores.coin = getCookie("dinoplat_coin")
-		this.scores.diamond = getCookie("dinoplat_diamond")
-		this.scores.record_score = getCookie("dinoplat_record_score")
+		this._scores.coin = getCookie("dinoplat_coin")
+		this._scores.diamond = getCookie("dinoplat_diamond")
+		this._scores.record_score = getCookie("dinoplat_record_score")
 
 		this.theme.sounds.background.volume = 0.1
 
+		// document.getElementById("button_pause").style.height = (this._settings.scale / 2).toString() + 'px'
+		// document.getElementById("button_pause").style.width = (this._settings.scale / 2).toString() + 'px'
+
 		let buttons = document.getElementsByClassName("button")
+		for (let i = 0; i < buttons.length; ++i) buttons[i].style.font = this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
 
-		for (let i = 0; i < buttons.length; ++i) buttons[i].style.font = this.ctx.font = this.settings.font_size.toString() + "px publicpixel"
-
-		document.getElementById("game_over_background").style.width = this.canvas.width.toString() + 'px'
-		document.getElementById("game_over_background").style.height = this.canvas.height.toString() + 'px'
-
-		document.getElementById("game_over_window").style.left = (this.canvas.width / 5 - this.ctx.measureText(document.getElementById("game_over_text").textContent).width / 2).toString() + 'px'
+		this._menu.show("main")
 	}
 
 	over() {
 		time = 0
 		window.cancelAnimationFrame(this.reqId)
 
-		if (this.scores.score > this.scores.record_score) this.scores.record_score = this.scores.score
-		this.scores.score = 0
+		if (this._scores.score > this._scores.record_score) this._scores.record_score = this._scores.score
+		this._scores.score = 0
 
-		setCookie("dinoplat_record_score", this.scores.record_score.toString(), 30)
-		setCookie("dinoplat_coin", this.scores.coin.toString(), 30)
-		setCookie("dinoplat_diamond", this.scores.diamond.toString(), 30)
+		setCookie("dinoplat_record_score", this._scores.record_score.toString(), 30)
+		setCookie("dinoplat_coin", this._scores.coin.toString(), 30)
+		setCookie("dinoplat_diamond", this._scores.diamond.toString(), 30)
 
-		document.getElementById("game_over_background").style.top = "0px"
-		document.getElementById("game_over_background").style.backgroundColor = "rgba(0, 0, 0, 0.7)"
-
-		document.getElementById("game_over_window").style.top = (this.canvas.height / 3).toString() + 'px'
-
-		// game.start()
+		this._menu.show("gameover")
 	}
 
 	start() {
@@ -105,79 +100,89 @@ class Game {
 
 			this._bonuses[i][0] = "non"
 			this._bonuses[i][3] = true
-			this._blocks[i][1] = this.settings.scale * i * 4
-			this._bonuses[i][2] = this.settings.scale * i * 4
+			this._blocks[i][1] = this._settings.scale * i * 4
+			this._bonuses[i][2] = this._settings.scale * i * 4
 		}
 
-		this.settings.speed = this.settings.start_speed
-		this.player.x = random(1, this.settings.width - 2)
-		this.player.lives = 3
+		this._settings.speed = this._settings.start_speed
+		this._player.x = random(1, this._settings.width - 2)
+		this._player.lives = 3
 
-		document.getElementById("game_over_background").style.top = (this.canvas.height * -1).toString() + 'px'
-		document.getElementById("game_over_window").style.top = (this.canvas.height * -1).toString() + 'px'
-		document.getElementById("game_over_background").style.backgroundColor = "rgba(0, 0, 0, 0.0)"
+		this._menu.hide("main")
+		this._menu.hide("gameover")
+	}
+
+	pause () {
+		window.cancelAnimationFrame(this.reqId)
+		time = 0
+		this._menu.show("pause")
+	}
+
+	unpause() {
+		this.reqId = window.requestAnimationFrame(this.mainloop)
+		this._menu.hide("pause")
 	}
 
 	step(dt) {
 		this.reqId = window.requestAnimationFrame(this.mainloop)
 
-		if (this.player.lives <= 0) this.over()     // game over
+		if (this._player.lives <= 0) this.over()     // game over
 
-		// move player
-		if (this.player.move === true) {
-			if (this.player.x > this.player.x2) this.player.x2 += 0.25  // right
-			if (this.player.x < this.player.x2) this.player.x2 -= 0.25  // left
+		// move _player
+		if (this._player.move === true) {
+			if (this._player.x > this._player.x2) this._player.x2 += 0.25  // right
+			if (this._player.x < this._player.x2) this._player.x2 -= 0.25  // left
 		}
 
 		// probs control
-		if (this.player.lives === this.settings.max_lives) this._probs.live = 0
-		else if (this.player.lives <= 2) { this._probs.live = 5; this._probs.diamond = 10}
-		else if (this.player.lives === Math.ceil(this.settings.max_lives / 2)) this._probs.live = 3
+		if (this._player.lives === this._settings.max_lives) this._probs.live = 0
+		else if (this._player.lives <= 2) { this._probs.live = 5; this._probs.diamond = 10}
+		else if (this._player.lives === Math.ceil(this._settings.max_lives / 2)) this._probs.live = 3
 
 		// iterating all elements
 		for (let i = 0; i < this._blocks.length; ++i) {
-			if (this.settings.move === true) {
-				this._blocks[i][1] += dt / (0.3 + this.settings.speed)  // move block
-				this._bonuses[i][2] += dt / this.settings.speed         // move bonuses
+			if (this._settings.move === true) {
+				this._blocks[i][1] += dt / (0.3 + this._settings.speed)  // move block
+				this._bonuses[i][2] += dt / this._settings.speed         // move bonuses
 			}
 
 			// redrawing blocks
 			if (this._blocks[i][1] > this.canvas.height) {
-				this._blocks[i][1] = this.settings.scale * -1                                   // y = 0 (minus the block size for smooth appearance)
-				this._blocks[i][0] = (this.settings.scale * random(0, this.settings.width - 1)) // new random x (<->)
-				this.scores.score++                                                             // passed the block, score + 1
+				this._blocks[i][1] = this._settings.scale * -1                                   // y = 0 (minus the block size for smooth appearance)
+				this._blocks[i][0] = (this._settings.scale * random(0, this._settings.width - 1)) // new random x (<->)
+				this._scores.score++                                                             // passed the block, score + 1
 			}
 
 			// redrawing bonuses
 			if (this._bonuses[i][2] > this.canvas.height) {
-				this._bonuses[i][2] = this.settings.scale * -1
+				this._bonuses[i][2] = this._settings.scale * -1
 				this._bonuses[i][3] = true
-				this._bonuses[i][1] = (this.settings.scale * random(0, this.settings.width - 1))
+				this._bonuses[i][1] = (this._settings.scale * random(0, this._settings.width - 1))
 				let prob = random(0, 100)
 				this._bonuses[i][0] = this._bonuses_id[(prob <= this._probs.coin ? this._bonuses_id.indexOf("coin") : (prob <= this._probs.diamond + this._probs.coin ? this._bonuses_id.indexOf("diamond") : (prob <= this._probs.diamond + this._probs.coin + this._probs.live ? this._bonuses_id.indexOf("live") : (0))))]
 			}
 
 			// collision
-			if (this.settings.collision === true) {
-				if (this._blocks[i][1] > (this.canvas.height - this.settings.scale * 2.9) && this._blocks[i][0] === this.player.x * this.settings.scale && this._blocks[i][1] < (this.canvas.height - this.settings.scale * 1.5)) {
-					this.player.x = (this.settings.width - 1) / 2
-					this.player.move = false
-					this.settings.collision = false
-					this.settings.move = false
-					this.player.lives--
-					this.settings.iid = setInterval(() => {this.player.visible = !this.player.visible}, 200)
+			if (this._settings.collision === true) {
+				if (this._blocks[i][1] > (this.canvas.height - this._settings.scale * 2.9) && this._blocks[i][0] === this._player.x * this._settings.scale && this._blocks[i][1] < (this.canvas.height - this._settings.scale * 1.5)) {
+					this._player.x = (this._settings.width - 1) / 2
+					this._player.move = false
+					this._settings.collision = false
+					this._settings.move = false
+					this._player.lives--
+					this._settings.iid = setInterval(() => {this._player.visible = !this._player.visible}, 200)
 
 					setTimeout(() => {
-						this.settings.move = true
-						this.player.move = true
-						this.settings.speed = this.settings.start_speed
+						this._settings.move = true
+						this._player.move = true
+						this._settings.speed = this._settings.start_speed
 					}, 300)
 
-					setTimeout(() => {this.settings.collision = true; clearInterval(this.settings.iid); this.player.visible = true}, 3000)
+					setTimeout(() => {this._settings.collision = true; clearInterval(this._settings.iid); this._player.visible = true}, 3000)
 				}
 
 				// bonuses
-				if (this._bonuses[i][2] > (this.canvas.height - this.settings.scale * 2.5) && this._bonuses[i][1] === this.player.x * this.settings.scale && this._bonuses[i][2] < (this.canvas.height - this.settings.scale * 1.5)) {
+				if (this._bonuses[i][2] > (this.canvas.height - this._settings.scale * 2.5) && this._bonuses[i][1] === this._player.x * this._settings.scale && this._bonuses[i][2] < (this.canvas.height - this._settings.scale * 1.5)) {
 					if (this._bonuses[i][3] === true) {
 						this._bonuses_funcs[this._bonuses[i][0]](this)  // calling the bonus function
 						this._bonuses[i][0] = "non"                     // display: none
@@ -188,7 +193,7 @@ class Game {
 			}
 		}
 
-		if (this.settings.speed > this.settings.max_speed) this.settings.speed -= 0.00005    // Increase the speed
+		if (this._settings.speed > this._settings.max_speed) this._settings.speed -= 0.00005    // Increase the speed
 	}
 
 	// render function
@@ -198,60 +203,61 @@ class Game {
 
 		// bonuses
 		for (let i = 0; i < this._bonuses.length; ++i) {
-			this.ctx.drawImage(this.theme.icons.bonuses[this._bonuses[i][0]], this._bonuses[i][1] + this.settings.icon_scale, this._bonuses[i][2] + this.settings.icon_scale, this.settings.icon_scale * 2, this.settings.icon_scale * 2)
+			this.ctx.drawImage(this.theme.icons.bonuses[this._bonuses[i][0]], this._bonuses[i][1] + this._settings.icon_scale, this._bonuses[i][2] + this._settings.icon_scale, this._settings.icon_scale * 2, this._settings.icon_scale * 2)
 		}
 
 		// blocks
 		this.ctx.fillStyle = this.theme.block.color
 		for (let i = 0; i < this._blocks.length; ++i) {
-			this.ctx.drawImage(this.theme.block.image, this._blocks[i][0], this._blocks[i][1], this.settings.scale, this.settings.scale)
+			this.ctx.drawImage(this.theme.block.image, this._blocks[i][0], this._blocks[i][1], this._settings.scale, this._settings.scale)
 		}
 
-		// player
-		if (this.player.visible === true) {
+		// _player
+		if (this._player.visible === true) {
 			this.ctx.fillStyle = this.theme.player.color
-			this.ctx.drawImage(this.theme.player.image, (this.player.x2 * this.settings.scale), (this.canvas.height - this.settings.scale * 2), this.settings.scale, this.settings.scale)
+			this.ctx.drawImage(this.theme.player.image, (this._player.x2 * this._settings.scale), (this.canvas.height - this._settings.scale * 2), this._settings.scale, this._settings.scale)
 		}
 
 		// score
 		this.ctx.fillStyle = this.theme.font.color
 		
-		this.ctx.drawImage(this.theme.block.image, 10, 10, this.settings.icon_scale, this.settings.icon_scale)
-		this.ctx.fillText(":" + this.scores.score.toString(), this.settings.icon_scale + 10, 10 + this.settings.font_size)
+		this.ctx.drawImage(this.theme.block.image, 10, 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(":" + this._scores.score.toString(), this._settings.icon_scale + 10, 10 + this._settings.font_size)
 
 		// record score
-		this.ctx.drawImage(this.theme.icons.record, 10, 10 + this.settings.font_size + 10, this.settings.icon_scale, this.settings.icon_scale)
-		this.ctx.fillText(":" + this.scores.record_score.toString(), this.settings.icon_scale + 10, 20 + this.settings.font_size * 2)
+		this.ctx.drawImage(this.theme.icons.record, 10, 10 + this._settings.font_size + 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(":" + this._scores.record_score.toString(), this._settings.icon_scale + 10, 20 + this._settings.font_size * 2)
 
 		// coins
-		this.ctx.drawImage(this.theme.icons.bonuses.coin, this.canvas.width - (10 + this.settings.icon_scale), 10, this.settings.icon_scale, this.settings.icon_scale)
-		this.ctx.fillText(this.scores.coin.toString(), this.canvas.width - (10 + this.settings.icon_scale + 10 + this.ctx.measureText(this.scores.coin.toString()).width), this.settings.font_size + 10)
+		this.ctx.drawImage(this.theme.icons.bonuses.coin, this.canvas.width - (10 + this._settings.icon_scale), 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(this._scores.coin.toString(), this.canvas.width - (10 + this._settings.icon_scale + 10 + this.ctx.measureText(this._scores.coin.toString()).width), this._settings.font_size + 10)
 
 		// diamonds
-		this.ctx.drawImage(this.theme.icons.bonuses.diamond, this.canvas.width - (10 + this.settings.icon_scale), 10 + this.settings.icon_scale + 10, this.settings.icon_scale, this.settings.icon_scale)
-		this.ctx.fillText(this.scores.diamond.toString(), this.canvas.width - (10 + this.settings.icon_scale + 10 + this.ctx.measureText(this.scores.diamond.toString()).width), this.settings.font_size * 2 + 20)
+		this.ctx.drawImage(this.theme.icons.bonuses.diamond, this.canvas.width - (10 + this._settings.icon_scale), 10 + this._settings.icon_scale + 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(this._scores.diamond.toString(), this.canvas.width - (10 + this._settings.icon_scale + 10 + this.ctx.measureText(this._scores.diamond.toString()).width), this._settings.font_size * 2 + 20)
 
 		// lives
-		for (let i = 0; i < this.player.lives; ++i) {
-			this.ctx.drawImage(this.theme.icons.live, i * this.settings.icon_scale + (this.canvas.width / 2 - (this.settings.icon_scale * this.player.lives / 2)), 10, this.settings.icon_scale, this.settings.icon_scale)
+		for (let i = 0; i < this._player.lives; ++i) {
+			this.ctx.drawImage(this.theme.icons.live, i * this._settings.icon_scale + (this.canvas.width / 2 - (this._settings.icon_scale * this._player.lives / 2)), 10, this._settings.icon_scale, this._settings.icon_scale)
 		}
 	}
 
-	player = {x: 0, x2: 0, lives: 3, move: true, visible: true}
-	scores = {score: 0, record_score: 0, coin: 0, diamond: 0}
-	settings = {speed: 2.5, max_speed: 1, start_speed: 2.5, collision: true, max_lives: 5, move: true, iid: undefined}
-
-	// system
+	_player = {x: 0, x2: 0, lives: 3, move: true, visible: true}
+	_scores = {score: 0}
+	_settings = {speed: 2.5, max_speed: 1, start_speed: 2.5, collision: true, max_lives: 5, move: true, iid: undefined}
 	_blocks = []
-
 	_probs = {diamond: 5, coin: 80, live: 3}
 	_bonuses = []
 	_bonuses_funcs = {
-		coin: function(gamec) {gamec.scores.coin++},
-		diamond: function(gamec) {gamec.scores.diamond++},
-		live: function(gamec) {if (gamec.player.lives < gamec.settings.max_lives) {gamec.player.lives++}}
+		coin: function(gamec) {gamec._scores.coin++},
+		diamond: function(gamec) {gamec._scores.diamond++},
+		live: function(gamec) {if (gamec._player.lives < gamec._settings.max_lives) {gamec._player.lives++}}
 	}
 	_bonuses_id = ["coin", "diamond", "live"]
+	_menu = {
+		show: function(name) {document.getElementById(name + "_menu_window").style.top = "100%"},
+		hide: function(name) {document.getElementById(name + "_menu_window").style.top = "0%"}
+	}
 }
 
 let game = new Game(loop, canvas, 5, getGet("theme"))   // game main object
@@ -306,6 +312,15 @@ function getGet(name) {
     return s ? s[1] : false;
 }
 
+// loading animation
+function loading() {
+	document.body.classList.add('loaded_hiding');
+	window.setTimeout(function () {
+		document.body.classList.add('loaded');
+		document.body.classList.remove('loaded_hiding');
+	}, 100);
+}
+
 // event handler
 
 document.addEventListener("touchstart", touchHandler, true)
@@ -336,17 +351,48 @@ canvas.addEventListener('mousedown', (event) => {
 	game.theme.sounds.background.autoplay = true
 	game.theme.sounds.background.play()
 	if (event.x > document.documentElement.clientWidth / 2) {
-		if (game.player.x < game.settings.width - 1) ++game.player.x
+		if (game._player.x < game._settings.width - 1) ++game._player.x
 	} else {
-		if (game.player.x > 0) --game.player.x
+		if (game._player.x > 0) --game._player.x
 	}
 })
 document.onmousedown = document.onselectstart = function() {
 	return false
 }
 
-document.getElementById("restart").addEventListener('mouseup', (event) => {
+// main menu
+// button - "играть"
+document.getElementById("button_play").addEventListener('mouseup', (event) => {
 	game.start()
 })
 
-game.start()
+// button - "магазин"
+// document.getElementById("button_shop").addEventListener('mouseup', (event) => {
+// 	...
+// })
+
+// pause menu
+// button - "продолжить"
+document.getElementById("button_main_menu_pause").addEventListener('mouseup', (event) => {
+	window.location.reload()
+})
+
+// button - "главное меню"
+document.getElementById("button_continue").addEventListener('mouseup', (event) => {
+	game.unpause()
+})
+
+// gameover menu
+// button - "играть снова"
+document.getElementById("button_restart").addEventListener('mouseup', (event) => {
+	game.start()
+})
+
+// button - "главное меню"
+document.getElementById("button_main_menu_gameover").addEventListener('mouseup', (event) => {
+	window.location.reload()
+})
+
+document.getElementById("button_pause").addEventListener('mouseup', (event) => {
+	game.pause()
+})
