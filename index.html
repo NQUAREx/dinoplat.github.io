@@ -9,42 +9,36 @@
 		<script src="https://telegram.org/js/telegram-web-app.js"></script>
 	</head>
 	<body oncopy="return false">
-	<div class="preloader">
-        <svg class="preloader__image" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-            <path fill="currentColor"
-                d="M304 48c0 26.51-21.49 48-48 48s-48-21.49-48-48 21.49-48 48-48 48 21.49 48 48zm-48 368c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48-21.49-48-48-48zm208-208c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48-21.49-48-48-48zM96 256c0-26.51-21.49-48-48-48S0 229.49 0 256s21.49 48 48 48 48-21.49 48-48zm12.922 99.078c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48c0-26.509-21.491-48-48-48zm294.156 0c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48c0-26.509-21.49-48-48-48zM108.922 60.922c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48-21.491-48-48-48z">
-            </path>
-        </svg>
-	</div>
+		<div class="preloader">
+            <svg class="preloader__image" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                <path fill="currentColor" d="M304 48c0 26.51-21.49 48-48 48s-48-21.49-48-48 21.49-48 48-48 48 21.49 48 48zm-48 368c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48-21.49-48-48-48zm208-208c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48-21.49-48-48-48zM96 256c0-26.51-21.49-48-48-48S0 229.49 0 256s21.49 48 48 48 48-21.49 48-48zm12.922 99.078c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48c0-26.509-21.491-48-48-48zm294.156 0c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48c0-26.509-21.49-48-48-48zM108.922 60.922c-26.51 0-48 21.49-48 48s21.49 48 48 48 48-21.49 48-48-21.491-48-48-48z"></path>
+            </svg>
+		</div>
 		<canvas id="main_canvas" oncopy="return false"></canvas>
-
-		<div>
-			<div id="game_over_background">
-				<div id="game_over_window">
-					<div id="game_over_text">Конец игры!</div>
-					<div class="button" id="restart"><div class="button_text">играть снова</div></div>
-					<div class="button" id="menu"><div class="button_text">главное меню</div></div>
+		<div class="button pause" id="button_pause">
+			<img id="icon_pause" src="resources/images/icons/pause.png">
+		</div>
+		<div id="menu_container">
+			<div class="menu_window main" id="main_menu_window">
+				<div class="menu" id="main_menu">
+					<!--<img id="main_logo" src="resources/images/logo.png">-->
+					<div class="button play" id="button_play"><span>играть</span></div>
+					<!--<div class="button shop" id="button_shop">магазин</div>-->
 				</div>
 			</div>
-
-			<div id="menu_background">
-				<img id="logo" src="resources/images/logo.png">
-				<div id="menu_window">
-					<div class="button" id="start"><div class="button_text">играть</div></div>
-<!--				<div class="button" id="shop"><div class="button_text">магазин/div></div>-->
+			<div class="menu_window pause" id="pause_menu_window">
+				<div class="menu" id="pause_menu">
+					<div class="button continue" id="button_continue"><span>продолжить</span></div>
+					<div class="button main_menu" id="button_main_menu_pause"><span>главное меню</span></div>
+				</div>
+			</div>
+			<div class="menu_window gameover" id="gameover_menu_window">
+				<div class="menu" id="gameover_menu">
+					<div class="button restart" id="button_restart"><span>играть снова</span></div>
+					<div class="button main_menu" id="button_main_menu_gameover"><span>главное меню</span></div>
 				</div>
 			</div>
 		</div>
 		<script type="text/javascript" src="main.js"></script>
-		<script>
-            window.onload = function () {
-                document.body.classList.add('loaded_hiding');
-                window.setTimeout(function () {
-                    document.body.classList.add('loaded');
-                    document.body.classList.remove('loaded_hiding');
-					game.start()
-                }, 100);
-            }
-		</script>
 	</body>
 </html>
