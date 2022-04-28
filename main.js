@@ -325,34 +325,33 @@ function loading() {
 
 // event handler
 
-document.addEventListener("touchstart", touchHandler, true)
-document.addEventListener("touchend", touchHandler, true)
-document.addEventListener("touchcancel", touchHandler, true)
+// document.addEventListener("touchstart", touchHandler, true)
+// document.addEventListener("touchend", touchHandler, true)
 
-function touchHandler(event) {
-	event.preventDefault()
-	let touches = event.changedTouches,
-		first = touches[0],
-		type = ""
-	switch (event.type) {
-		case "touchstart":
-			type = "mousedown"
-			break
-		case "touchend":
-			type = "mouseup"
-			break
-		default:
-			return
-	}
-	let simulatedEvent = document.createEvent("MouseEvent")
-	simulatedEvent.initMouseEvent(type, true, true, window, 1, first.screenX, first.screenY, first.clientX, first.clientY, false, false, false, false, 0, null)
-	first.target.dispatchEvent(simulatedEvent)
-}
+// function touchHandler(event) {
+// 	event.preventDefault()
+// 	let touches = event.changedTouches,
+// 		first = touches[0],
+// 		type = ""
+// 	switch (event.type) {
+// 		case "touchstart":
+// 			type = "mousedown"
+// 			break
+// 		case "touchend":
+// 			type = "mouseup"
+// 			break
+// 		default:
+// 			return
+// 	}
+// 	// let simulatedEvent = document.createEvent("MouseEvent")
+// 	let simulatedEvent = new MouseEvent(type, {screenX: first.screenX, screenY: first.screenY, clientX: first.clientX, clientY: first.clientY, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, button: 0, relatedTarget: null})
+// 	first.target.dispatchEvent(simulatedEvent)
+// }
 
-canvas.addEventListener('mousedown', (event) => {
+canvas.addEventListener('touchstart', (event) => {
 	game.theme.sounds.background.autoplay = true
 	game.theme.sounds.background.play()
-	if (event.x > document.documentElement.clientWidth / 2) {
+	if (event.changedTouches[0].clientX > document.documentElement.clientWidth / 2) {
 		if (game._player.x < game._settings.width - 1) ++game._player.x
 	} else {
 		if (game._player.x > 0) --game._player.x
