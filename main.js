@@ -4,7 +4,7 @@ window.onload = loading;
 // main game class
 class Game {
 	constructor(mainloop, canvas, width, theme_name) {
-		if (window.Telegram.WebApp.isExpanded == false) window.Telegram.WebApp.expand()
+		window.Telegram.WebApp.expand()
 		this.mainloop = mainloop
 		this._settings.width = width
 
