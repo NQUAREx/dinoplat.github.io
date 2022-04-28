@@ -116,6 +116,15 @@ html {
 	transform: translateY(8px);
 }
 
+.text_label {
+	position: absolute;
+	color: white;
+	text-transform: uppercase;
+	left: 50%;
+	transform: translate(-50%, calc((var(--scale) * 2 + 30px) * -1));
+	/*white-space: nowrap;*/
+}
+
 .button.play {
 	background-color: #a6ee28;
 	color: #364c0f;
@@ -132,13 +141,13 @@ html {
 .button.continue {
 	background-color: #a6ee28;
 	color: #364c0f;
-	transform: translate(-50%, calc(calc(var(--scale) + 30px) * -1));
+	transform: translate(-50%, calc((var(--scale) + 30px) * -1));
 }
 
 .button.restart {
 	background-color: #a6ee28;
 	color: #364c0f;
-	transform: translate(-50%, calc(calc(var(--scale) + 30px) * -1));
+	transform: translate(-50%, calc((var(--scale) + 30px) * -1));
 }
 
 .button.pause {
