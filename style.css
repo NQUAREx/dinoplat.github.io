@@ -1,0 +1,178 @@
+* {
+	-webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+body {
+	display: block;
+	margin: 0px;
+	padding: 0px;
+	background-color: black;
+}
+
+#main_canvas {
+
+}
+
+html {
+	overflow: hidden;
+}
+
+.preloader {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  background: #e0e0e0;
+  z-index: 1001;
+}
+
+.preloader__image {
+  position: relative;
+  top: 50%;
+  left: 50%;
+  width: 70px;
+  height: 70px;
+  margin-top: -35px;
+  margin-left: -35px;
+  text-align: center;
+  animation: preloader-rotate 2s infinite linear;
+}
+
+@keyframes preloader-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loaded_hiding .preloader {
+  transition: 0.3s opacity;
+  opacity: 0;
+}
+
+.loaded .preloader {
+  display: none;
+}
+
+#menu_container {
+	position: absolute;
+	height: 100%;
+	width: 100%;
+	top: -100%;
+}
+
+.menu_window {
+	position: absolute;
+	height: 100%;
+	width: 100%;
+	/*top: -100%;*/
+	background-color: rgba(0, 0, 0, 0.5);
+	transition: top 0.5s cubic-bezier(0,1.64,1,1);
+}
+
+.menu {
+	position: absolute;
+	height: auto;
+	transform: translate(-50%, -50%);
+	top: 50%;
+	left: 50%;
+}
+
+.menu_window.main {
+	background-color: #000;
+	top: 0%;
+}
+
+.menu_window.pause {
+	top: 0%;
+}
+
+.menu_window.gameover {
+	top: 0%;
+}
+
+.button {
+	position: absolute;
+	border-radius: 10px;
+	height: calc(var(--scale) / 2);
+	width:  calc(var(--scale) * 4);
+	left: 50%;
+	padding: 10px;
+	text-transform: uppercase;
+	text-align: center;
+	box-shadow: 0px -4px 0px 0px rgba(0, 0, 0, 0.5) inset;
+	transform: translate(-50%, -50%);
+	margin: 5px;
+}
+
+.button:active {
+	box-shadow: 0px 4px 0px 0px rgba(0, 0, 0, 0.5) inset;
+}
+
+.button:active span {
+	transform: translateY(8px);
+}
+
+.text_label {
+	position: absolute;
+	color: white;
+	text-transform: uppercase;
+	left: 50%;
+	transform: translate(-50%, calc((var(--scale) * 2 + 30px) * -1));
+	white-space: nowrap;
+}
+
+.button.play {
+	background-color: #a6ee28;
+	color: #364c0f;
+	top: 50%;
+	left: 50%;
+}
+
+.button.main_menu {
+	background-color: #a6ee28;
+	color: #364c0f;
+
+}
+
+.button.continue {
+	background-color: #a6ee28;
+	color: #364c0f;
+	transform: translate(-50%, calc((var(--scale) + 30px) * -1));
+}
+
+.button.restart {
+	background-color: #a6ee28;
+	color: #364c0f;
+	transform: translate(-50%, calc((var(--scale) + 30px) * -1));
+}
+
+.button.pause {
+	bottom: 1%;
+	right: 2%;
+	left: unset;
+	height: calc(var(--scale) / 2);
+	width: calc(var(--scale) / 2);
+	background-color: #a6ee28;
+	color: #364c0f;
+	padding: 0px;
+	transform: none;
+}
+
+#icon_pause {
+	height: 100%;
+	width: 100%;
+}
+
+#main_logo {
+	position: absolute;
+	transform: scale(30%);
+}
+
+span {
+	display: block;
+	transform: translateY(25%);
+}
