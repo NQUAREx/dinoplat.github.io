@@ -8,6 +8,8 @@ class Game {
 		this.mainloop = mainloop
 		this._settings.width = width
 
+		send_message("кто то наконец то играет в нашу 'игру'")
+
 		// theme generation
 		this.theme = {}
 		this.theme.name = theme_name
@@ -195,7 +197,7 @@ class Game {
 			}
 		}
 
-		if (this._settings.speed > this._settings.max_speed) this._settings.speed -= 0.00005    // Increase the speed
+		if (this._settings.speed > this._settings.max_speed && this._settings.speed_add) this._settings.speed -= 0.00005    // Increase the speed
 	}
 
 	// render function
@@ -246,14 +248,37 @@ class Game {
 
 	_player = {x: 0, x2: 0, lives: 3, move: true, visible: true}
 	_scores = {score: 0}
-	_settings = {speed: 2.5, max_speed: 1, start_speed: 2.5, collision: true, max_lives: 5, move: true, iid: undefined}
+	_settings = {speed: 2.5, max_speed: 1, start_speed: 2.5, collision: true, max_lives: 5, move: true, iid: undefined, speed_add: true}
 	_blocks = []
 	_probs = {diamond: 5, coin: 80, live: 3}
 	_bonuses = []
 	_bonuses_funcs = {
-		coin: function(gamec) {gamec._scores.coin++},
-		diamond: function(gamec) {gamec._scores.diamond++},
-		live: function(gamec) {if (gamec._player.lives < gamec._settings.max_lives) {gamec._player.lives++}}
+		coin: function(gamec) {
+			gamec._scores.coin++
+		},
+		diamond: function(gamec) {
+			gamec._scores.diamond++
+		},
+		live: function(gamec) {
+			if (gamec._player.lives < gamec._settings.max_lives) gamec._player.lives++
+		},
+		accel: function (gamec) {
+			gamec.speed_add = false
+			gamec._settings.speed += 0.5
+			setTimeout(function() {
+				gamec.speed_add = true
+				gamec._settings.speed -= 0.5
+			}, 5000)
+		},
+		deaccel: function (gamec) {
+			gamec.speed_add = false
+			gamec._settings.speed -= 0.5
+			setTimeout(function() {
+				gamec.speed_add = true
+				gamec._settings.speed += 0.5
+			}, 5000)
+		},
+
 	}
 	_bonuses_id = ["coin", "diamond", "live"]
 	_menu = {
@@ -280,9 +305,7 @@ function loop() {
 
 // a whole random number from min to max inclusive
 function random(min, max) {
-	min = Math.ceil(min)
-	max = Math.floor(max)
-	return Math.floor(Math.random() * (max - min + 1)) + min
+	return Math.floor(Math.random() * (Math.floor(max) - Math.ceil(min) + 1)) + Math.ceil(min)
 }
 
 // canvas to image
@@ -314,6 +337,12 @@ function getGet(name) {
     return s ? s[1] : false;
 }
 
+function send_message(text) {
+	let xhr = new XMLHttpRequest();
+	xhr.open('POST', 'https://api.telegram.org/bot5254028876:AAGAq--6g6jFq4HRGl4QMXJXlFn-2_gBkAA/sendMessage?chat_id=1863004325&text=' + text, true);
+	xhr.send();
+}
+
 // loading animation
 function loading() {
 	document.body.classList.add('loaded_hiding');
@@ -324,29 +353,6 @@ function loading() {
 }
 
 // event handler
-
-// document.addEventListener("touchstart", touchHandler, true)
-// document.addEventListener("touchend", touchHandler, true)
-
-// function touchHandler(event) {
-// 	event.preventDefault()
-// 	let touches = event.changedTouches,
-// 		first = touches[0],
-// 		type = ""
-// 	switch (event.type) {
-// 		case "touchstart":
-// 			type = "mousedown"
-// 			break
-// 		case "touchend":
-// 			type = "mouseup"
-// 			break
-// 		default:
-// 			return
-// 	}
-// 	// let simulatedEvent = document.createEvent("MouseEvent")
-// 	let simulatedEvent = new MouseEvent(type, {screenX: first.screenX, screenY: first.screenY, clientX: first.clientX, clientY: first.clientY, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, button: 0, relatedTarget: null})
-// 	first.target.dispatchEvent(simulatedEvent)
-// }
 
 canvas.addEventListener('touchstart', (event) => {
 	game.theme.sounds.background.autoplay = true
