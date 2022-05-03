@@ -64,7 +64,7 @@ class Game {
 		this._blocks.length = Math.round((this.canvas.height / 4) / this._settings.scale)
 		this._bonuses.length = this._blocks.length
 
-		this._scores.get()
+		this._scores.get(this)
 
 		this.theme.sounds.background.volume = 0.1
 
@@ -86,7 +86,7 @@ class Game {
 		if (this._scores.score > this._scores.record_score) this._scores.record_score = this._scores.score
 		this._scores.score = 0
 
-		this._scores.save()
+		this._scores.save(this)
 
 		this._menu.show("gameover")
 	}
@@ -117,7 +117,7 @@ class Game {
 		window.cancelAnimationFrame(this.reqId)
 		time = 0
 		this._menu.show("pause")
-		this._scores.save()
+		this._scores.save(this)
 	}
 
 	unpause() {
@@ -247,15 +247,15 @@ class Game {
 	_player = {x: 0, x2: 0, lives: 3, move: true, visible: true}
 	_scores = {
 		score: 0,
-		save: function() {
-			setCookie("dinoplat_record_score", game._scores.record_score.toString(), 30)
-			setCookie("dinoplat_coin", game._scores.coin.toString(), 30)
-			setCookie("dinoplat_diamond", game._scores.diamond.toString(), 30)
+		save: function(gamec) {
+			setCookie("dinoplat_record_score", gamec._scores.record_score.toString(), 30)
+			setCookie("dinoplat_coin", gamec._scores.coin.toString(), 30)
+			setCookie("dinoplat_diamond", gamec._scores.diamond.toString(), 30)
 		},
-		get: function() {
-			game._scores.coin = getCookie("dinoplat_coin")
-			game._scores.diamond = getCookie("dinoplat_diamond")
-			game._scores.record_score = getCookie("dinoplat_record_score")
+		get: function(gamec) {
+			gamec._scores.coin = getCookie("dinoplat_coin")
+			gamec._scores.diamond = getCookie("dinoplat_diamond")
+			gamec._scores.record_score = getCookie("dinoplat_record_score")
 		}
 	}
 	_settings = {speed: 2.5, max_speed: 1, start_speed: 2.5, collision: true, max_lives: 5, move: true, iid: undefined, speed_add: true}
