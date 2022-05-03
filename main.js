@@ -8,7 +8,8 @@ class Game {
 		this.mainloop = mainloop
 		this._settings.width = width
 
-		send_message("Играет: @" + getGet("u").toString())
+		let user_name = getGet("u")
+		if ('undefined' !== user_name) send_message("Играет: @" + user_name.toString())
 
 		// theme generation
 		this.theme = {}
@@ -63,9 +64,7 @@ class Game {
 		this._blocks.length = Math.round((this.canvas.height / 4) / this._settings.scale)
 		this._bonuses.length = this._blocks.length
 
-		this._scores.coin = getCookie("dinoplat_coin")
-		this._scores.diamond = getCookie("dinoplat_diamond")
-		this._scores.record_score = getCookie("dinoplat_record_score")
+		this._scores.get()
 
 		this.theme.sounds.background.volume = 0.1
 
@@ -87,7 +86,7 @@ class Game {
 		if (this._scores.score > this._scores.record_score) this._scores.record_score = this._scores.score
 		this._scores.score = 0
 
-		this.saveScores()
+		this._scores.save()
 
 		this._menu.show("gameover")
 	}
@@ -118,13 +117,7 @@ class Game {
 		window.cancelAnimationFrame(this.reqId)
 		time = 0
 		this._menu.show("pause")
-		this.saveScores()
-	}
-
-	saveScores() {
-		setCookie("dinoplat_record_score", this._scores.record_score.toString(), 30)
-		setCookie("dinoplat_coin", this._scores.coin.toString(), 30)
-		setCookie("dinoplat_diamond", this._scores.diamond.toString(), 30)
+		this._scores.save()
 	}
 
 	unpause() {
@@ -252,7 +245,19 @@ class Game {
 	}
 
 	_player = {x: 0, x2: 0, lives: 3, move: true, visible: true}
-	_scores = {score: 0}
+	_scores = {
+		score: 0,
+		save: function() {
+			setCookie("dinoplat_record_score", game._scores.record_score.toString(), 30)
+			setCookie("dinoplat_coin", game._scores.coin.toString(), 30)
+			setCookie("dinoplat_diamond", game._scores.diamond.toString(), 30)
+		},
+		get: function() {
+			game._scores.coin = getCookie("dinoplat_coin")
+			game._scores.diamond = getCookie("dinoplat_diamond")
+			game._scores.record_score = getCookie("dinoplat_record_score")
+		}
+	}
 	_settings = {speed: 2.5, max_speed: 1, start_speed: 2.5, collision: true, max_lives: 5, move: true, iid: undefined, speed_add: true}
 	_blocks = []
 	_probs = {diamond: 5, coin: 80, live: 3}
@@ -342,6 +347,7 @@ function getGet(name) {
     return s ? s[1] : false;
 }
 
+// send a message to telegram bot
 function send_message(text) {
 	let xhr = new XMLHttpRequest();
 	xhr.open('POST', 'https://api.telegram.org/bot5254028876:AAGAq--6g6jFq4HRGl4QMXJXlFn-2_gBkAA/sendMessage?chat_id=1863004325&text=' + text, true);
