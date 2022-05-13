@@ -1,5 +1,5 @@
 let canvas = document.getElementById("main_canvas")
-window.onload = loading
+window.onload = loading;
 
 // main game class
 class Game {
@@ -8,38 +8,20 @@ class Game {
 		this.mainloop = mainloop
 		this._settings.width = width
 
-		Array.prototype.remove = function (name) {
-			let index = this.indexOf(name)
-			return (index !== -1 ? this.splice(index, 1) : undefined)
-		}
+		send_message("🎮 " + getGet("u").toString())
 
 		// theme generation
 		this.theme = {}
 		this.theme.name = theme_name
 
 		this.theme.background = {}
-		this.theme.background.image = function (ctx, width, height) {
-			ctx.globalAlpha = 0.7;
-			let image = new Image();
-			image.src = "resources/themes/" + theme_name + "/images/background.png";
-			image.onload = function () {
-				ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)
-			}
-		}
+		this.theme.background.image = function(ctx, width, height) {ctx.globalAlpha = 0.7; let image = new Image(); image.src = "resources/themes/" + theme_name + "/images/background.png"; image.onload = function() {ctx.drawImage(image, 0, 0, width, image.height, 0, 0, width, height)}}
 
 		this.theme.player = {}
-		this.theme.player.image = function () {
-			let img = new Image();
-			img.src = "resources/themes/" + theme_name + "/images/player.png";
-			return img;
-		}()
+		this.theme.player.image = function () {let img = new Image(); img.src = "resources/themes/" + theme_name + "/images/player.png"; return img;}()
 
 		this.theme.block = {}
-		this.theme.block.image = function () {
-			let img = new Image();
-			img.src = "resources/themes/" + theme_name + "/images/box.png";
-			return img;
-		}()
+		this.theme.block.image = function () {let img = new Image(); img.src = "resources/themes/" + theme_name + "/images/box.png"; return img;}()
 
 		this.theme.font = {}
 		this.theme.font.color = "white"
@@ -47,24 +29,11 @@ class Game {
 
 		this.theme.icons = {}
 		let icons = ['live', 'record']
-		for (let i = 0; i < icons.length; ++i) {
-			this.theme.icons[icons[i]] = function () {
-				let img = new Image()
-				img.src = "resources/images/icons/" + icons[i] + ".png"
-				return img
-			}()
-		}
+		for (let i = 0; i < icons.length; ++i) this.theme.icons[icons[i]] = function () {let img = new Image(); img.src = "resources/images/icons/" + icons[i] + ".png"; return img;}()
 
 		this.theme.icons.bonuses = {}
-		this._bonuses_id.push('non')
-		for (let i = 0; i < this._bonuses_id.length; ++i) {
-			this.theme.icons.bonuses[this._bonuses_id[i]] = function(gamec) {
-				let img = new Image()
-				img.src = "resources/images/icons/" + gamec._bonuses_id[i] + ".png"
-				return img
-			}(this)
-		}
-		this._bonuses_id.pop()
+		let bonuses = ['coin', 'diamond', 'live', 'non']
+		for (let i = 0; i < bonuses.length; ++i) this.theme.icons.bonuses[bonuses[i]] = function () {let img = new Image(); img.src = "resources/images/icons/" + bonuses[i] + ".png"; return img;}()
 
 		this.theme.sounds = {}
 		this.theme.sounds.coin = (new Audio("resources/sounds/coin.mp3"))
@@ -98,13 +67,13 @@ class Game {
 
 		this.theme.sounds.background.volume = 0.1
 
+		// document.getElementById("button_pause").style.height = (this._settings.scale / 2).toString() + 'px'
+		// document.getElementById("button_pause").style.width = (this._settings.scale / 2).toString() + 'px'
+
 		let buttons = document.getElementsByClassName("button")
 		let labels = document.getElementsByClassName("text_label")
-		for (let i = 0; i < buttons.length; ++i)
-			buttons[i].style.font = this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
-
-		for (let i = 0; i < labels.length; ++i)
-			labels[i].style.font = this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
+		for (let i = 0; i < buttons.length; ++i) buttons[i].style.font = this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
+		for (let i = 0; i < labels.length; ++i) labels[i].style.font = this.ctx.font = this._settings.font_size.toString() + "px publicpixel"
 
 		this._menu.show("main")
 	}
@@ -115,25 +84,15 @@ class Game {
 
 		if (this._scores.score > this._scores.record_score) this._scores.record_score = this._scores.score
 		this._scores.score = 0
+
 		this._scores.save(this)
 
-		for (let i = 0; i < this._settings.active_bonuses.length; i++) {
-			clearTimeout(this._settings.active_bonuses[i].split(':')[1])
-		}
-
-		this._settings.active_bonuses = []
-
-		let cl = document.body.classList.contains('rotate')
-		document.body.classList = ['loaded']
-
-
-		setTimeout(() => {this._menu.show("gameover")}, (cl ? (parseInt(getComputedStyle(document.body).transitionDuration) * 1000) : 10))
+		this._menu.show("gameover")
 	}
 
 	start() {
 		time = 0
 		this.reqId = window.requestAnimationFrame(this.mainloop)
-		send_message("🎮 " + getGet("u").toString())
 
 		for (let i = 0; i < this._blocks.length; ++i) {
 			this._blocks[i] = []
@@ -172,12 +131,14 @@ class Game {
 
 		// move _player
 		if (this._player.move === true) {
-			if (this._player.x > this._player.x2)
-				this._player.x2 += dt / this._settings.scale / this._settings.move_speed // right
-
-			if (this._player.x < this._player.x2)
-				this._player.x2 -= dt / this._settings.scale / this._settings.move_speed // left
+			if (this._player.x > this._player.x2) this._player.x2 += 0.25  // right
+			if (this._player.x < this._player.x2) this._player.x2 -= 0.25  // left
 		}
+
+		// probs control
+		if (this._player.lives === this._settings.max_lives) this._probs.live = 0
+		else if (this._player.lives <= 2) { this._probs.live = 5; this._probs.diamond = 10}
+		else if (this._player.lives === Math.ceil(this._settings.max_lives / 2)) this._probs.live = 3
 
 		// iterating all elements
 		for (let i = 0; i < this._blocks.length; ++i) {
@@ -198,33 +159,13 @@ class Game {
 				this._bonuses[i][2] = this._settings.scale * -1
 				this._bonuses[i][3] = true
 				this._bonuses[i][1] = (this._settings.scale * random(0, this._settings.width - 1))
-
-				let prob_sum = 0
-				let bonus = 'coin'
-				for (let i = 0; i < this._bonuses_id.length; ++i)
-					prob_sum += this._settings._probs[this._bonuses_id[i]]
-
-				let prob = random(0, prob_sum)
-				prob_sum = 0
-
-				for (let i = 0; i < this._bonuses_id.length; ++i) {
-					prob_sum += this._settings._probs[this._bonuses_id[i]]
-					if (prob <= prob_sum) {
-						bonus = this._bonuses_id[i]
-						break
-					}
-				}
-
-				this._bonuses[i][0] = bonus
-				console.log(bonus)
+				let prob = random(0, 100)
+				this._bonuses[i][0] = this._bonuses_id[(prob <= this._probs.coin ? this._bonuses_id.indexOf("coin") : (prob <= this._probs.diamond + this._probs.coin ? this._bonuses_id.indexOf("diamond") : (prob <= this._probs.diamond + this._probs.coin + this._probs.live ? this._bonuses_id.indexOf("live") : (0))))]
 			}
 
 			// collision
 			if (this._settings.collision === true) {
-				if (this._blocks[i][1] > (this.canvas.height - this._settings.scale * 2.9) &&
-					this._blocks[i][0] === this._player.x * this._settings.scale &&
-					this._blocks[i][1] < (this.canvas.height - this._settings.scale * 1.5))
-				{
+				if (this._blocks[i][1] > (this.canvas.height - this._settings.scale * 2.9) && this._blocks[i][0] === this._player.x * this._settings.scale && this._blocks[i][1] < (this.canvas.height - this._settings.scale * 1.5)) {
 					this._player.x = (this._settings.width - 1) / 2
 					this._player.move = false
 					this._settings.collision = false
@@ -235,22 +176,14 @@ class Game {
 					setTimeout(() => {
 						this._settings.move = true
 						this._player.move = true
-						this._settings.speed += 0.5
-					}, 400)
+						this._settings.speed = this._settings.start_speed
+					}, 300)
 
-					setTimeout(() => {
-						this._settings.collision = true
-						clearInterval(this._settings.iid)
-						this._player.visible = true
-						this._settings.speed -= 0.5
-					}, 3000)
+					setTimeout(() => {this._settings.collision = true; clearInterval(this._settings.iid); this._player.visible = true}, 3000)
 				}
 
 				// bonuses
-				if (this._bonuses[i][2] > (this.canvas.height - this._settings.scale * 2.5) &&
-					this._bonuses[i][1] === this._player.x * this._settings.scale &&
-					this._bonuses[i][2] < (this.canvas.height - this._settings.scale * 1.5))
-				{
+				if (this._bonuses[i][2] > (this.canvas.height - this._settings.scale * 2.5) && this._bonuses[i][1] === this._player.x * this._settings.scale && this._bonuses[i][2] < (this.canvas.height - this._settings.scale * 1.5)) {
 					if (this._bonuses[i][3] === true) {
 						this._bonuses_funcs[this._bonuses[i][0]](this)  // calling the bonus function
 						this._bonuses[i][0] = "non"                     // display: none
@@ -261,8 +194,7 @@ class Game {
 			}
 		}
 
-		if (this._settings.speed > this._settings.max_speed && this._settings.speed_add)
-			this._settings.speed -= 0.00015   // Increase the speed
+		if (this._settings.speed > this._settings.max_speed && this._settings.speed_add) this._settings.speed -= 0.00005    // Increase the speed
 	}
 
 	// render function
@@ -272,128 +204,46 @@ class Game {
 
 		// bonuses
 		for (let i = 0; i < this._bonuses.length; ++i) {
-			this.ctx.drawImage(
-				this.theme.icons.bonuses[
-				this._bonuses[i][0]],
-				this._bonuses[i][1] + this._settings.icon_scale,
-				this._bonuses[i][2] + this._settings.icon_scale,
-				this._settings.icon_scale * 2,
-				this._settings.icon_scale * 2
-			)
+			this.ctx.drawImage(this.theme.icons.bonuses[this._bonuses[i][0]], this._bonuses[i][1] + this._settings.icon_scale, this._bonuses[i][2] + this._settings.icon_scale, this._settings.icon_scale * 2, this._settings.icon_scale * 2)
 		}
 
 		// blocks
 		this.ctx.fillStyle = this.theme.block.color
 		for (let i = 0; i < this._blocks.length; ++i) {
-			this.ctx.drawImage(
-				this.theme.block.image,
-				this._blocks[i][0],
-				this._blocks[i][1],
-				this._settings.scale,
-				this._settings.scale
-			)
+			this.ctx.drawImage(this.theme.block.image, this._blocks[i][0], this._blocks[i][1], this._settings.scale, this._settings.scale)
 		}
 
 		// _player
 		if (this._player.visible === true) {
 			this.ctx.fillStyle = this.theme.player.color
-			this.ctx.drawImage(
-				this.theme.player.image,
-				this._player.x2 * this._settings.scale,
-				this.canvas.height - this._settings.scale * 2,
-				this._settings.scale,
-				this._settings.scale
-			)
+			this.ctx.drawImage(this.theme.player.image, (this._player.x2 * this._settings.scale), (this.canvas.height - this._settings.scale * 2), this._settings.scale, this._settings.scale)
 		}
 
 		// score
 		this.ctx.fillStyle = this.theme.font.color
-
-		this.ctx.drawImage(
-			this.theme.block.image,
-			10,
-			10,
-			this._settings.icon_scale,
-			this._settings.icon_scale
-		)
-		this.ctx.fillText(
-			":" + this._scores.score.toString(),
-			this._settings.icon_scale + 10,
-			10 + this._settings.font_size
-		)
+		
+		this.ctx.drawImage(this.theme.block.image, 10, 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(":" + this._scores.score.toString(), this._settings.icon_scale + 10, 10 + this._settings.font_size)
 
 		// record score
-		this.ctx.drawImage(
-			this.theme.icons.record,
-			10,
-			10 + this._settings.font_size + 10,
-			this._settings.icon_scale,
-			this._settings.icon_scale
-		)
-		this.ctx.fillText(
-			":" + this._scores.record_score.toString(),
-			this._settings.icon_scale + 10,
-			20 + this._settings.font_size * 2
-		)
+		this.ctx.drawImage(this.theme.icons.record, 10, 10 + this._settings.font_size + 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(":" + this._scores.record_score.toString(), this._settings.icon_scale + 10, 20 + this._settings.font_size * 2)
 
 		// coins
-		this.ctx.drawImage(
-			this.theme.icons.bonuses.coin,
-			this.canvas.width - (10 + this._settings.icon_scale),
-			10,
-			this._settings.icon_scale,
-			this._settings.icon_scale
-		)
-		this.ctx.fillText(
-			this._scores.coin.toString(),
-			this.canvas.width - (10 + this._settings.icon_scale + 10 + this.ctx.measureText(this._scores.coin.toString()).width),
-			this._settings.font_size + 10
-		)
+		this.ctx.drawImage(this.theme.icons.bonuses.coin, this.canvas.width - (10 + this._settings.icon_scale), 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(this._scores.coin.toString(), this.canvas.width - (10 + this._settings.icon_scale + 10 + this.ctx.measureText(this._scores.coin.toString()).width), this._settings.font_size + 10)
 
 		// diamonds
-		this.ctx.drawImage(
-			this.theme.icons.bonuses.diamond,
-			this.canvas.width - (10 + this._settings.icon_scale),
-			10 + this._settings.icon_scale + 10,
-			this._settings.icon_scale,
-			this._settings.icon_scale
-		)
-		this.ctx.fillText(
-			this._scores.diamond.toString(),
-			this.canvas.width - (10 + this._settings.icon_scale + 10 + this.ctx.measureText(this._scores.diamond.toString()).width),
-			this._settings.font_size * 2 + 20
-		)
+		this.ctx.drawImage(this.theme.icons.bonuses.diamond, this.canvas.width - (10 + this._settings.icon_scale), 10 + this._settings.icon_scale + 10, this._settings.icon_scale, this._settings.icon_scale)
+		this.ctx.fillText(this._scores.diamond.toString(), this.canvas.width - (10 + this._settings.icon_scale + 10 + this.ctx.measureText(this._scores.diamond.toString()).width), this._settings.font_size * 2 + 20)
 
 		// lives
 		for (let i = 0; i < this._player.lives; ++i) {
-			this.ctx.drawImage(
-				this.theme.icons.live,
-				i * this._settings.icon_scale + (this.canvas.width / 2 - (this._settings.icon_scale * this._player.lives / 2)),
-				10,
-				this._settings.icon_scale,
-				this._settings.icon_scale
-			)
-		}
-
-		// active bonuses
-		for (let i = 0; i < this._settings.active_bonuses.length; ++i) {
-			this.ctx.drawImage(
-				this.theme.icons.bonuses[this._settings.active_bonuses[i].split(':', 1)[0]],
-				i * this._settings.icon_scale + (this.canvas.width / 2 - (this._settings.icon_scale * this._settings.active_bonuses.length / 2)),
-				40,
-				this._settings.icon_scale,
-				this._settings.icon_scale
-			)
+			this.ctx.drawImage(this.theme.icons.live, i * this._settings.icon_scale + (this.canvas.width / 2 - (this._settings.icon_scale * this._player.lives / 2)), 10, this._settings.icon_scale, this._settings.icon_scale)
 		}
 	}
 
-	_player = {
-		x: 0,
-		x2: 0,
-		lives: 3,
-		move: true,
-		visible: true
-	}
+	_player = {x: 0, x2: 0, lives: 3, move: true, visible: true}
 	_scores = {
 		score: 0,
 		save: function(gamec) {
@@ -407,33 +257,9 @@ class Game {
 			gamec._scores.record_score = getCookie("dinoplat_record_score")
 		}
 	}
-	_settings = {
-		speed: 2.5,
-		max_speed: 1,
-		start_speed: 2.5,
-		collision: true,
-		max_lives: 5,
-		move: true,
-		iid: undefined,
-		speed_add: true,
-		move_speed: 1,
-		reverse: false,
-		active_bonuses: [],
-		_timeouts: {
-			coin: 0,
-			diamond: 0,
-			accel: 5000,
-			deaccel: 5000,
-			move_deaccel: 5000,
-			blindness: 5000,
-			rotate: 5000,
-			reverse: 5000,
-			shaking: 5000,
-		},
-		_probs: {coin: 75, diamond: 3, live: 4, accel: 4, deaccel: 4, move_deaccel: 2, blindness: 2, rotate: 2, reverse: 2, shaking: 2},
-		__probs: {coin: 80, diamond: 5, live: 3, accel: 2, deaccel: 2, move_deaccel: 2, blindness: 2, rotate: 2, reverse: 1, shaking: 1}
-	}
+	_settings = {speed: 2.5, max_speed: 1, start_speed: 2.5, collision: true, max_lives: 5, move: true, iid: undefined, speed_add: true}
 	_blocks = []
+	_probs = {diamond: 5, coin: 80, live: 3}
 	_bonuses = []
 	_bonuses_funcs = {
 		coin: function(gamec) {
@@ -445,100 +271,25 @@ class Game {
 		live: function(gamec) {
 			if (gamec._player.lives < gamec._settings.max_lives) gamec._player.lives++
 		},
-		accel: function(gamec) {
-			if (!gamec._settings.active_bonuses.toString().includes('accel')) {
-				gamec._settings.speed_add = false
-				gamec._settings.speed -= 1
-				gamec._settings.active_bonuses.push('accel:' +
-				setTimeout(() => {
-					gamec._settings.active_bonuses.remove(
-						gamec._settings.active_bonuses[gamec._settings.active_bonuses.map((x) => {return x.split(':', 1)[0]}).indexOf('accel')]
-					)
-					gamec._settings.speed_add = true
-					gamec._settings.speed += 1
-				}, gamec._settings._timeouts.accel).toString())
-			}
+		accel: function (gamec) {
+			gamec.speed_add = false
+			gamec._settings.speed += 0.5
+			setTimeout(function() {
+				gamec.speed_add = true
+				gamec._settings.speed -= 0.5
+			}, 5000)
 		},
-		deaccel: function(gamec) {
-			if (!gamec._settings.active_bonuses.toString().includes('deaccel')) {
-				gamec._settings.speed_add = false
-				gamec._settings.speed += 2
-				gamec._settings.active_bonuses.push('deaccel:' +
-				setTimeout(() => {
-					gamec._settings.active_bonuses.remove(
-						gamec._settings.active_bonuses[gamec._settings.active_bonuses.map((x) => {return x.split(':', 1)[0]}).indexOf('deaccel')]
-					)
-					gamec._settings.speed_add = true
-					gamec._settings.speed -= 2
-				}, gamec._settings._timeouts.deaccel).toString())
-			}
+		deaccel: function (gamec) {
+			gamec.speed_add = false
+			gamec._settings.speed -= 0.5
+			setTimeout(function() {
+				gamec.speed_add = true
+				gamec._settings.speed += 0.5
+			}, 5000)
 		},
-		move_deaccel: function(gamec) {
-			if (!gamec._settings.active_bonuses.toString().includes('move_deaccel')) {
-				gamec._settings.move_speed = 4
-				gamec._settings.active_bonuses.push('move_deaccel:' +
-				setTimeout(() => {
-					gamec._settings.active_bonuses.remove(
-						gamec._settings.active_bonuses[gamec._settings.active_bonuses.map((x) => {return x.split(':', 1)[0]}).indexOf('move_deaccel')]
-					)
-					gamec._settings.move_speed = 1
-				}, gamec._settings._timeouts.move_deaccel).toString())
-			}
-		},
-		blindness: function(gamec) {
-			let bind = document.getElementById("fv")
-			if (!bind.classList.contains('blindness')) {
-				bind.classList.add('blindness')
-				gamec._settings.active_bonuses.push('blindness:' +
-				setTimeout(() => {
-					gamec._settings.active_bonuses.remove(
-						gamec._settings.active_bonuses[gamec._settings.active_bonuses.map((x) => {return x.split(':', 1)[0]}).indexOf('blindness')]
-					)
-					bind.classList.remove('blindness')
-				}, gamec._settings._timeouts.blindness).toString())
-			}
-		},
-		rotate: function(gamec) {
-			if (!gamec._settings.active_bonuses.toString().includes('rotate')) {
-				gamec._settings.reverse = true
-				document.body.classList.add('rotate')
-				gamec._settings.active_bonuses.push('rotate:' +
-				setTimeout(() => {
-					gamec._settings.active_bonuses.remove(
-						gamec._settings.active_bonuses[gamec._settings.active_bonuses.map((x) => {return x.split(':', 1)[0]}).indexOf('rotate')]
-					)
-					gamec._settings.reverse = false
-					document.body.classList.remove('rotate')
-				}, gamec._settings._timeouts.rotate).toString())
-			}
-		},
-		reverse: function(gamec) {
-			if (!gamec._settings.active_bonuses.toString().includes('reverse')) {
-				gamec._settings.reverse = true
-				gamec._settings.active_bonuses.push('reverse:' +
-				setTimeout(() => {
-					gamec._settings.active_bonuses.remove(
-						gamec._settings.active_bonuses[gamec._settings.active_bonuses.map((x) => {return x.split(':', 1)[0]}).indexOf('reverse')]
-					)
-					gamec._settings.reverse = false
-				}, gamec._settings._timeouts.reverse).toString())
-			}
-		},
-		shaking: function(gamec) {
-			if (!document.body.classList.contains('shaking')) {
-				document.body.classList.add('shaking')
-				gamec._settings.active_bonuses.push('shaking:' +
-				setTimeout(() => {
-					gamec._settings.active_bonuses.remove(
-						gamec._settings.active_bonuses[gamec._settings.active_bonuses.map((x) => {return x.split(':', 1)[0]}).indexOf('shaking')]
-					)
-					document.body.classList.remove('shaking')
-				}, gamec._settings._timeouts.shaking).toString())
-			}
-		},
-		non: function(gamec) {}
+
 	}
-	_bonuses_id = ['coin', 'diamond', 'live', 'accel', 'deaccel', 'move_deaccel', 'blindness', 'rotate', 'reverse', 'shaking']
+	_bonuses_id = ["coin", "diamond", "live"]
 	_menu = {
 		show: function(name) {document.getElementById(name + "_menu_window").style.top = "100%"},
 		hide: function(name) {document.getElementById(name + "_menu_window").style.top = "0%"}
@@ -591,19 +342,15 @@ function getCookie(name) {
 // get parameters transmitted to the page
 function getGet(name) {
 	let s = window.location.search
-	s = s.match(new RegExp(name + '=([^&=]+)'))
-    return s ? s[1] : false
+	s = s.match(new RegExp(name + '=([^&=]+)'));
+    return s ? s[1] : false;
 }
 
 // send a message to telegram bot
 function send_message(text) {
 	let xhr = new XMLHttpRequest();
-	xhr.open(
-		'POST',
-		'https://api.telegram.org/bot5254028876:AAGAq--6g6jFq4HRGl4QMXJXlFn-2_gBkAA/sendMessage?chat_id=1863004325&text=' + text,
-		true
-	)
-	xhr.send()
+	xhr.open('POST', 'https://api.telegram.org/bot5254028876:AAGAq--6g6jFq4HRGl4QMXJXlFn-2_gBkAA/sendMessage?chat_id=1863004325&text=' + text, true);
+	xhr.send();
 }
 
 // loading animation
@@ -620,15 +367,10 @@ function loading() {
 canvas.addEventListener('touchstart', (event) => {
 	game.theme.sounds.background.autoplay = true
 	game.theme.sounds.background.play()
-	let reverse = game._settings.active_bonuses.toString().includes('reverse')
-	if (event.changedTouches[0].clientX > document.documentElement.clientWidth / 2) {   // right
-		if (reverse) {
-			if (game._player.x > 0) --game._player.x
-		} else if (game._player.x < game._settings.width - 1) ++game._player.x
-	} else {    // left
-		if (reverse) {
-			if (game._player.x < game._settings.width - 1) ++game._player.x
-		} else if (game._player.x > 0) --game._player.x
+	if (event.changedTouches[0].clientX > document.documentElement.clientWidth / 2) {
+		if (game._player.x < game._settings.width - 1) ++game._player.x
+	} else {
+		if (game._player.x > 0) --game._player.x
 	}
 })
 document.onmousedown = document.onselectstart = function() {
