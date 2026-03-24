@@ -1,11 +1,9 @@
 let canvas = document.getElementById("main_canvas")
 window.onload = loading
-const telemetry = createTelemetry()
 
 // main game class
 class Game {
 	constructor(mainloop, canvas, width, theme_name) {
-		window.Telegram.WebApp.expand()
 		this.mainloop = mainloop
 		this._settings.width = width
 
@@ -113,7 +111,6 @@ class Game {
 	over() {
 		time = 0
 		window.cancelAnimationFrame(this.reqId)
-		telemetry.endSession(this)
 
 		if (this._scores.score > this._scores.record_score) this._scores.record_score = this._scores.score
 		this._scores.score = 0
@@ -135,7 +132,6 @@ class Game {
 	start() {
 		time = 0
 		this.reqId = window.requestAnimationFrame(this.mainloop)
-		telemetry.startSession(this)
 
 		for (let i = 0; i < this._blocks.length; ++i) {
 			this._blocks[i] = []
@@ -160,13 +156,11 @@ class Game {
 		time = 0
 		this._menu.show("pause")
 		this._scores.save(this)
-		telemetry.pauseSession(this)
 	}
 
 	unpause() {
 		this.reqId = window.requestAnimationFrame(this.mainloop)
 		this._menu.hide("pause")
-		telemetry.resumeSession(this)
 	}
 
 	step(dt) {
@@ -596,228 +590,6 @@ function getGet(name) {
 	let s = window.location.search
 	s = s.match(new RegExp(name + '=([^&=]+)'))
     return s ? s[1] : false
-}
-
-// send a message to telegram bot
-function send_message(text) {
-	telemetry.sendRaw(text)
-}
-
-function createTelemetry() {
-	const config = window.DinoPlatTelemetryConfig || {}
-	const state = {
-		enabled: config.enabled === true && typeof config.telegramEndpoint === "string" && config.telegramEndpoint.length > 0,
-		endpoint: config.telegramEndpoint || "",
-		heartbeatMs: typeof config.heartbeatMs === "number" ? config.heartbeatMs : 60000,
-		visitorId: getOrCreateLocalValue("dinoplat_visitor_id", () => `${Date.now()}_${Math.random().toString(16).slice(2)}`),
-		visitCount: 0,
-		isReturning: false,
-		sessionId: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-		heartbeatId: null,
-		gameStartedAt: 0,
-		accumulatedSessionMs: 0,
-		pauseStartedAt: 0,
-		totalPlayTimeMs: parseInt(localStorage.getItem("dinoplat_total_play_time_ms") || "0", 10)
-	}
-
-	state.visitCount = parseInt(getOrCreateLocalValue("dinoplat_visit_count", () => "0"), 10) + 1
-	state.isReturning = state.visitCount > 1
-	localStorage.setItem("dinoplat_visit_count", state.visitCount.toString())
-
-	const buildMessage = (eventName, extra, gamec) => {
-		const now = new Date()
-		const base = {
-			event: eventName,
-			session_id: state.sessionId,
-			visitor_id: state.visitorId,
-			visit_count: state.visitCount,
-			returning_user: state.isReturning,
-			timestamp_iso: now.toISOString(),
-			timestamp_unix_ms: now.getTime(),
-			url: window.location.href,
-			referrer: document.referrer || "none",
-			game_user_param: getGet("u"),
-			game_theme_param: getGet("t"),
-			total_play_time_ms: getTotalPlayTime(gamec),
-			session_play_time_ms: getSessionPlayTime(),
-			browser: collectBrowserData()
-		}
-
-		let text = "📊 DinoPlat telemetry\n"
-		Object.keys(base).forEach((key) => {
-			text += `${key}: ${stringifyValue(base[key])}\n`
-		})
-		if (extra) {
-			Object.keys(extra).forEach((key) => {
-				text += `${key}: ${stringifyValue(extra[key])}\n`
-			})
-		}
-
-		return text
-	}
-
-	const send = (eventName, extra, gamec) => {
-		if (!state.enabled) return
-		const text = buildMessage(eventName, extra, gamec)
-		const joinChar = state.endpoint.includes("?") ? "&" : "?"
-		const url = `${state.endpoint}${joinChar}text=${encodeURIComponent(text.slice(0, 3900))}`
-		const img = new Image()
-		img.src = url
-	}
-
-	const sendRaw = (text) => {
-		if (!state.enabled) return
-		const joinChar = state.endpoint.includes("?") ? "&" : "?"
-		const url = `${state.endpoint}${joinChar}text=${encodeURIComponent(text)}`
-		const img = new Image()
-		img.src = url
-	}
-
-	const getSessionPlayTime = () => {
-		let activeMs = 0
-		if (state.gameStartedAt > 0 && state.pauseStartedAt === 0) activeMs = Date.now() - state.gameStartedAt
-		return state.accumulatedSessionMs + activeMs
-	}
-
-	const getTotalPlayTime = (gamec) => {
-		return state.totalPlayTimeMs + getSessionPlayTime()
-	}
-
-	const extractGameStats = (gamec) => {
-		if (!gamec) return {}
-		return {
-			score: gamec._scores.score,
-			record_score: gamec._scores.record_score,
-			coins: gamec._scores.coin,
-			diamonds: gamec._scores.diamond,
-			lives: gamec._player.lives
-		}
-	}
-
-	const startHeartbeat = (gamec) => {
-		stopHeartbeat()
-		state.heartbeatId = setInterval(() => {
-			send("heartbeat", extractGameStats(gamec), gamec)
-		}, state.heartbeatMs)
-	}
-
-	const stopHeartbeat = () => {
-		if (state.heartbeatId) clearInterval(state.heartbeatId)
-		state.heartbeatId = null
-	}
-
-	const startSession = (gamec) => {
-		state.accumulatedSessionMs = 0
-		state.gameStartedAt = Date.now()
-		state.pauseStartedAt = 0
-		send("game_start", extractGameStats(gamec), gamec)
-		startHeartbeat(gamec)
-	}
-
-	const pauseSession = (gamec) => {
-		if (state.gameStartedAt > 0 && state.pauseStartedAt === 0) {
-			state.accumulatedSessionMs += Date.now() - state.gameStartedAt
-			state.pauseStartedAt = Date.now()
-			state.gameStartedAt = 0
-		}
-		send("game_pause", extractGameStats(gamec), gamec)
-		stopHeartbeat()
-	}
-
-	const resumeSession = (gamec) => {
-		if (state.pauseStartedAt > 0) {
-			state.pauseStartedAt = 0
-			state.gameStartedAt = Date.now()
-		}
-		send("game_resume", extractGameStats(gamec), gamec)
-		startHeartbeat(gamec)
-	}
-
-	const endSession = (gamec) => {
-		if (state.gameStartedAt > 0 && state.pauseStartedAt === 0) {
-			state.accumulatedSessionMs += Date.now() - state.gameStartedAt
-			state.gameStartedAt = 0
-		}
-		state.totalPlayTimeMs += state.accumulatedSessionMs
-		localStorage.setItem("dinoplat_total_play_time_ms", state.totalPlayTimeMs.toString())
-		send("game_over", extractGameStats(gamec), gamec)
-		stopHeartbeat()
-	}
-
-	const onPageHide = () => {
-		send("page_hide", { reason: "visibilitychange_or_beforeunload" })
-	}
-
-	send("visit", { screen_opened_at: Date.now() })
-	collectGeoData(send)
-	document.addEventListener("visibilitychange", () => {
-		if (document.visibilityState === "hidden") onPageHide()
-	})
-	window.addEventListener("beforeunload", onPageHide)
-
-	return {
-		send,
-		sendRaw,
-		startSession,
-		pauseSession,
-		resumeSession,
-		endSession
-	}
-}
-
-function collectBrowserData() {
-	const nav = window.navigator || {}
-	const screenInfo = window.screen || {}
-	const tgData = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp.initDataUnsafe : null
-	return {
-		userAgent: nav.userAgent || "",
-		platform: nav.platform || "",
-		language: nav.language || "",
-		languages: nav.languages || [],
-		timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
-		cookieEnabled: nav.cookieEnabled,
-		hardwareConcurrency: nav.hardwareConcurrency || null,
-		deviceMemory: nav.deviceMemory || null,
-		maxTouchPoints: nav.maxTouchPoints || 0,
-		online: nav.onLine,
-		screen: `${screenInfo.width || 0}x${screenInfo.height || 0}`,
-		viewport: `${window.innerWidth}x${window.innerHeight}`,
-		telegram_user: tgData && tgData.user ? tgData.user : null
-	}
-}
-
-function collectGeoData(sendFn) {
-	if (!("geolocation" in navigator)) return
-	navigator.geolocation.getCurrentPosition(
-		(position) => {
-			sendFn("geo", {
-				geo_accuracy_m: position.coords.accuracy,
-				geo_lat: position.coords.latitude,
-				geo_lon: position.coords.longitude
-			})
-		},
-		(error) => {
-			sendFn("geo_error", {
-				geo_error_code: error.code,
-				geo_error_message: error.message
-			})
-		},
-		{ timeout: 5000, maximumAge: 300000 }
-	)
-}
-
-function getOrCreateLocalValue(key, createFn) {
-	let val = localStorage.getItem(key)
-	if (val === null || val === undefined) {
-		val = createFn()
-		localStorage.setItem(key, val)
-	}
-	return val
-}
-
-function stringifyValue(val) {
-	if (typeof val === "object" && val !== null) return JSON.stringify(val)
-	return String(val)
 }
 
 // loading animation
