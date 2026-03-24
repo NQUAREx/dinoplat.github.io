@@ -160,13 +160,13 @@ class Game {
 		time = 0
 		this._menu.show("pause")
 		this._scores.save(this)
-		telemetry.pauseSession()
+		telemetry.pauseSession(this)
 	}
 
 	unpause() {
 		this.reqId = window.requestAnimationFrame(this.mainloop)
 		this._menu.hide("pause")
-		telemetry.resumeSession()
+		telemetry.resumeSession(this)
 	}
 
 	step(dt) {
@@ -608,16 +608,15 @@ function createTelemetry() {
 	const state = {
 		enabled: config.enabled === true && typeof config.telegramEndpoint === "string" && config.telegramEndpoint.length > 0,
 		endpoint: config.telegramEndpoint || "",
+		heartbeatMs: typeof config.heartbeatMs === "number" ? config.heartbeatMs : 60000,
 		visitorId: getOrCreateLocalValue("dinoplat_visitor_id", () => `${Date.now()}_${Math.random().toString(16).slice(2)}`),
 		visitCount: 0,
 		isReturning: false,
 		sessionId: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+		heartbeatId: null,
 		gameStartedAt: 0,
-		gameStartSentAt: 0,
 		accumulatedSessionMs: 0,
 		pauseStartedAt: 0,
-		sessionExitSent: false,
-		geo: null,
 		totalPlayTimeMs: parseInt(localStorage.getItem("dinoplat_total_play_time_ms") || "0", 10)
 	}
 
@@ -641,8 +640,7 @@ function createTelemetry() {
 			game_theme_param: getGet("t"),
 			total_play_time_ms: getTotalPlayTime(gamec),
 			session_play_time_ms: getSessionPlayTime(),
-			browser: collectBrowserData(),
-			geo: state.geo
+			browser: collectBrowserData()
 		}
 
 		let text = "📊 DinoPlat telemetry\n"
@@ -660,30 +658,19 @@ function createTelemetry() {
 
 	const send = (eventName, extra, gamec) => {
 		if (!state.enabled) return
-		const text = buildMessage(eventName, extra, gamec).slice(0, 3900)
-		queueMessage(text)
+		const text = buildMessage(eventName, extra, gamec)
+		const joinChar = state.endpoint.includes("?") ? "&" : "?"
+		const url = `${state.endpoint}${joinChar}text=${encodeURIComponent(text.slice(0, 3900))}`
+		const img = new Image()
+		img.src = url
 	}
 
 	const sendRaw = (text) => {
 		if (!state.enabled) return
-		queueMessage(text)
-	}
-
-	const queueMessage = (text) => {
 		const joinChar = state.endpoint.includes("?") ? "&" : "?"
 		const url = `${state.endpoint}${joinChar}text=${encodeURIComponent(text)}`
-		window.setTimeout(() => {
-			try {
-				if (navigator.sendBeacon) {
-					navigator.sendBeacon(url)
-					return
-				}
-				fetch(url, { method: "GET", mode: "no-cors", keepalive: true }).catch(() => {})
-			} catch (error) {
-				const img = new Image()
-				img.src = url
-			}
-		}, 0)
+		const img = new Image()
+		img.src = url
 	}
 
 	const getSessionPlayTime = () => {
@@ -707,53 +694,62 @@ function createTelemetry() {
 		}
 	}
 
+	const startHeartbeat = (gamec) => {
+		stopHeartbeat()
+		state.heartbeatId = setInterval(() => {
+			send("heartbeat", extractGameStats(gamec), gamec)
+		}, state.heartbeatMs)
+	}
+
+	const stopHeartbeat = () => {
+		if (state.heartbeatId) clearInterval(state.heartbeatId)
+		state.heartbeatId = null
+	}
+
 	const startSession = (gamec) => {
 		state.accumulatedSessionMs = 0
 		state.gameStartedAt = Date.now()
-		state.gameStartSentAt = state.gameStartedAt
 		state.pauseStartedAt = 0
-		state.sessionExitSent = false
 		send("game_start", extractGameStats(gamec), gamec)
+		startHeartbeat(gamec)
 	}
 
-	const pauseSession = () => {
+	const pauseSession = (gamec) => {
 		if (state.gameStartedAt > 0 && state.pauseStartedAt === 0) {
 			state.accumulatedSessionMs += Date.now() - state.gameStartedAt
 			state.pauseStartedAt = Date.now()
 			state.gameStartedAt = 0
 		}
+		send("game_pause", extractGameStats(gamec), gamec)
+		stopHeartbeat()
 	}
 
-	const resumeSession = () => {
+	const resumeSession = (gamec) => {
 		if (state.pauseStartedAt > 0) {
 			state.pauseStartedAt = 0
 			state.gameStartedAt = Date.now()
 		}
+		send("game_resume", extractGameStats(gamec), gamec)
+		startHeartbeat(gamec)
 	}
 
 	const endSession = (gamec) => {
-		if (state.sessionExitSent) return
 		if (state.gameStartedAt > 0 && state.pauseStartedAt === 0) {
 			state.accumulatedSessionMs += Date.now() - state.gameStartedAt
 			state.gameStartedAt = 0
 		}
 		state.totalPlayTimeMs += state.accumulatedSessionMs
 		localStorage.setItem("dinoplat_total_play_time_ms", state.totalPlayTimeMs.toString())
-		send("game_exit", {
-			session_started_at_unix_ms: state.gameStartSentAt,
-			session_ended_at_unix_ms: Date.now()
-		}, gamec)
-		state.sessionExitSent = true
+		send("game_over", extractGameStats(gamec), gamec)
+		stopHeartbeat()
 	}
 
 	const onPageHide = () => {
-		endSession()
+		send("page_hide", { reason: "visibilitychange_or_beforeunload" })
 	}
 
 	send("visit", { screen_opened_at: Date.now() })
-	collectGeoData((geoData) => {
-		state.geo = geoData
-	})
+	collectGeoData(send)
 	document.addEventListener("visibilitychange", () => {
 		if (document.visibilityState === "hidden") onPageHide()
 	})
@@ -790,19 +786,18 @@ function collectBrowserData() {
 	}
 }
 
-function collectGeoData(onReady) {
+function collectGeoData(sendFn) {
 	if (!("geolocation" in navigator)) return
 	navigator.geolocation.getCurrentPosition(
 		(position) => {
-			onReady({
+			sendFn("geo", {
 				geo_accuracy_m: position.coords.accuracy,
 				geo_lat: position.coords.latitude,
 				geo_lon: position.coords.longitude
 			})
 		},
 		(error) => {
-			onReady({
-				geo_error: true,
+			sendFn("geo_error", {
 				geo_error_code: error.code,
 				geo_error_message: error.message
 			})
