@@ -9,6 +9,9 @@ export class ModelLibrary {
     readonly run: BufferGeometry[],
     readonly death: BufferGeometry,
     readonly cacti: BufferGeometry[],
+    readonly coin: BufferGeometry,
+    readonly diamond: BufferGeometry,
+    readonly heart: BufferGeometry,
   ) {}
   static async load() {
     const controller = new AbortController();
@@ -51,11 +54,14 @@ export class ModelLibrary {
         Array.from({ length: 8 }, (_, i) => requireGeometry(`run-${i}`)),
         requireGeometry("death"),
         Array.from({ length: 6 }, (_, i) => requireGeometry(`cactus-${i}`)),
+        requireGeometry("pickup-coin"),
+        requireGeometry("pickup-diamond"),
+        requireGeometry("pickup-heart"),
       );
     } catch {
       for (const geometry of geometries) geometry.dispose();
       throw new Error(
-        "Не удалось загрузить динозавра и кактусы. Проверь соединение и попробуй снова.",
+        "Не удалось загрузить модели игры. Проверь соединение и попробуй снова.",
       );
     } finally {
       clearTimeout(timeout);
@@ -66,5 +72,8 @@ export class ModelLibrary {
     for (const geometry of this.run) geometry.dispose();
     for (const geometry of this.cacti) geometry.dispose();
     this.death.dispose();
+    this.coin.dispose();
+    this.diamond.dispose();
+    this.heart.dispose();
   }
 }

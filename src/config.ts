@@ -8,11 +8,14 @@ export class Rules {
   static readonly cactusScale = 2;
   static readonly chunkSize = 16;
   static readonly candidatesPerChunk = 6;
+  static readonly pickupsPerChunk = 4;
+  static readonly slotsPerChunk =
+    Rules.candidatesPerChunk + Rules.pickupsPerChunk;
   static readonly firstRow = 28;
   static readonly rowSlots = 9;
   static readonly maxColumns = 13;
   static readonly poolSize =
-    Rules.rowSlots * Rules.maxColumns * Rules.candidatesPerChunk;
+    Rules.rowSlots * Rules.maxColumns * Rules.slotsPerChunk;
   static readonly playerRadius = 0.32;
   static readonly playerBodyHeight = 1.3;
   static readonly duckBodyHeight = 0.65;

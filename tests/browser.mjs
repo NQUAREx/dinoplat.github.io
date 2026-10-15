@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { checkCollectibles } from "./collectibles-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -63,6 +64,11 @@ try {
   assert.equal(await desktop.locator("#mobile-required").isVisible(), true);
   await desktop.close();
   const context = await browser.newContext(phone);
+  report.collectibles = await checkCollectibles(
+    context,
+    url,
+    "chromium-browser",
+  );
   const page = await context.newPage();
   await page.addInitScript(() => {
     window.vibrationCalls = [];
@@ -267,6 +273,7 @@ try {
         g.world.halfX[i] = 0.55;
         g.world.halfZ[i] = 0.55;
         g.world.height[i] = 1.55;
+        g.world.baseY[i] = 0;
       }
       r.render();
     }
@@ -275,13 +282,32 @@ try {
     g.phase = "paused";
   });
   await page.screenshot({ path: "test-results/cactus-variants.png" });
+  // Warm all new banks, including the very rare heart, before memory checks.
+  await page.evaluate(() => {
+    const r = window.__runner,
+      g = r.game;
+    for (let i = 0; i < 3; i++) {
+      g.world.active[i] = 1;
+      g.world.kinds[i] = [1, 2, 5][i];
+      g.world.variants[i] = 0;
+      g.world.x[i] = (i - 1) * 2;
+      g.world.z[i] = g.distance + 4;
+      g.world.baseY[i] = 0.5;
+    }
+    r.render();
+  });
   // The visible cactus behind the old -4m cutoff is not discarded.
   await page.evaluate(() => {
     const r = window.__runner,
       g = r.game;
     g.world.active.fill(0);
     g.world.active[0] = 1;
+    g.world.kinds[0] = 0;
     g.world.variants[0] = 1;
+    g.world.baseY[0] = 0;
+    g.world.height[0] = 3.1;
+    g.world.halfX[0] = 0.96;
+    g.world.halfZ[0] = 0.3;
     g.world.x[0] = g.x;
     g.world.z[0] = g.distance - 4.5;
     document.querySelector("#overlay").hidden = true;
@@ -290,6 +316,10 @@ try {
   assert.equal(
     await page.evaluate(() => window.__runner.stats().nearestRenderedForward),
     -4.5,
+  );
+  assert.equal(
+    await page.evaluate(() => window.__runner.stats().visibleObstacles),
+    1,
   );
   await page.screenshot({ path: "test-results/trailing-cactus.png" });
   // Floating GPU origin remains bounded after huge lateral/forward travel.
@@ -544,7 +574,7 @@ try {
   });
   assert.equal(report.performance.failed, undefined);
   assert.equal(report.performance.lives, 3);
-  assert.ok(report.performance.calls <= 15);
+  assert.ok(report.performance.calls <= 18);
   await page.screenshot({ path: "test-results/animated-run.png" });
   await page.evaluate(() => {
     const gl = document.querySelector("#game").getContext("webgl2");

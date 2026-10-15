@@ -98,15 +98,16 @@ test("2D cell pool is bounded, deterministic after reentry, and generates both a
         left ||= pool.x[slot] < x;
         right ||= pool.x[slot] > x;
         variants |= 1 << pool.variants[slot];
-        assert.equal(
-          pool.isRouteClear(
-            pool.x[slot],
-            pool.z[slot],
-            pool.halfX[slot],
-            pool.halfZ[slot],
-          ),
-          false,
-        );
+        if (pool.registry.get(pool.kinds[slot])!.blocking)
+          assert.equal(
+            pool.isRouteClear(
+              pool.x[slot],
+              pool.z[slot],
+              pool.halfX[slot],
+              pool.halfZ[slot],
+            ),
+            false,
+          );
         assert.notEqual(pool.x[slot] % Rules.chunkSize, 0);
         assert.notEqual(pool.z[slot] % Rules.chunkSize, 0);
       }
@@ -137,6 +138,8 @@ test("continuous safe routes have bounded slope across unbounded X", () => {
 test("100 seeds: safe route survives 5 minutes at max speed with 300ms reaction and all 3 lives", () => {
   for (let seed = 1; seed <= 100; seed++) {
     const game = new Simulation(seed);
+    let hits = 0;
+    game.events.on(GameEvent.Hit, () => hits++);
     game.phase = "running";
     game.distance = 2000;
     game.x = game.previousX = game.world.safeCenter(game.distance);
@@ -149,6 +152,11 @@ test("100 seeds: safe route survives 5 minutes at max speed with 300ms reaction 
       game.step(STEP);
       assert.equal(game.health.lives, 3, `seed ${seed}, step ${n}`);
     }
+    assert.equal(
+      hits,
+      0,
+      `hearts must not mask route collisions for seed ${seed}`,
+    );
   }
 });
 test("swept cactus collision works at arbitrary positive and negative world coordinates", () => {
@@ -280,7 +288,7 @@ test("hit gives exactly two seconds of immunity and temporary start speed, then 
   game.step(STEP);
   assert.equal(game.health.lives, 1);
 });
-test("wallet/bonuses/registry are extension points; pickups and destruction are not enabled", () => {
+test("wallet/bonuses/registry remain extensible; only requested pickups are enabled", () => {
   const events = new GameEvents(),
     wallet = new Wallet(events),
     bonuses = new BonusSystem(events);
@@ -296,13 +304,11 @@ test("wallet/bonuses/registry are extension points; pickups and destruction are 
   assert.equal(bonuses.shield, false);
   assert.equal(bonuses.speedFactor, 1);
   const registry = ObjectRegistry.defaults();
-  for (const kind of [
-    ObjectKind.Coin,
-    ObjectKind.Diamond,
-    ObjectKind.Bonus,
-    ObjectKind.Enemy,
-  ])
+  for (const kind of [ObjectKind.Bonus, ObjectKind.Enemy])
     assert.equal(registry.get(kind)?.weight, 0);
+  assert.equal(registry.get(ObjectKind.Coin)?.weight, 250);
+  assert.equal(registry.get(ObjectKind.Diamond)?.weight, 10);
+  assert.equal(registry.get(ObjectKind.Heart)?.weight, 1);
   assert.equal(registry.get(ObjectKind.Cactus)?.destruction, undefined);
 });
 test("registered pickups/bonuses flow through the same pool and speed stays within route budget", () => {

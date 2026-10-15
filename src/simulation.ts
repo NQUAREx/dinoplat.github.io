@@ -3,6 +3,7 @@ import { GameEvent, GameEvents } from "./events";
 import { BonusSystem, Currency, Health, Wallet } from "./progression";
 import { ObjectKind, ObjectRegistry, WorldSpawner } from "./world";
 import { Terrain } from "./terrain";
+import { PickupMotion } from "./pickup-motion";
 
 export type Phase = "ready" | "running" | "paused" | "over";
 export const STEP = Rules.step;
@@ -14,6 +15,7 @@ export class Simulation {
   readonly terrain = new Terrain();
   readonly wallet = new Wallet(this.events);
   readonly health = new Health(this.events);
+  readonly pickupMotion = new PickupMotion();
   readonly bonuses = new BonusSystem(this.events);
   readonly world: WorldSpawner;
   phase: Phase = "ready";
@@ -35,6 +37,8 @@ export class Simulation {
   previousDistance = 0;
   speed = Rules.startSpeed;
   time = 0;
+  previousTime = 0;
+  private previousBob = 0;
   private nextStep = 0;
   constructor(seed = 1, registry = ObjectRegistry.defaults()) {
     this.world = new WorldSpawner(registry);
@@ -46,6 +50,8 @@ export class Simulation {
     this.x = this.previousX = this.y = this.previousY = 0;
     this.heading = this.previousHeading = this.movingX = this.steering = 0;
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
+    this.previousTime = this.previousBob = 0;
+    this.pickupMotion.update(0);
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
     this.speed = Rules.startSpeed;
@@ -92,7 +98,10 @@ export class Simulation {
     this.previousCrouch = this.crouch;
     this.previousHeading = this.heading;
     this.previousDistance = this.distance;
+    this.previousTime = this.time;
+    this.previousBob = this.pickupMotion.bob;
     this.time += dt;
+    this.pickupMotion.update(this.time);
     this.health.step(dt);
     this.bonuses.step(dt);
     const ducking = this.crouchRemaining > 0;
@@ -185,9 +194,17 @@ export class Simulation {
       const top = this.y + this.bodyHeight;
       const topEnter = previousTop + (top - previousTop) * enter;
       const topLeave = previousTop + (top - previousTop) * leave;
+      const animated = definition.animation === "spin-bob";
+      const bobEnter = animated
+        ? this.previousBob + (this.pickupMotion.bob - this.previousBob) * enter
+        : 0;
+      const bobLeave = animated
+        ? this.previousBob + (this.pickupMotion.bob - this.previousBob) * leave
+        : 0;
       if (
-        Math.min(yEnter, yLeave) >= pool.baseY[i] + pool.height[i] ||
-        Math.max(topEnter, topLeave) <= pool.baseY[i]
+        Math.min(yEnter - bobEnter, yLeave - bobLeave) >=
+          pool.baseY[i] + pool.height[i] ||
+        Math.max(topEnter - bobEnter, topLeave - bobLeave) <= pool.baseY[i]
       )
         continue;
       if (definition.blocking) {
@@ -204,6 +221,8 @@ export class Simulation {
           this.wallet.add(Currency.Coin, definition.reward ?? 1);
         else if (definition.kind === ObjectKind.Diamond)
           this.wallet.add(Currency.Diamond, definition.reward ?? 1);
+        else if (definition.healing !== undefined)
+          this.health.heal(definition.healing);
         else if (
           definition.kind === ObjectKind.Bonus &&
           definition.bonusId !== undefined

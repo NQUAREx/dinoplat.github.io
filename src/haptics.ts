@@ -20,6 +20,7 @@ export class Haptics {
       events.on(GameEvent.Hit, () => this.play(this.patterns.hit)),
       events.on(GameEvent.Death, () => this.play(this.patterns.death, true)),
       events.on(GameEvent.Pickup, () => this.play(this.patterns.pickup)),
+      events.on(GameEvent.Heal, () => this.play(this.patterns.bonus)),
       events.on(GameEvent.BonusChanged, () => this.play(this.patterns.bonus)),
     ];
   }

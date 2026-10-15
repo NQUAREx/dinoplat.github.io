@@ -28,7 +28,7 @@ class VoxelModel {
     if (buffer.toString("ascii", 0, 4) !== "VOX ")
       throw new Error("Invalid VOX");
     this.palette = new Uint32Array(256);
-    for (let offset = 8; offset + 12 <= buffer.length; ) {
+    for (let offset = 8; offset + 12 <= buffer.length;) {
       const id = buffer.toString("ascii", offset, offset + 4),
         length = buffer.readUInt32LE(offset + 4),
         start = offset + 12;
@@ -102,7 +102,7 @@ class VoxelModel {
             mask[p[v] * width + p[u]] = a && b ? 0 : a ? a : -b;
           }
         for (let j = 0; j < rows; j++)
-          for (let i = 0; i < width; ) {
+          for (let i = 0; i < width;) {
             const value = mask[j * width + i];
             if (!value) {
               i++;
@@ -193,6 +193,9 @@ class ModelBuilder {
         [1.15, 1.55, 1.05, 1.15, 1.55, 1.05][i],
         false,
       ]),
+      ["../collectibles/coin", "pickup-coin", 0.75, false],
+      ["../collectibles/diamond", "pickup-diamond", 0.7, false],
+      ["../collectibles/heart", "pickup-heart", 0.7, false],
     ];
     const colliders = [];
     for (const [file, name, height, dinosaur] of entries) {
@@ -203,7 +206,7 @@ class ModelBuilder {
         mesh = new Mesh(geometry, material);
       mesh.name = name;
       scene.add(mesh);
-      if (!dinosaur) {
+      if (name.startsWith("cactus-")) {
         const b = geometry.boundingBox;
         colliders.push({
           halfX: +b.max.x.toFixed(5),

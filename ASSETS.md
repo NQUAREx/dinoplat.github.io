@@ -8,7 +8,7 @@ All runtime assets are local static files, with no third-party CDN requests.
 - The project owner explicitly approved distributing DinoPlat3d under compatible GPLv3 terms. The menu links the licence/source and states the lack of warranty.
 - Original preferred editable files are preserved in `art/reference-models/t-rex/` (0–7.vox and death.vox, upstream other/wow.vox) and `art/reference-models/cactus/` (six upstream cactus/fcactus variants). The original author used MagicaVoxel. No upstream game code, old Three.js, Howler, vox.js or Nebula is included in this game.
 - Modified adaptation by DinoPlat3d, 2026-10-15: original `tools/build-reference-models.mjs` reads VOX, emits only exposed coloured surfaces, greedily merges coplanar same-colour faces, indexes shared vertices, stores normalized vertex colours and converts axes/scales for our rear camera.
-- Runtime: `src/assets/voxel-models.glb`, **595 972 bytes**, 15 meshes: eight running poses, one death pose, six cactus variants. 550–830 triangles per model; no images, texture maps, skeleton, Draco/KTX decoders or runtime VOX parser. Source editable geometry stays in the repo, not in dist.
+- Runtime: `src/assets/voxel-models.glb`, **736 084 bytes**, 18 meshes: eight running poses, one death pose, six cactus variants and three project-authored pickups described below. Original reference models remain 550–830 triangles each; no images, texture maps, skeleton, Draco/KTX decoders or runtime VOX parser. Source editable geometry stays in the repo, not in dist.
 - Run/jump/death integration and foot dust are written for this project. Running swaps cached poses; jumping chooses takeoff/falling poses, with height controlled by our simulation; foot dust uses one fixed instanced pool. Upstream animation/gameplay implementation is not copied.
 - `src/assets/model-colliders.json` is regenerated with the model library and holds normalized variant bounds. Cactus yaw is included in collision extents. The retired hand-made Blender dinosaur, GLB and generator were removed from the current tree; history retains them.
 
@@ -27,6 +27,13 @@ All runtime assets are local static files, with no third-party CDN requests.
 - User-owned original repository: https://github.com/NQUAREx/dinoplat.github.io/tree/main/resources/images/icons . Requested icons: coin.png, diamond.png, live.png, record.png, pause.png. No changes are published to the original repository.
 - Original PNGs are preserved in `art/hud-icons/`; optimized runtime copies are under `src/assets/icons/`. `npm run icons:build` nearest-resizes them to at most 32×32 and strips metadata. In particular, the original 1600×1600 pause icon is not decoded at that size during gameplay.
 - These are supplied from the user's project at their request; no unverified third-party licence is claimed. The distance footsteps SVG and menu mascot are project-authored. DOM images/SVGs are not WebGL texture objects.
+
+## Project-authored voxel collectibles
+
+- Generated for this project from the user-owned HUD coin/diamond/heart silhouettes and palettes, not downloaded third-party models. Editable MagicaVoxel sources: `art/collectibles/coin.vox`, `diamond.vox`, `heart.vox`. Distributed with the project under GPLv3; original icon rights remain as noted above.
+- Original authoring tool `tools/build-collectibles.mjs` samples 17×15, 18×15 and 18×16 pixels with nearest filtering, quantizes to five/six saturated icon colours and builds solid cubic voxels with a two-step bevel and five-cell central thickness. Both faces retain the icon colours. These are real volumes (819/665/696 voxels), not textured extruded image planes.
+- `npm run collectibles:build` uses offline ImageMagick, writes VOX files and runs the existing colour-aware greedy mesher/GLB builder. The runtime does not load source PNG/VOX files or require modelling software. The GLB contains `pickup-coin`, `pickup-diamond`, `pickup-heart`: **748/900/800 triangles**, heights **0.75/0.7/0.7m**. Removed internal faces, indexed vertices, vertex colours, one shared opaque material and three bounded instanced banks; no new texture maps or animation clips.
+- Rotation/bobbing is project-authored numerical animation, with one shared phase for all items, driven by simulation time and interpolated for rendering. Pickup colliders conservatively cover every yaw; bob is included in vertical collision and culling.
 
 ## Home-screen app icons
 

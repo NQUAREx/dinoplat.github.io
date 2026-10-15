@@ -114,6 +114,14 @@ export class Health {
   lives = 3;
   immunity = 0;
   constructor(private readonly events: GameEvents) {}
+  heal(amount = 1) {
+    if (!Number.isSafeInteger(amount) || amount <= 0)
+      throw new Error("Healing must be a positive safe integer");
+    if (this.lives <= 0 || this.lives >= 3) return false;
+    this.lives = Math.min(3, this.lives + amount);
+    this.events.emit(GameEvent.Heal, this.lives);
+    return true;
+  }
   damage() {
     if (this.immunity > 0 || this.lives <= 0) return false;
     this.lives--;

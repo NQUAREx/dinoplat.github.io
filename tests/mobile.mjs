@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { checkCollectibles } from "./collectibles-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -395,6 +396,11 @@ try {
         errors,
       };
       results[engine].lighting = await checkLighting(context, engine);
+      results[engine].collectibles = await checkCollectibles(
+        context,
+        url,
+        engine,
+      );
       // iPhone-like missing Fullscreen API and denied embedded/fullscreen policy.
       for (const mode of ["missing", "denied", "standalone"]) {
         const fallback = await context.newPage();

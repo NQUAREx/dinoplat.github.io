@@ -12,6 +12,7 @@ import type { ModelLibrary } from "./models";
 import { LightingRig } from "./lighting";
 import { RenderPose } from "./render-pose";
 import { CactusShadows } from "./shadows";
+import { PickupMotion } from "./pickup-motion";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
@@ -19,6 +20,7 @@ export class View {
   readonly rig: CameraRig;
   readonly lighting = new LightingRig();
   private readonly pose = new RenderPose();
+  private readonly pickupMotion = new PickupMotion();
   private readonly shadows: CactusShadows;
   private readonly scene = new THREE.Scene();
   private readonly ground: Ground;
@@ -27,6 +29,14 @@ export class View {
   private readonly cactusMaterial = new THREE.MeshLambertMaterial({
     vertexColors: true,
     flatShading: true,
+  });
+  // Palette is the HUD palette, with just a little self-emission for night
+  // readability. One opaque vertex-colour material shared by all three types.
+  private readonly pickupMaterial = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.025,
   });
   private readonly objectRenderers = new ObjectRendererRegistry();
   private readonly visibility = new ObjectVisibility();
@@ -79,6 +89,21 @@ export class View {
       ObjectKind.Cactus,
       models.cacti,
       this.cactusMaterial,
+    );
+    this.registerObjectType(
+      ObjectKind.Coin,
+      [models.coin],
+      this.pickupMaterial,
+    );
+    this.registerObjectType(
+      ObjectKind.Diamond,
+      [models.diamond],
+      this.pickupMaterial,
+    );
+    this.registerObjectType(
+      ObjectKind.Heart,
+      [models.heart],
+      this.pickupMaterial,
     );
     this.scene.add(this.ground.mesh, this.dinosaur.mesh, this.dust.mesh);
     this.shadows = new CactusShadows(models.cacti, this.ground, this.scene);
@@ -197,12 +222,18 @@ export class View {
     this.nearestRenderedForward = Infinity;
     this.maximumRelativeX = 0;
     const world = game.world;
+    this.pickupMotion.update(
+      game.previousTime + (game.time - game.previousTime) * alpha,
+    );
     for (let i = 0; i < world.active.length; i++) {
       if (!world.active[i]) continue;
       const renderer = this.objectRenderers.get(world.kinds[i]);
       if (!renderer) continue;
       const x = world.x[i] - this.pose.x,
         forward = world.z[i] - this.pose.distance;
+      const animated =
+        world.registry.get(world.kinds[i])?.animation === "spin-bob";
+      const y = world.baseY[i] + (animated ? this.pickupMotion.bob : 0);
       if (
         this.lighting.shadowStrength > 0.001 &&
         world.kinds[i] === ObjectKind.Cactus
@@ -226,7 +257,7 @@ export class View {
           world.halfX[i],
           world.halfZ[i],
           world.height[i],
-          world.baseY[i],
+          y,
         )
       )
         continue;
@@ -234,8 +265,8 @@ export class View {
         world.variants[i],
         x,
         -forward,
-        world.angles[i],
-        world.baseY[i],
+        animated ? this.pickupMotion.angle : world.angles[i],
+        y,
       );
       this.nearestRenderedForward = Math.min(
         this.nearestRenderedForward,
@@ -274,7 +305,13 @@ export class View {
       boundaryCount: 0,
       obstacleVariants: this.models.cacti.length,
       obstacleCapacity: Rules.poolSize,
-      visibleObstacles: this.objectRenderers.visible,
+      visibleCoins: this.objectRenderers.get(ObjectKind.Coin)!.visible,
+      visibleDiamonds: this.objectRenderers.get(ObjectKind.Diamond)!.visible,
+      visibleHearts: this.objectRenderers.get(ObjectKind.Heart)!.visible,
+      pickupAngle: this.pickupMotion.angle,
+      pickupBob: this.pickupMotion.bob,
+      visibleObstacles: this.objectRenderers.get(ObjectKind.Cactus)!.visible,
+      visibleObjects: this.objectRenderers.visible,
       nearestRenderedForward: this.nearestRenderedForward,
       maximumRelativeX: this.maximumRelativeX,
       playerFrame: this.dinosaur.frame,
@@ -297,6 +334,7 @@ export class View {
     this.objectRenderers.dispose();
     this.shadows.dispose();
     this.cactusMaterial.dispose();
+    this.pickupMaterial.dispose();
     this.dinosaur.dispose();
     this.dust.dispose();
     this.ground.dispose();

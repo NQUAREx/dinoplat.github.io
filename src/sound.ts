@@ -14,6 +14,7 @@ export class GameSound {
       events.on(GameEvent.Hit, () => this.play(180, 70, 0.18)),
       events.on(GameEvent.Death, () => this.play(240, 45, 0.35)),
       events.on(GameEvent.Pickup, () => this.play(900, 1400, 0.08)),
+      events.on(GameEvent.Heal, () => this.play(680, 1350, 0.16)),
     ];
   }
   unlock() {

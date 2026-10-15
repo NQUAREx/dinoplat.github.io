@@ -7,6 +7,7 @@ export enum ObjectKind {
   Diamond,
   Bonus,
   Enemy,
+  Heart,
 }
 export interface ColliderDefinition {
   readonly baseY?: number;
@@ -26,6 +27,9 @@ export interface ObjectDefinition {
   readonly colliders: readonly ColliderDefinition[];
   readonly reward?: number;
   readonly bonusId?: number;
+  readonly healing?: number;
+  readonly spawnGroup?: "pickup";
+  readonly animation?: "spin-bob";
   readonly destruction?: DestructionDefinition;
 }
 
@@ -33,6 +37,7 @@ export class ObjectRegistry {
   private readonly definitions: ObjectDefinition[] = [];
   private readonly byKind = new Map<ObjectKind, ObjectDefinition>();
   private totalWeight = 0;
+  private pickupWeight = 0;
   register(definition: ObjectDefinition) {
     if (
       this.byKind.has(definition.kind) ||
@@ -41,6 +46,9 @@ export class ObjectRegistry {
       definition.kind > 255 ||
       !Number.isFinite(definition.weight) ||
       definition.weight < 0 ||
+      (definition.healing !== undefined &&
+        (!Number.isSafeInteger(definition.healing) ||
+          definition.healing <= 0)) ||
       !definition.colliders.length ||
       definition.colliders.length > 256 ||
       definition.colliders.some(
@@ -63,14 +71,16 @@ export class ObjectRegistry {
     });
     this.definitions.push(entry);
     this.byKind.set(entry.kind, entry);
-    this.totalWeight += entry.weight;
+    if (entry.spawnGroup === "pickup") this.pickupWeight += entry.weight;
+    else this.totalWeight += entry.weight;
   }
   get(kind: ObjectKind) {
     return this.byKind.get(kind);
   }
-  pick(random: number) {
-    let value = random * this.totalWeight;
+  pick(random: number, pickup = false) {
+    let value = random * (pickup ? this.pickupWeight : this.totalWeight);
     for (const definition of this.definitions) {
+      if ((definition.spawnGroup === "pickup") !== pickup) continue;
       if (!definition.weight) continue;
       value -= definition.weight;
       if (value < 0) return definition;
@@ -89,20 +99,34 @@ export class ObjectRegistry {
         height: b.height * Rules.cactusScale,
       })),
     });
-    const pickup = [{ halfX: 0.25, halfZ: 0.25, height: 0.6 }];
+    // Rotation-invariant envelope for all authored voxel models and bobbing.
+    const pickup = [{ halfX: 0.46, halfZ: 0.46, height: 0.75, baseY: 0.5 }];
     registry.register({
       kind: ObjectKind.Coin,
-      weight: 0,
+      weight: 250,
       blocking: false,
       colliders: pickup,
       reward: 1,
+      spawnGroup: "pickup",
+      animation: "spin-bob",
     });
     registry.register({
       kind: ObjectKind.Diamond,
-      weight: 0,
+      weight: 10,
       blocking: false,
       colliders: pickup,
       reward: 1,
+      spawnGroup: "pickup",
+      animation: "spin-bob",
+    });
+    registry.register({
+      kind: ObjectKind.Heart,
+      weight: 1,
+      blocking: false,
+      colliders: pickup,
+      healing: 1,
+      spawnGroup: "pickup",
+      animation: "spin-bob",
     });
     registry.register({
       kind: ObjectKind.Bonus,
@@ -210,14 +234,10 @@ export class WorldSpawner {
         const first =
           (GridMath.mod(row, Rules.rowSlots) * Rules.maxColumns +
             GridMath.mod(column, Rules.maxColumns)) *
-          Rules.candidatesPerChunk;
+          Rules.slotsPerChunk;
         if (this.columns[first] === column && this.rows[first] === row)
           continue;
-        for (
-          let candidate = 0;
-          candidate < Rules.candidatesPerChunk;
-          candidate++
-        )
+        for (let candidate = 0; candidate < Rules.slotsPerChunk; candidate++)
           this.populate(first + candidate, column, row, candidate);
       }
     this.revision++;
@@ -232,6 +252,7 @@ export class WorldSpawner {
     this.rows[slot] = row;
     this.active[slot] = 0;
     this.generated++;
+    const pickup = candidate >= Rules.candidatesPerChunk;
     const x =
       (column + this.random(column, row, candidate, 0x311a)) * Rules.chunkSize;
     const z =
@@ -240,13 +261,14 @@ export class WorldSpawner {
     // World-distance-based acceptance stays deterministic through slowdown/reentry.
     const speed = Math.min(Rules.maxSpeed, Rules.startSpeed + z * 0.008);
     if (
-      z < Rules.firstRow ||
+      z < (pickup ? 12 : Rules.firstRow) ||
       this.random(column, row, candidate, 0x17f3) >
         0.96 - (speed - Rules.startSpeed) * 0.012
     )
       return;
     const definition = this.registry.pick(
       this.random(column, row, candidate, 0x8db3),
+      pickup,
     );
     if (!definition) return;
     const variant = Math.floor(
@@ -261,10 +283,42 @@ export class WorldSpawner {
     this.angles[slot] = angle;
     this.x[slot] = x;
     this.z[slot] = z;
-    this.halfX[slot] = bounds.halfX * cos + bounds.halfZ * sin;
-    this.halfZ[slot] = bounds.halfZ * cos + bounds.halfX * sin;
+    if (definition.animation === "spin-bob") {
+      // Authored pickup bounds already enclose every yaw. Do not rotate this
+      // envelope again using the spawn angle (which the shared motion ignores).
+      this.halfX[slot] = this.halfZ[slot] = Math.max(
+        bounds.halfX,
+        bounds.halfZ,
+      );
+    } else {
+      this.halfX[slot] = bounds.halfX * cos + bounds.halfZ * sin;
+      this.halfZ[slot] = bounds.halfZ * cos + bounds.halfX * sin;
+    }
     this.height[slot] = bounds.height;
     this.baseY[slot] = bounds.baseY ?? 0;
+    // Pickups must never be hidden inside a cactus. Check the deterministic
+    // candidate field, not active slots (which depend on window/reentry order).
+    // Conservative padding also excludes a few thinned/non-spawned candidates.
+    if (pickup) {
+      const cacti = this.registry.get(ObjectKind.Cactus);
+      let reach = 0;
+      if (cacti && cacti.weight > 0)
+        for (const b of cacti.colliders)
+          reach = Math.max(reach, Math.hypot(b.halfX, b.halfZ));
+      if (reach > 0) {
+        reach +=
+          Math.hypot(bounds.halfX, bounds.halfZ) + Rules.playerRadius + 0.3;
+        for (let rz = row - 1; rz <= row + 1; rz++)
+          for (let cx = column - 1; cx <= column + 1; cx++)
+            for (let n = 0; n < Rules.candidatesPerChunk; n++) {
+              const nx =
+                (cx + this.random(cx, rz, n, 0x311a)) * Rules.chunkSize;
+              const nz =
+                (rz + this.random(cx, rz, n, 0x741d)) * Rules.chunkSize;
+              if ((nx - x) ** 2 + (nz - z) ** 2 < reach * reach) return;
+            }
+      }
+    }
     if (
       definition.blocking &&
       this.isRouteClear(x, z, this.halfX[slot], this.halfZ[slot])
