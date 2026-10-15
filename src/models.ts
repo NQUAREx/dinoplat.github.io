@@ -1,6 +1,7 @@
 import { BufferGeometry, Mesh, type Material } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import modelUrl from "./assets/voxel-models.glb?url";
+import { Rules } from "./config";
 
 /** Owns all preloaded poses/variants. No scenes are cloned during gameplay. */
 export class ModelLibrary {
@@ -26,6 +27,12 @@ export class ModelLibrary {
       gltf.scene.traverse((object) => {
         if (!(object instanceof Mesh)) return;
         const geometry = object.geometry.applyMatrix4(object.matrixWorld);
+        if (object.name.startsWith("cactus-"))
+          geometry.scale(
+            Rules.cactusScale,
+            Rules.cactusScale,
+            Rules.cactusScale,
+          );
         geometry.computeBoundingBox();
         geometry.computeBoundingSphere();
         geometries.push(geometry);

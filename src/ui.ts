@@ -17,6 +17,7 @@ export class GameUI {
     this.element("best"),
   ];
   private readonly shown = new Float64Array(5).fill(-1);
+  private readonly hearts = this.element("lives").querySelectorAll("img");
   best = 0;
   phase: Phase | "loading" | "error" = "loading";
   constructor() {
@@ -59,7 +60,11 @@ export class GameUI {
                 : values4;
       if (this.shown[i] !== value) {
         this.shown[i] = value;
-        this.counters[i].textContent = this.format(value);
+        if (i === 2) {
+          this.counters[i].setAttribute("aria-label", `${value} из 3 жизней`);
+          for (let h = 0; h < this.hearts.length; h++)
+            this.hearts[h].classList.toggle("empty-heart", h >= value);
+        } else this.counters[i].textContent = this.format(value);
       }
     }
   }
@@ -68,6 +73,8 @@ export class GameUI {
     this.phase = phase;
     this.app.dataset.phase = phase;
     this.overlay.hidden = phase === "running";
+    this.showSettings(false);
+    this.element("settings-toggle").hidden = phase !== "paused";
     this.pauseButton.disabled = phase !== "running" && phase !== "paused";
     this.pauseButton.setAttribute(
       "aria-label",
@@ -99,6 +106,10 @@ export class GameUI {
     }
     this.element("menu-best").textContent = this.format(this.best);
     this.update(game);
+  }
+  showSettings(visible: boolean) {
+    this.element("menu-panel").hidden = visible;
+    this.element("settings-panel").hidden = !visible;
   }
   error(error: unknown) {
     this.phase = "error";

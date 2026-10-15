@@ -83,7 +83,11 @@ export class ObjectRegistry {
       kind: ObjectKind.Cactus,
       weight: 1,
       blocking: true,
-      colliders,
+      colliders: colliders.map((b) => ({
+        halfX: b.halfX * Rules.cactusScale,
+        halfZ: b.halfZ * Rules.cactusScale,
+        height: b.height * Rules.cactusScale,
+      })),
     });
     const pickup = [{ halfX: 0.25, halfZ: 0.25, height: 0.6 }];
     registry.register({
@@ -116,7 +120,8 @@ export class ObjectRegistry {
   }
 }
 
-/** Fixed 2D ring of numeric cells, not scene objects. No history/map growth. */
+/** Chunk keys are storage only. Multiple independent continuous points per chunk;
+ * no rows, columns or quantization in the actual obstacle positions. */
 export class WorldSpawner {
   readonly active = new Uint8Array(Rules.poolSize);
   readonly columns = new Float64Array(Rules.poolSize).fill(Infinity);
@@ -130,7 +135,7 @@ export class WorldSpawner {
   readonly halfZ = new Float32Array(Rules.poolSize);
   readonly height = new Float32Array(Rules.poolSize);
   readonly baseY = new Float32Array(Rules.poolSize);
-  radius = 6;
+  radius = 3;
   generated = 0;
   revision = 0;
   private seed = 1;
@@ -149,27 +154,40 @@ export class WorldSpawner {
   setVisibleHalfWidth(width: number) {
     const radius = Math.min(
       (Rules.maxColumns - 1) / 2,
-      Math.max(3, Math.ceil(width / Rules.columnWidth) + 1),
+      Math.max(2, Math.ceil(width / Rules.chunkSize) + 1),
     );
     if (radius !== this.radius) {
       this.radius = radius;
       this.centerX = Infinity;
     }
   }
-  safeOffset(row: number) {
-    const phase = row + (this.seed % 4096) * 0.1;
-    // Derivative is bounded by .732 columns/row: flooring cannot jump >1.
-    // Two independent phases avoid a short, visibly repeating zig-zag route.
-    return Math.floor(
-      Math.sin(phase * 0.37) * 1.65 + Math.sin(phase * 0.11) * 1.1,
+  safeCenter(z: number, corridor = 0) {
+    const phase = (this.seed % 4096) * 0.013;
+    return (
+      corridor * 32 +
+      3 * (Math.sin(z / 48 + phase) - Math.sin(phase)) +
+      2 * (Math.sin(z / 110 + phase * 2) - Math.sin(phase * 2))
     );
   }
-  isSafe(column: number, row: number) {
-    return GridMath.mod(column - this.safeOffset(row), 5) === 0;
+  isRouteClear(x: number, z: number, halfX: number, halfZ: number) {
+    const center = this.safeCenter(z);
+    const gap = Math.abs(x - center - Math.round((x - center) / 32) * 32);
+    // |route derivative| <= .081: Minkowski padding covers the full cactus,
+    // avatar, 300ms delayed following and substep steering error, not just centres.
+    return gap < halfX + Rules.playerRadius + 1.1 + 0.081 * halfZ;
+  }
+  private random(column: number, row: number, candidate: number, salt: number) {
+    return (
+      GridMath.hash(
+        column,
+        row,
+        this.seed ^ Math.imul(candidate + 1, 0x9e3779b9) ^ salt,
+      ) / 4294967296
+    );
   }
   update(worldX: number, distance: number) {
-    const cx = Math.floor(worldX / Rules.columnWidth);
-    const cz = Math.floor((distance - Rules.firstRow) / Rules.rowGap);
+    const cx = Math.floor(worldX / Rules.chunkSize);
+    const cz = Math.floor(distance / Rules.chunkSize);
     if (cx === this.centerX && cz === this.centerZ) return;
     this.centerX = cx;
     this.centerZ = cz;
@@ -189,47 +207,82 @@ export class WorldSpawner {
         column <= cx + this.radius;
         column++
       ) {
-        const slot =
-          GridMath.mod(row, Rules.rowSlots) * Rules.maxColumns +
-          GridMath.mod(column, Rules.maxColumns);
-        if (this.columns[slot] === column && this.rows[slot] === row) continue;
-        this.populate(slot, column, row);
+        const first =
+          (GridMath.mod(row, Rules.rowSlots) * Rules.maxColumns +
+            GridMath.mod(column, Rules.maxColumns)) *
+          Rules.candidatesPerChunk;
+        if (this.columns[first] === column && this.rows[first] === row)
+          continue;
+        for (
+          let candidate = 0;
+          candidate < Rules.candidatesPerChunk;
+          candidate++
+        )
+          this.populate(first + candidate, column, row, candidate);
       }
     this.revision++;
   }
-  private populate(slot: number, column: number, row: number) {
+  private populate(
+    slot: number,
+    column: number,
+    row: number,
+    candidate: number,
+  ) {
     this.columns[slot] = column;
     this.rows[slot] = row;
     this.active[slot] = 0;
     this.generated++;
-    const hash = GridMath.hash(column, row, this.seed);
-    // Empty first row at the player's initial column; every fifth column has a
-    // connected safe route which moves at most one column between rows.
-    if (hash / 4294967296 > 0.56) return;
-    const definition = this.registry.pick(
-      GridMath.hash(column, row, this.seed ^ 0x8db3) / 4294967296,
-    );
-    if (!definition || (definition.blocking && this.isSafe(column, row)))
+    const x =
+      (column + this.random(column, row, candidate, 0x311a)) * Rules.chunkSize;
+    const z =
+      (row + this.random(column, row, candidate, 0x741d)) * Rules.chunkSize;
+    // Denser than old rows; fewer candidates per second as natural speed grows.
+    // World-distance-based acceptance stays deterministic through slowdown/reentry.
+    const speed = Math.min(Rules.maxSpeed, Rules.startSpeed + z * 0.008);
+    if (
+      z < Rules.firstRow ||
+      this.random(column, row, candidate, 0x17f3) >
+        0.96 - (speed - Rules.startSpeed) * 0.012
+    )
       return;
-    const variant =
-      GridMath.hash(column, row, this.seed ^ 0x51ac) %
-      definition.colliders.length;
-    const angle =
-      (GridMath.hash(column, row, this.seed ^ 0xad27) / 4294967296) *
-      Math.PI *
-      2;
+    const definition = this.registry.pick(
+      this.random(column, row, candidate, 0x8db3),
+    );
+    if (!definition) return;
+    const variant = Math.floor(
+      this.random(column, row, candidate, 0x51ac) * definition.colliders.length,
+    );
+    const angle = this.random(column, row, candidate, 0xad27) * Math.PI * 2;
     const bounds = definition.colliders[variant],
       cos = Math.abs(Math.cos(angle)),
       sin = Math.abs(Math.sin(angle));
     this.kinds[slot] = definition.kind;
     this.variants[slot] = variant;
     this.angles[slot] = angle;
-    this.x[slot] = column * Rules.columnWidth;
-    this.z[slot] = Rules.firstRow + row * Rules.rowGap;
+    this.x[slot] = x;
+    this.z[slot] = z;
     this.halfX[slot] = bounds.halfX * cos + bounds.halfZ * sin;
     this.halfZ[slot] = bounds.halfZ * cos + bounds.halfX * sin;
     this.height[slot] = bounds.height;
     this.baseY[slot] = bounds.baseY ?? 0;
+    if (
+      definition.blocking &&
+      this.isRouteClear(x, z, this.halfX[slot], this.halfZ[slot])
+    )
+      return;
+    // Deterministic hard-core thinning over this and neighbouring chunks avoids
+    // interpenetrating clusters without storing an unbounded spatial index.
+    if (definition.blocking) {
+      const priority = this.random(column, row, candidate, 0xa193);
+      for (let rz = row - 1; rz <= row + 1; rz++)
+        for (let cx = column - 1; cx <= column + 1; cx++)
+          for (let n = 0; n < Rules.candidatesPerChunk; n++) {
+            if (this.random(cx, rz, n, 0xa193) >= priority) continue;
+            const nx = (cx + this.random(cx, rz, n, 0x311a)) * Rules.chunkSize;
+            const nz = (rz + this.random(cx, rz, n, 0x741d)) * Rules.chunkSize;
+            if ((nx - x) ** 2 + (nz - z) ** 2 < 3.3 ** 2) return;
+          }
+    }
     this.active[slot] = 1;
   }
   consume(slot: number) {

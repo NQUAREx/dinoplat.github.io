@@ -9,6 +9,8 @@ export class AnimatedDinosaur {
   private readonly material = new THREE.MeshLambertMaterial({
     vertexColors: true,
     flatShading: true,
+    transparent: true,
+    depthWrite: false,
   });
   readonly mesh: THREE.Mesh;
   frame = 0;
@@ -66,8 +68,12 @@ export class AnimatedDinosaur {
     );
     const squash = Math.max(0, 1 - (game.time - this.landedAt) / 0.12) * 0.06;
     this.mesh.scale.set(1 + squash * 0.3, 1 - squash, 1 + squash * 0.3);
-    const hit = game.health.immunity > 1.05;
-    this.material.color.setHex(hit ? 0xffb18c : 0xffffff);
+    this.material.opacity =
+      game.phase !== "over" &&
+      game.health.immunity > 0 &&
+      Math.floor((Rules.immunitySeconds - game.health.immunity) * 10) % 2 === 0
+        ? 0.5
+        : 1;
   }
   dispose() {
     for (const off of this.off) off();

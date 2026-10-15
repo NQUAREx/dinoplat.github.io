@@ -7,7 +7,7 @@ import { PixelQuilter } from "./pixel-quilter.mjs";
 /** Offline only. Runtime gets one prepacked, independently mipmapped array. */
 class TerrainAtlasBuilder {
   quilter = new PixelQuilter();
-  async image(path, width, height) {
+  async image(path, width, height, saturation = 120) {
     const { stdout } = await execute(
       "magick",
       [
@@ -17,7 +17,7 @@ class TerrainAtlasBuilder {
         "-resize",
         `${width}x${height}!`,
         "-modulate",
-        "100,120,100",
+        `100,${saturation},100`,
         "-depth",
         "8",
         "rgba:-",
@@ -70,10 +70,12 @@ class TerrainAtlasBuilder {
   async build() {
     const [baseSource, transitionSource, stoneSource] = await Promise.all([
       this.image("../art/terrain-atlas-source.png", 512, 512),
-      this.image("../art/terrain-transitions-source.png", 512, 256),
+      this.image("../art/terrain-transitions-attached.jpg", 512, 256, 100),
       this.image("../art/terrain-stone-source.png", 128, 128),
     ]);
     const base = [];
+    const entries = [],
+      exits = [];
     for (let i = 0; i < 16; i++) {
       const tile = this.extract(
         baseSource,
@@ -97,49 +99,6 @@ class TerrainAtlasBuilder {
         Math.floor(i / 4) * 64,
         64,
       );
-      // Read the irregular border from the painted connector. Bake continuous
-      // base/stone interiors on its two sides (hard mask, never alpha layering).
-      // Both UV phases now continue into the adjacent full tile, not just its
-      // very last pixel row; this avoids a straight seam inside the stone.
-      const original = Buffer.from(tile),
-        boundary = new Uint8Array(128);
-      const isStone = (x, y) => {
-        const at = (y * 128 + x) * 4;
-        const r = original[at],
-          g = original[at + 1],
-          b = original[at + 2];
-        return r - g < 27 && Math.abs(b - g) < 24 && r - b < 45;
-      };
-      for (let x = 0; x < 128; x++) {
-        boundary[x] = 33;
-        for (let y = 25; y < 42; y++) {
-          let grey = 0;
-          for (let dy = 0; dy < 4; dy++)
-            for (let dx = -1; dx <= 1; dx++)
-              if (isStone((x + dx + 128) % 128, y + dy)) grey++;
-          if (grey >= 10) {
-            boundary[x] = y;
-            break;
-          }
-        }
-      }
-      const edge = Math.round((boundary[0] + boundary[127]) / 2);
-      for (let x = 0; x < 5; x++) {
-        const blend = x / 5;
-        boundary[x] = Math.round(edge * (1 - blend) + boundary[x] * blend);
-        boundary[127 - x] = Math.round(
-          edge * (1 - blend) + boundary[127 - x] * blend,
-        );
-      }
-      for (let y = 0; y < 64; y++)
-        for (let x = 0; x < 128; x++) {
-          const at = (y * 128 + x) * 4;
-          if (x >= 6 && x < 122 && Math.abs(y - boundary[x]) <= 1) continue; // Preserve painted rubble/outline.
-          const source = y < boundary[x] ? base[i] : stone;
-          const sy = y < boundary[x] ? y : y + 64;
-          source.copy(tile, at, (sy * 128 + x) * 4, (sy * 128 + x + 1) * 4);
-        }
-
       const square = Buffer.alloc(128 * 128 * 4);
       for (let y = 0; y < 128; y++)
         tile.copy(
@@ -148,15 +107,25 @@ class TerrainAtlasBuilder {
           Math.floor(y / 2) * 128 * 4,
           (Math.floor(y / 2) + 1) * 128 * 4,
         );
-      layers.push(square);
+      const rotated = Buffer.alloc(square.length);
+      for (let y = 0; y < 128; y++)
+        for (let x = 0; x < 128; x++) {
+          const from = ((127 - y) * 128 + 127 - x) * 4;
+          square.copy(rotated, (y * 128 + x) * 4, from, from + 4);
+        }
+      // Keep the entire authored border/rocks. Only narrow endpoint collars
+      // receive minimum-error hard cuts to the neighbouring periodic surfaces.
+      entries.push(this.collars(square, base[i], stone));
+      exits.push(this.collars(rotated, stone, base[i]));
     }
-    const width = 9 * 128,
+    layers.push(...entries, ...exits);
+    const width = 10 * 128,
       atlas = Buffer.alloc(width * width * 4);
     for (let i = 0; i < layers.length; i++)
       for (let y = 0; y < 128; y++)
         layers[i].copy(
           atlas,
-          ((Math.floor(i / 9) * 128 + y) * width + (i % 9) * 128) * 4,
+          ((Math.floor(i / 10) * 128 + y) * width + (i % 10) * 128) * 4,
           y * 128 * 4,
           (y + 1) * 128 * 4,
         );
@@ -185,8 +154,37 @@ class TerrainAtlasBuilder {
       child.stdin.end(atlas);
     });
     console.log(
-      `Prepared ${layers.length} layers: 64 varied bases, one stone, 16 drawn transitions.`,
+      `Prepared ${layers.length} layers: 64 varied bases, one stone, 16 drawn entries and 16 rotated exits.`,
     );
+  }
+  collars(painted, start, end) {
+    const result = Buffer.from(painted);
+    const top = this.quilter.cut(8, 128, (p, x) =>
+      this.quilter.error(
+        painted,
+        ((p + 2) * 128 + x) * 4,
+        start,
+        ((p + 2) * 128 + x) * 4,
+      ),
+    );
+    const bottom = this.quilter.cut(8, 128, (p, x) =>
+      this.quilter.error(
+        painted,
+        ((p + 118) * 128 + x) * 4,
+        end,
+        ((p + 118) * 128 + x) * 4,
+      ),
+    );
+    for (let x = 0; x < 128; x++)
+      for (let y = 0; y < 128; y++) {
+        const source =
+          y <= top[x] + 2 ? start : y >= bottom[x] + 118 ? end : null;
+        if (source) {
+          const at = (y * 128 + x) * 4;
+          source.copy(result, at, at, at + 4);
+        }
+      }
+    return result;
   }
 }
 await new TerrainAtlasBuilder().build();

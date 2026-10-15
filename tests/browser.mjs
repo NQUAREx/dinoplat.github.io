@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 
 const url = "http://127.0.0.1:4174";
@@ -62,7 +62,8 @@ try {
   assert.equal(await desktop.evaluate(() => !!window.__runner), false);
   assert.equal(await desktop.locator("#mobile-required").isVisible(), true);
   await desktop.close();
-  const page = await browser.newPage(phone);
+  const context = await browser.newContext(phone);
+  const page = await context.newPage();
   await page.addInitScript(() => {
     window.vibrationCalls = [];
     Object.defineProperty(navigator, "vibrate", {
@@ -92,9 +93,15 @@ try {
   assert.equal(report.initial.boundaryCount, 0);
   assert.equal(report.initial.obstacleVariants, 6);
   assert.equal(report.initial.loadedPoses, 8);
-  assert.equal(report.initial.terrainLayers, 81);
-  assert.equal(report.initial.terrainTileMetres, 20);
+  assert.equal(report.initial.terrainLayers, 97);
+  assert.equal(report.initial.terrainTileMetres, 10);
   assert.equal(report.initial.cameraFov, 50);
+  assert.equal(report.initial.cameraFar, 96);
+  assert.equal(report.initial.fogStart, 36);
+  assert.equal(report.initial.fogEnd, 84);
+  assert.ok(report.initial.cactusHeight >= 2.1);
+  assert.equal(await page.locator("#lives img").count(), 3);
+  assert.equal(await page.locator("#lives").innerText(), "");
   assert.equal(await page.locator("#hint").count(), 0);
   assert.equal(await page.locator(".topbar").isVisible(), false);
   assert.equal(await page.locator(".touch-help").isVisible(), false);
@@ -161,6 +168,54 @@ try {
 
   // All frames/variant buffers are exercised before a resource-growth comparison.
   await page.tap("#pause");
+  const pausedTime = await page.evaluate(() => window.__runner.game.time);
+  await page.tap("#settings-toggle");
+  assert.equal(await page.locator("#settings-panel").isVisible(), true);
+  await page.tap("#vibration");
+  await page.tap("#sound");
+  assert.equal(
+    await page.evaluate(() => window.__runner.audio().enabled),
+    false,
+  );
+  await page.locator("#shake").evaluate((input) => {
+    input.value = "3";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  assert.equal(await page.locator("#shake-value").innerText(), "300%");
+  assert.equal(
+    await page.evaluate(() => window.__runner.camera.shakeMultiplier),
+    3,
+  );
+  assert.equal(
+    await page.evaluate(() => window.__runner.game.time),
+    pausedTime,
+  );
+  await page.screenshot({ path: "test-results/pause-settings.png" });
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("dinoplat-settings")),
+  );
+  assert.deepEqual(saved, { vibration: false, sound: false, shake: 3 });
+  const restored = await page.context().newPage();
+  await ready(restored);
+  assert.equal(
+    await restored.evaluate(() => window.__runner.settings.shake),
+    3,
+  );
+  assert.equal(
+    await restored.evaluate(() => window.__runner.audio().enabled),
+    false,
+  );
+  await restored.close();
+  await page.tap("#vibration");
+  await page.tap("#sound");
+  await page.waitForFunction(() => window.__runner.audio().state === "running");
+  assert.equal(await page.evaluate(() => window.__runner.audio().voices), 1);
+  await page.locator("#shake").evaluate((input) => {
+    input.value = "1";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.tap("#settings-back");
+  assert.equal(await page.locator("#menu-panel").isVisible(), true);
   await page.evaluate(() => {
     const r = window.__runner,
       g = r.game;
@@ -216,7 +271,7 @@ try {
   assert.ok(Math.abs(report.rebased.cameraX) < 0.2);
   await page.screenshot({ path: "test-results/infinite-world.png" });
   // Painted connectors at both sides of the common stone strip.
-  for (const distance of [481, 495, 511, 521]) {
+  for (const distance of [481, 491, 496, 501, 506, 511, 521]) {
     await page.evaluate((distance) => {
       const g = window.__runner.game;
       g.distance = g.previousDistance = distance;
@@ -236,12 +291,12 @@ try {
     image.src = url;
     await image.decode();
     const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 1152;
+    canvas.width = canvas.height = 1280;
     const context = canvas.getContext("2d");
     context.drawImage(image, 0, 0);
-    const pixels = context.getImageData(0, 0, 1152, 1152).data;
+    const pixels = context.getImageData(0, 0, 1280, 1280).data;
     const at = (layer, x, y) =>
-      ((Math.floor(layer / 9) * 128 + y) * 1152 + (layer % 9) * 128 + x) * 4;
+      ((Math.floor(layer / 10) * 128 + y) * 1280 + (layer % 10) * 128 + x) * 4;
     // Variants share the same edge phase, but opposite texels need not be
     // identical: hard-cut periodic quilting preserves natural neighbouring
     // pixels rather than averaging them into blurry grid lines.
@@ -268,10 +323,112 @@ try {
             return false;
           if (pixels[at(65 + type, x, 127) + c] !== pixels[at(64, x, 127) + c])
             return false;
+          if (pixels[at(81 + type, x, 0) + c] !== pixels[at(64, x, 0) + c])
+            return false;
+          if (
+            pixels[at(81 + type, x, 127) + c] !==
+            pixels[at(type * 4, x, 127) + c]
+          )
+            return false;
         }
     return true;
   });
   assert.equal(report.atlasSeams, true);
+  report.paintedPixelError = await page.evaluate(
+    async (source) => {
+      const original = new Image();
+      original.src = source;
+      await original.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(original, 0, 0, 512, 256);
+      const expected = ctx.getImageData(0, 0, 512, 256).data;
+      const atlas = new Image();
+      atlas.src = performance
+        .getEntriesByType("resource")
+        .find((e) => /terrains-.*webp/.test(e.name)).name;
+      await atlas.decode();
+      canvas.width = canvas.height = 1280;
+      ctx.drawImage(atlas, 0, 0);
+      const actual = ctx.getImageData(0, 0, 1280, 1280).data;
+      let total = 0,
+        count = 0;
+      for (let type = 0; type < 16; type++)
+        for (let y = 14; y < 114; y++)
+          for (let x = 0; x < 128; x++)
+            for (let c = 0; c < 3; c++) {
+              const from =
+                ((Math.floor(type / 4) * 64 + Math.floor(y / 2)) * 512 +
+                  (type % 4) * 128 +
+                  x) *
+                  4 +
+                c;
+              const layer = 65 + type,
+                at =
+                  ((Math.floor(layer / 10) * 128 + y) * 1280 +
+                    (layer % 10) * 128 +
+                    x) *
+                    4 +
+                  c;
+              total += Math.abs(expected[from] - actual[at]);
+              count++;
+              const exit = 81 + type,
+                rotated =
+                  ((Math.floor(exit / 10) * 128 + 127 - y) * 1280 +
+                    (exit % 10) * 128 +
+                    127 -
+                    x) *
+                    4 +
+                  c;
+              total += Math.abs(expected[from] - actual[rotated]);
+              count++;
+            }
+      return total / count;
+    },
+    `data:image/jpeg;base64,${(await readFile(new URL("../art/terrain-transitions-attached.jpg", import.meta.url))).toString("base64")}`,
+  );
+  assert.ok(
+    report.paintedPixelError < 15,
+    "authored transition interiors must survive; do not replace them with base/stone masks",
+  );
+  const hit = await page.evaluate(() => {
+    const r = window.__runner,
+      g = r.game;
+    g.phase = "over";
+    r.start();
+    g.distance = g.previousDistance = 2000;
+    g.world.update(g.x, g.distance);
+    g.world.active.fill(0);
+    g.world.active[0] = 1;
+    g.world.kinds[0] = 0;
+    g.world.x[0] = g.x;
+    g.world.z[0] = g.distance + 0.3;
+    g.world.halfX[0] = 0.8;
+    g.world.halfZ[0] = 0.8;
+    g.world.height[0] = 3;
+    g.step(1 / 120);
+    r.pause();
+    r.render();
+    return {
+      lives: g.health.lives,
+      immunity: g.health.immunity,
+      speed: g.speed,
+      opacity: r.stats().playerOpacity,
+    };
+  });
+  assert.deepEqual(hit, { lives: 2, immunity: 2, speed: 12, opacity: 0.5 });
+  assert.equal(await page.locator("#lives .empty-heart").count(), 1);
+  await page.evaluate(() => {
+    window.__runner.game.health.immunity = 1.85;
+    window.__runner.render();
+  });
+  assert.equal(
+    await page.evaluate(() => window.__runner.stats().playerOpacity),
+    1,
+  );
   // Real collision/lives and game over; immunity isn't allowed to mask the check.
   await page.evaluate(() => {
     window.__runner.game.phase = "over";
@@ -326,20 +483,12 @@ try {
     const samples = [];
     const began = performance.now();
     let previous = began;
-    let target = -1,
-      reaction = 0;
     return await new Promise((resolve) => {
       function tick(now) {
         const g = window.__runner.game;
         if (g.phase !== "running") return resolve({ failed: g.phase });
-        const row = Math.max(0, Math.ceil((g.distance - 40 - 0.85) / 20));
-        if (row !== target) {
-          target = row;
-          reaction = 0.3;
-        }
-        reaction -= (now - previous) / 1000;
-        const delta = g.world.safeOffset(row) * 2.8 - g.x;
-        g.move(reaction <= 0 && Math.abs(delta) > 0.12 ? Math.sign(delta) : 0);
+        const delta = g.world.safeCenter(g.distance - g.speed * 0.3) - g.x;
+        g.move(Math.abs(delta) > 0.12 ? Math.sign(delta) : 0);
         samples.push(now - previous);
         previous = now;
         if (now - began < 7000) requestAnimationFrame(tick);
@@ -392,12 +541,21 @@ try {
   await ready(small);
   await small.evaluate(() => document.fonts.ready);
   await small.screenshot({ path: "test-results/small-menu.png" });
-  const bounds = await small.locator(".panel").boundingBox();
+  const bounds = await small.locator("#menu-panel").boundingBox();
   assert.ok(bounds.y > 55 && bounds.y + bounds.height < 568);
   await small.tap("#action");
   await small.screenshot({ path: "test-results/small-game.png" });
   const smallHud = await small.locator(".hud").boundingBox();
   assert.ok(smallHud.width > 285);
+  await small.tap("#pause");
+  const smallPause = await small.locator("#menu-panel").boundingBox();
+  assert.ok(smallPause.y > 55 && smallPause.y + smallPause.height < 568);
+  await small.tap("#settings-toggle");
+  const smallSettings = await small.locator("#settings-panel").boundingBox();
+  assert.ok(
+    smallSettings.y > 55 && smallSettings.y + smallSettings.height < 568,
+  );
+  await small.screenshot({ path: "test-results/small-settings.png" });
   await small.close();
   const noStorage = await browser.newPage(phone);
   await noStorage.addInitScript(() =>

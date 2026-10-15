@@ -7,6 +7,8 @@ import { TerrainTexture } from "./terrain-texture";
 import { View } from "./view";
 import { GameUI } from "./ui";
 import { Haptics } from "./haptics";
+import { GameSettings } from "./settings";
+import { GameSound } from "./sound";
 
 class GameApplication {
   readonly game = new Simulation(1979);
@@ -17,6 +19,8 @@ class GameApplication {
   private readonly abort = new AbortController();
   private readonly landscape = matchMedia("(orientation: landscape)");
   private readonly haptics = new Haptics(this.game.events);
+  private readonly sound = new GameSound(this.game.events);
+  private readonly settings = new GameSettings();
   private view?: View;
   private input?: Input;
   private alive = true;
@@ -74,6 +78,7 @@ class GameApplication {
         },
       );
       this.bind();
+      this.applySettings();
       this.ui.show(this.game);
       this.schedule();
       if (this.debug)
@@ -85,6 +90,8 @@ class GameApplication {
             stats: () => this.view!.stats(),
             render: () => this.view!.draw(),
             camera: this.view.rig,
+            settings: this.settings,
+            audio: () => this.sound.stats(),
             snapshot: () => ({
               phase: this.game.phase,
               x: this.game.x,
@@ -142,11 +149,34 @@ class GameApplication {
     );
     const vibration = document.getElementById("vibration") as HTMLButtonElement;
     touchButton(vibration, () => {
-      this.haptics.enabled = !this.haptics.enabled;
-      vibration.setAttribute("aria-pressed", String(this.haptics.enabled));
-      vibration.textContent = `ВИБРАЦИЯ: ${this.haptics.enabled ? "ДА" : "НЕТ"}`;
-      if (!this.haptics.enabled) this.haptics.stop();
+      this.settings.vibration = !this.settings.vibration;
+      this.applySettings();
     });
+    touchButton(document.getElementById("sound") as HTMLButtonElement, () => {
+      this.settings.sound = !this.settings.sound;
+      this.applySettings();
+      if (this.settings.sound) this.sound.unlock();
+    });
+    touchButton(
+      document.getElementById("settings-toggle") as HTMLButtonElement,
+      () => this.ui.showSettings(true),
+    );
+    touchButton(
+      document.getElementById("settings-back") as HTMLButtonElement,
+      () => this.ui.showSettings(false),
+    );
+    const shake = document.getElementById("shake") as HTMLInputElement;
+    shake.addEventListener(
+      "input",
+      () => {
+        this.settings.shake = Math.max(
+          0,
+          Math.min(3, Number(shake.value) || 0),
+        );
+        this.applySettings();
+      },
+      options,
+    );
     const resize = () => {
       if (this.landscape.matches) {
         this.pause();
@@ -198,6 +228,24 @@ class GameApplication {
       options,
     );
   }
+  private applySettings() {
+    this.haptics.enabled = this.settings.vibration;
+    this.sound.enabled = this.settings.sound;
+    if (!this.haptics.enabled) this.haptics.stop();
+    if (!this.sound.enabled) this.sound.stop();
+    if (this.view) this.view.rig.shakeMultiplier = this.settings.shake;
+    for (const key of ["vibration", "sound"] as const) {
+      const button = document.getElementById(key)!;
+      button.setAttribute("aria-pressed", String(this.settings[key]));
+      button.textContent = `${key === "vibration" ? "ВИБРАЦИЯ" : "ЗВУК"}: ${this.settings[key] ? "ДА" : "НЕТ"}`;
+    }
+    (document.getElementById("shake") as HTMLInputElement).value = String(
+      this.settings.shake,
+    );
+    document.getElementById("shake-value")!.textContent =
+      `${Math.round(this.settings.shake * 100)}%`;
+    this.settings.save();
+  }
   start() {
     if (
       !this.alive ||
@@ -210,6 +258,7 @@ class GameApplication {
       this.game.reset((Math.random() * 0xffffffff) >>> 0);
     this.game.phase = "running";
     this.haptics.stop();
+    this.sound.unlock();
     this.input?.clear();
     this.previous = this.accumulator = 0;
     this.ui.show(this.game);
@@ -218,6 +267,7 @@ class GameApplication {
   pause() {
     this.input?.clear();
     this.haptics.stop();
+    this.sound.stop();
     if (this.game.phase !== "running") return;
     this.game.phase = "paused";
     this.previous = this.accumulator = 0;
@@ -277,6 +327,7 @@ class GameApplication {
     this.abort.abort();
     this.input?.dispose();
     this.haptics.dispose();
+    this.sound.dispose();
     this.view?.dispose();
     this.view = undefined;
     this.game.events.dispose();

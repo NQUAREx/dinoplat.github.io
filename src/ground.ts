@@ -52,18 +52,18 @@ export class Ground {
           float layer;
           vec2 sampleUv = uv;
           if (hasPrevious < 0.5 && s < 250.0) layer = types.y * 4.0 + variant;
-          else if (boundary < -20.0) layer = before * 4.0 + variant;
-          else if (boundary < -10.0) {
+          else if (boundary < -10.0) layer = before * 4.0 + variant;
+          else if (boundary < -5.0) {
             layer = ${TerrainLayout.transitionLayer.toFixed(1)} + before;
-            sampleUv.y = clamp((boundary + 20.0) / 10.0, 0.00390625, 0.99609375);
+            sampleUv.y = clamp((boundary + 10.0) / 5.0, 0.00390625, 0.99609375);
             gradX.y *= 2.0; gradY.y *= 2.0;
-          } else if (boundary <= 10.0) {
+          } else if (boundary <= 5.0) {
             layer = ${TerrainLayout.stoneLayer.toFixed(1)};
-            sampleUv.y = (boundary + 10.0) / 20.0;
-          } else if (boundary <= 20.0) {
-            layer = ${TerrainLayout.transitionLayer.toFixed(1)} + after;
-            sampleUv.y = clamp(1.0 - (boundary - 10.0) / 10.0, 0.00390625, 0.99609375);
-            gradX.y *= -2.0; gradY.y *= -2.0;
+            sampleUv.y = (boundary + 5.0) / 10.0;
+          } else if (boundary <= 10.0) {
+            layer = ${TerrainLayout.exitTransitionLayer.toFixed(1)} + after;
+            sampleUv.y = clamp((boundary - 5.0) / 5.0, 0.00390625, 0.99609375);
+            gradX.y *= 2.0; gradY.y *= 2.0;
           } else layer = after * 4.0 + variant;
           // One opaque texture sample. Transitions are painted assets, not overlays.
           vec3 colour = textureGrad(ground, vec3(sampleUv, layer), gradX, gradY).rgb;
@@ -82,10 +82,14 @@ export class Ground {
       game.terrain.current,
       game.terrain.next,
     );
-    uniforms.origin.value.set(GridMath.mod(game.x, 20), game.distance % 20);
+    const tileSize = TerrainLayout.worldTileSize;
+    uniforms.origin.value.set(
+      GridMath.mod(game.x, tileSize),
+      game.distance % tileSize,
+    );
     uniforms.tiles.value.set(
-      GridMath.mod(Math.floor(game.x / 20), 65536),
-      Math.floor(game.distance / 20) % 65536,
+      GridMath.mod(Math.floor(game.x / tileSize), 65536),
+      Math.floor(game.distance / tileSize) % 65536,
     );
     uniforms.progress.value = game.distance % TERRAIN_LENGTH;
     uniforms.hasPrevious.value = game.terrain.segment > 0 ? 1 : 0;

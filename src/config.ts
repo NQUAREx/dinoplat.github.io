@@ -3,16 +3,21 @@ export class Rules {
   static readonly step = 1 / 120;
   static readonly sideSpeed = 8;
   static readonly maxSpeed = 24;
-  static readonly columnWidth = 2.8;
-  static readonly rowGap = 20;
-  static readonly firstRow = 40;
-  static readonly rowSlots = 6;
-  static readonly maxColumns = 33;
-  static readonly poolSize = Rules.rowSlots * Rules.maxColumns;
+  static readonly startSpeed = 12;
+  static readonly immunitySeconds = 2;
+  static readonly cactusScale = 2;
+  static readonly chunkSize = 16;
+  static readonly candidatesPerChunk = 6;
+  static readonly firstRow = 28;
+  static readonly rowSlots = 9;
+  static readonly maxColumns = 13;
+  static readonly poolSize =
+    Rules.rowSlots * Rules.maxColumns * Rules.candidatesPerChunk;
   static readonly playerRadius = 0.32;
   static readonly playerBodyHeight = 1.3;
   static readonly gravity = 22;
-  static readonly jumpSpeed = 9.4;
+  // Preserve jump clearance after doubling cactus height (v² / 2g).
+  static readonly jumpSpeed = 13.3;
   static readonly runFramesPerMetre = 0.9;
   static readonly stepStride = 4 / Rules.runFramesPerMetre;
 }

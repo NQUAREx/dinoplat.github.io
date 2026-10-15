@@ -41,9 +41,11 @@
           >
         </div>
         <div class="score-box" aria-label="Жизни" title="Жизни">
-          <img src="/src/assets/icons/live.png" alt="" /><span id="lives"
-            >3</span
-          >
+          <span id="lives" role="img" aria-label="3 из 3 жизней"
+            ><img src="/src/assets/icons/live.png" alt="" /><img
+              src="/src/assets/icons/live.png"
+              alt="" /><img src="/src/assets/icons/live.png" alt=""
+          /></span>
         </div>
         <div
           class="score-box"
@@ -64,7 +66,7 @@
         </div>
       </section>
       <main id="overlay">
-        <section class="panel" aria-labelledby="title">
+        <section id="menu-panel" class="panel" aria-labelledby="title">
           <svg
             class="mascot"
             viewBox="0 0 32 32"
@@ -104,8 +106,12 @@
           <p class="record-note">
             Твой рекорд: <span id="menu-best">0</span> м
           </p>
-          <button id="vibration" class="vibration-button" aria-pressed="true">
-            ВИБРАЦИЯ: ДА
+          <button
+            id="settings-toggle"
+            class="pixel-button settings-link"
+            hidden
+          >
+            НАСТРОЙКИ
           </button>
           <p class="licence-note">
             <a
@@ -119,6 +125,45 @@
               >GPLv3, без гарантий</a
             ><br />Модели: © 2020 Abraham Tugalov / dino3d
           </p>
+        </section>
+        <section
+          id="settings-panel"
+          class="panel"
+          aria-labelledby="settings-title"
+          hidden
+        >
+          <h2 id="settings-title">НАСТРОЙКИ</h2>
+          <button
+            id="vibration"
+            class="pixel-button setting-toggle"
+            aria-pressed="true"
+          >
+            ВИБРАЦИЯ: ДА
+          </button>
+          <button
+            id="sound"
+            class="pixel-button setting-toggle"
+            aria-pressed="true"
+          >
+            ЗВУК: ДА
+          </button>
+          <label class="shake-label" for="shake"
+            >ТРЯСКА КАМЕРЫ
+            <output id="shake-value" for="shake">100%</output></label
+          >
+          <input
+            id="shake"
+            type="range"
+            min="0"
+            max="3"
+            step="0.1"
+            value="1"
+            aria-label="Сила тряски камеры"
+          />
+          <div class="range-labels"><span>0%</span><span>300%</span></div>
+          <button id="settings-back" class="pixel-button settings-link">
+            ← НАЗАД
+          </button>
         </section>
       </main>
       <footer class="bottom">

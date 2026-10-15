@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Vector3 } from "three";
 import { CameraRig, ObjectVisibility, FOG_END } from "../src/camera.ts";
 import { WorldSpawner } from "../src/world.ts";
+import { Rules } from "../src/config.ts";
 
 test("close dynamic camera remains bounded, and event pose can transition independently", () => {
   const rig = new CameraRig();
@@ -16,6 +17,24 @@ test("close dynamic camera remains bounded, and event pose can transition indepe
   assert.ok(Math.abs(rig.camera.fov - 45) < 0.01);
   assert.ok(Math.abs(rig.camera.position.x - 1.5) < 0.01);
   assert.ok(FOG_END < rig.camera.far - 2);
+});
+test("shake slider spans zero to three times original amplitude without altering baseline camera", () => {
+  const rig = new CameraRig();
+  rig.shakeMultiplier = 0;
+  rig.impulse(0.075, 0.22);
+  rig.update(1.1, 0, 0.016, true);
+  assert.equal(rig.camera.position.y, 10);
+  assert.equal(rig.camera.position.x, 0);
+  const normal = new CameraRig();
+  normal.update(1.1, 0, 0.016, true);
+  rig.shakeMultiplier = 3;
+  rig.update(1.1, 0, 0.016, true);
+  assert.ok(
+    Math.abs(rig.camera.position.y - 10 - (normal.camera.position.y - 10) * 3) <
+      1e-10,
+  );
+  assert.equal(rig.camera.fov, 50);
+  assert.equal(rig.camera.position.z, 12);
 });
 test("cacti remain until their full volume exits; pool retirement never removes a visible cell", () => {
   const rig = new CameraRig(),
@@ -33,9 +52,9 @@ test("cacti remain until their full volume exits; pool retirement never removes 
     );
     for (const x of [-100000.5, 0, 100000.5]) {
       pool.update(x, 500);
-      const cx = Math.floor(x / 2.8);
+      const cx = Math.floor(x / Rules.chunkSize);
       for (const side of [-1, 1]) {
-        const retiredX = (cx + side * (pool.radius + 1)) * 2.8 - x;
+        const retiredX = (cx + side * (pool.radius + 1)) * Rules.chunkSize - x;
         assert.equal(
           visibility.intersects(retiredX, 35, 0.55, 0.55, 1.55),
           false,

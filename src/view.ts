@@ -207,6 +207,12 @@ export class View {
       threeRevision: THREE.REVISION,
       cameraFov: this.rig.camera.fov,
       cameraFar: this.rig.camera.far,
+      fogStart: FOG_START,
+      fogEnd: FOG_END,
+      shakeMultiplier: this.rig.shakeMultiplier,
+      playerOpacity: (this.dinosaur.mesh.material as THREE.MeshLambertMaterial)
+        .opacity,
+      cactusHeight: this.models.cacti[0].boundingBox!.max.y,
       cameraX: this.rig.camera.position.x,
       cameraY: this.rig.camera.position.y,
       cameraZ: this.rig.camera.position.z,

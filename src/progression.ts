@@ -1,4 +1,5 @@
 import { GameEvent, GameEvents } from "./events";
+import { Rules } from "./config";
 
 export enum Currency {
   Coin,
@@ -116,13 +117,13 @@ export class Health {
   damage() {
     if (this.immunity > 0 || this.lives <= 0) return false;
     this.lives--;
-    this.immunity = 1.25;
+    this.immunity = Rules.immunitySeconds;
     this.events.emit(GameEvent.Hit, this.lives);
     if (!this.lives) this.events.emit(GameEvent.Death);
     return true;
   }
   step(dt: number) {
-    this.immunity = Math.max(0, this.immunity - dt);
+    this.immunity = this.immunity - dt < 1e-9 ? 0 : this.immunity - dt;
   }
   reset() {
     this.lives = 3;

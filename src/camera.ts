@@ -2,9 +2,9 @@ import { Box3, Frustum, Matrix4, PerspectiveCamera, Vector3 } from "three";
 import { Rules } from "./config";
 
 export const CAMERA_FOV = 50;
-export const CAMERA_FAR = 64;
-export const FOG_START = 24;
-export const FOG_END = 56;
+export const CAMERA_FAR = 96;
+export const FOG_START = 36;
+export const FOG_END = 84;
 export interface CameraPose {
   offsetX: number;
   height: number;
@@ -30,6 +30,7 @@ export class CameraRig {
   private blendTime = 0.35;
   private shake = 0;
   private shakeTime = 0;
+  shakeMultiplier = 1;
   constructor(private readonly reducedMotion = false) {
     this.update(0, 0, 0, false);
   }
@@ -69,11 +70,16 @@ export class CameraRig {
       this.camera.updateProjectionMatrix();
     }
     const phase = (distance * Math.PI * 2) / Rules.stepStride;
-    const bob = walking && !this.reducedMotion ? Math.sin(phase) * 0.035 : 0;
+    const intensity = Math.max(0, Math.min(3, this.shakeMultiplier));
+    const bob =
+      walking && !this.reducedMotion ? Math.sin(phase) * 0.035 * intensity : 0;
     this.shakeTime = Math.max(0, this.shakeTime - dt);
     const shake =
       this.shakeTime > 0 && !this.reducedMotion
-        ? this.shake * Math.sin(distance * 21) * Math.min(1, this.shakeTime * 8)
+        ? this.shake *
+          intensity *
+          Math.sin(distance * 21) *
+          Math.min(1, this.shakeTime * 8)
         : 0;
     this.camera.position.set(
       p.offsetX + localPlayerX * 0.75 + bob * 0.25 + shake,

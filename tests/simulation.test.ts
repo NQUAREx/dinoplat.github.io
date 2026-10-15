@@ -93,12 +93,22 @@ test("2D cell pool is bounded, deterministic after reentry, and generates both a
     for (let slot = 0; slot < pool.active.length; slot++)
       if (pool.active[slot]) {
         assert.ok(
-          Math.abs(pool.x[slot] - x) < (pool.radius + 1) * Rules.columnWidth,
+          Math.abs(pool.x[slot] - x) < (pool.radius + 1) * Rules.chunkSize,
         );
         left ||= pool.x[slot] < x;
         right ||= pool.x[slot] > x;
         variants |= 1 << pool.variants[slot];
-        assert.equal(pool.isSafe(pool.columns[slot], pool.rows[slot]), false);
+        assert.equal(
+          pool.isRouteClear(
+            pool.x[slot],
+            pool.z[slot],
+            pool.halfX[slot],
+            pool.halfZ[slot],
+          ),
+          false,
+        );
+        assert.notEqual(pool.x[slot] % Rules.chunkSize, 0);
+        assert.notEqual(pool.z[slot] % Rules.chunkSize, 0);
       }
   }
   assert.equal(left && right, true);
@@ -108,15 +118,17 @@ test("2D cell pool is bounded, deterministic after reentry, and generates both a
   assert.equal(pool.active, arrays[2]);
   assert.equal(pool.active.length, Rules.poolSize);
 });
-test("connected safe corridors move at most one column per row across unbounded X", () => {
+test("continuous safe routes have bounded slope across unbounded X", () => {
   const pool = new WorldSpawner();
   for (let seed = 1; seed <= 100; seed++) {
     pool.reset(seed);
     for (let row = 1; row < 1000; row++) {
-      assert.ok(Math.abs(pool.safeOffset(row) - pool.safeOffset(row - 1)) <= 1);
+      assert.ok(
+        Math.abs(pool.safeCenter(row) - pool.safeCenter(row - 1)) <= 0.081,
+      );
       for (const corridor of [-1000, 0, 1000])
         assert.equal(
-          pool.isSafe(corridor * 5 + pool.safeOffset(row), row),
+          pool.isRouteClear(pool.safeCenter(row, corridor), row, 1, 1),
           true,
         );
     }
@@ -127,24 +139,12 @@ test("100 seeds: safe route survives 5 minutes at max speed with 300ms reaction 
     const game = new Simulation(seed);
     game.phase = "running";
     game.distance = 2000;
-    game.x = game.world.safeOffset(98) * Rules.columnWidth;
-    let targetRow = -1,
-      reaction = 0;
+    game.x = game.previousX = game.world.safeCenter(game.distance);
     for (let n = 0; n < 300 / STEP; n++) {
-      const row = Math.max(
-        0,
-        Math.ceil((game.distance - Rules.firstRow - 0.85) / Rules.rowGap),
-      );
-      if (row !== targetRow) {
-        targetRow = row;
-        reaction = 0.3;
-      }
-      reaction -= STEP;
-      const delta = game.world.safeOffset(row) * Rules.columnWidth - game.x;
+      const delta =
+        game.world.safeCenter(game.distance - 0.3 * Rules.maxSpeed) - game.x;
       game.move(
-        reaction <= 0 && Math.abs(delta) > (Rules.sideSpeed * STEP) / 2
-          ? Math.sign(delta)
-          : 0,
+        Math.abs(delta) > (Rules.sideSpeed * STEP) / 2 ? Math.sign(delta) : 0,
       );
       game.step(STEP);
       assert.equal(game.health.lives, 3, `seed ${seed}, step ${n}`);
@@ -169,7 +169,7 @@ test("swept lateral collision does not tunnel through a cactus", () => {
 test("jump clears tall cactus, double jump is rejected, landing emits exactly once", () => {
   for (const distance of [0, 2000]) {
     const game = emptyGame(distance);
-    obstacle(game, 0, distance ? 9 : 4.5, 1.55);
+    obstacle(game, 0, distance ? 14 : 7, 3.1);
     let landed = 0;
     game.events.on(GameEvent.Land, () => landed++);
     game.jump();
@@ -177,7 +177,7 @@ test("jump clears tall cactus, double jump is rejected, landing emits exactly on
     const velocity = game.velocityY;
     game.jump();
     assert.equal(game.velocityY, velocity);
-    for (let i = 0; i < 140; i++) game.step(STEP);
+    for (let i = 0; i < 180; i++) game.step(STEP);
     assert.equal(game.health.lives, 3);
     assert.equal(game.y, 0);
     assert.equal(landed, 1);
@@ -205,6 +205,27 @@ test("lives, damage immunity, game over, pause and reset retain bounded pools", 
   game.phase = "paused";
   game.step(1);
   assert.equal(game.distance, 0);
+});
+test("hit gives exactly two seconds of immunity and temporary start speed, then restores progress speed", () => {
+  const game = emptyGame(2000);
+  obstacle(game, game.x, 0.3);
+  game.step(STEP);
+  assert.equal(game.health.lives, 2);
+  assert.equal(game.health.immunity, 2);
+  assert.equal(game.speed, Rules.startSpeed);
+  for (let i = 0; i < 239; i++) {
+    obstacle(game, game.x, 0.3);
+    game.step(STEP);
+    assert.equal(game.health.lives, 2);
+    assert.equal(game.speed, Rules.startSpeed);
+  }
+  game.world.active.fill(0);
+  game.step(STEP);
+  assert.equal(game.health.immunity, 0);
+  assert.equal(game.speed, Rules.maxSpeed);
+  obstacle(game, game.x, 0.3);
+  game.step(STEP);
+  assert.equal(game.health.lives, 1);
 });
 test("wallet/bonuses/registry are extension points; pickups and destruction are not enabled", () => {
   const events = new GameEvents(),

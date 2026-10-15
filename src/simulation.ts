@@ -29,7 +29,7 @@ export class Simulation {
   velocityY = 0;
   distance = 0;
   previousDistance = 0;
-  speed = 12;
+  speed = Rules.startSpeed;
   time = 0;
   private nextStep = 0;
   constructor(seed = 1, registry = ObjectRegistry.defaults()) {
@@ -42,7 +42,7 @@ export class Simulation {
     this.x = this.previousX = this.y = this.previousY = 0;
     this.heading = this.previousHeading = this.movingX = this.steering = 0;
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
-    this.speed = 12;
+    this.speed = Rules.startSpeed;
     this.nextStep = Rules.stepStride;
     this.world.reset(this.seed);
     this.world.update(0, 0);
@@ -87,10 +87,14 @@ export class Simulation {
       }
     }
     // Future speed bonuses must stay inside the generator's proven timing budget.
-    this.speed = Math.min(
-      Rules.maxSpeed,
-      (12 + this.distance * 0.008) * this.bonuses.speedFactor,
-    );
+    this.speed =
+      this.health.immunity > 0
+        ? Rules.startSpeed
+        : Math.min(
+            Rules.maxSpeed,
+            (Rules.startSpeed + this.distance * 0.008) *
+              this.bonuses.speedFactor,
+          );
     this.distance += this.speed * dt;
     this.world.update(this.x, this.distance);
     this.terrain.advance(this.distance);
@@ -111,6 +115,13 @@ export class Simulation {
       if (
         pool.z[i] < this.previousDistance - extentZ ||
         pool.z[i] > this.distance + extentZ
+      )
+        continue;
+      const definition = pool.registry.get(pool.kinds[i]);
+      if (
+        !definition ||
+        (definition.blocking &&
+          (this.health.immunity > 0 || this.bonuses.shield))
       )
         continue;
       let enter = Math.max(
@@ -137,17 +148,14 @@ export class Simulation {
         Math.max(yEnter, yLeave) + Rules.playerBodyHeight <= pool.baseY[i]
       )
         continue;
-      const definition = pool.registry.get(pool.kinds[i]);
-      if (!definition) continue;
       if (definition.blocking) {
-        if (
-          !this.bonuses.shield &&
-          this.health.damage() &&
-          !this.health.lives
-        ) {
-          this.phase = "over";
-          this.move(0);
-          return;
+        if (!this.bonuses.shield && this.health.damage()) {
+          this.speed = Rules.startSpeed;
+          if (!this.health.lives) {
+            this.phase = "over";
+            this.move(0);
+            return;
+          }
         }
       } else {
         if (definition.kind === ObjectKind.Coin)
