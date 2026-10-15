@@ -6,6 +6,8 @@ export const CENTER_LANE = Math.floor(LANES / 2);
 export const ROAD_WIDTH = LANES * LANE_WIDTH;
 export const ROW_COUNT = 12;
 export const ROW_GAP = 18;
+// Must remain behind the complete cube's screen exit; camera tests verify this.
+export const ROW_RECYCLE_Z = -16;
 export const MAX_SPEED = 24;
 export const STEP = 1 / 120;
 export const SIDE_SPEED = 8;
@@ -147,7 +149,7 @@ export class Simulation {
           }
         }
       }
-      if (after < -8) {
+      if (after < ROW_RECYCLE_Z) {
         this.rowZ[i] += ROW_COUNT * ROW_GAP;
         this.generate(i);
       }

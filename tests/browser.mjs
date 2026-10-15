@@ -73,7 +73,9 @@ try {
   });
   assert.equal(report.seamlessTiles, true);
   assert.equal(report.design.threeRevision, "186");
-  assert.ok(Math.abs(report.design.cameraExtraPitchDegrees - 10) < 1e-6);
+  assert.equal(report.design.cameraFov, 50);
+  assert.equal(report.design.cameraFar, 64);
+  assert.ok(Math.abs(report.design.playerNdcX) < 0.8);
   await page.screenshot({ path: "test-results/mobile-menu.png" });
   // Mouse and keyboard must not start a mobile game either.
   await page.click("#action");
@@ -81,6 +83,22 @@ try {
   assert.equal(await page.evaluate(() => window.__runner.game.phase), "ready");
   await page.tap("#action");
   await page.evaluate(() => window.__runner.game.masks.fill(0));
+  // Inspect a trailing row at the very cutoff that used to pop on screen.
+  await page.evaluate(() => {
+    window.__runner.pause();
+    const g = window.__runner.game;
+    g.rowZ[0] = -4.5;
+    g.masks[0] = 1 << 2;
+    document.querySelector("#overlay").hidden = true;
+    window.__runner.render();
+  });
+  await page.waitForFunction(() => window.__runner.stats().nearestRenderedRowZ < -4);
+  report.trailingCubeVisible = await page.evaluate(() => window.__runner.stats().nearestRenderedRowZ);
+  await page.screenshot({ path: "test-results/trailing-cube.png" });
+  await page.evaluate(() => {
+    window.__runner.game.masks.fill(0);
+    window.__runner.start();
+  });
   const cdp = await page.context().newCDPSession(page);
   const touch = (type, x = 320, y = 620) => cdp.send("Input.dispatchTouchEvent", {
     type, touchPoints: type === "touchEnd" || type === "touchCancel" ? [] : [{ x, y }],
@@ -246,7 +264,7 @@ try {
   await small.screenshot({ path: "test-results/small-menu.png" });
   let bounds = await small.locator(".panel").boundingBox();
   assert.ok(bounds.y >= 65 && bounds.y + bounds.height <= 550);
-  assert.ok(await small.evaluate(() => window.__runner.stats().laneEdgeNdc < 0.95));
+  assert.ok(await small.evaluate(() => Math.abs(window.__runner.stats().playerNdcX) < 0.8));
   await small.tap("#action");
   await small.evaluate(() => { const g = window.__runner.game; g.rowZ[0] = 0.9; g.masks[0] = 1 << 2; });
   await small.waitForFunction(() => window.__runner.game.phase === "over");

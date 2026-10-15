@@ -283,6 +283,7 @@ async function boot() {
         start,
         pause,
         stats: () => view.stats(),
+        render: () => view.draw(game),
         snapshot: () => ({
           phase: game.phase,
           x: game.x,

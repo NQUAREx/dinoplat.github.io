@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { TERRAIN_LENGTH, TERRAIN_TRANSITION } from "./terrain";
 import {
+  frameCamera, ObstacleVisibility, CAMERA_FOLLOW, FOG_START, FOG_END,
+} from "./camera";
+import {
   CUBE_SIZE,
   LANES,
   ROW_COUNT,
@@ -13,7 +16,7 @@ import {
 export class View {
   readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(56, 1, 0.2, 115);
+  private readonly camera = new THREE.PerspectiveCamera();
   private readonly cube = new THREE.BoxGeometry(1, 1, 1);
   private readonly white = new THREE.MeshLambertMaterial({
     color: 0xffffff,
@@ -68,7 +71,7 @@ export class View {
                           texture(ground, vec3(uv, b)).rgb, blend);
         // Same inexpensive distance fog as the rest of the scene, in linear space.
         vec3 fog = vec3(0.672443, 0.887923, 0.846873);
-        gl_FragColor = vec4(mix(colour, fog, smoothstep(32.0, 106.0, depth)), 1.0);
+        gl_FragColor = vec4(mix(colour, fog, smoothstep(${FOG_START.toFixed(1)}, ${FOG_END.toFixed(1)}, depth)), 1.0);
         #include <colorspace_fragment>
       }`,
   });
@@ -100,12 +103,12 @@ export class View {
     36,
   );
   private readonly matrix = new THREE.Matrix4();
+  private readonly visibility = new ObstacleVisibility();
+  private nearestRenderedRowZ = Infinity;
   private quality = 1;
   private sampleTime = 0;
   private sampleFrames = 0;
   private cooldown = 0;
-  private basePitch = 0;
-  private cameraPitch = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -123,13 +126,13 @@ export class View {
     });
     this.renderer.setClearColor(0xd6f2ec);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.scene.fog = new THREE.Fog(0xd6f2ec, 32, 106);
+    this.scene.fog = new THREE.Fog(0xd6f2ec, FOG_START, FOG_END);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0xc7a26d, 2.1));
     const light = new THREE.DirectionalLight(0xffffff, 1.7);
     light.position.set(-4, 12, 8);
     this.scene.add(light);
-    this.road.scale.set(ROAD_WIDTH, 0.1, 126);
-    this.road.position.set(0, -0.06, -49);
+    this.road.scale.set(ROAD_WIDTH, 0.1, 76);
+    this.road.position.set(0, -0.06, -21);
     this.player.position.set(0, 0, 0);
     this.player.rotation.y = 0;
     this.blocks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -142,10 +145,10 @@ export class View {
         i,
         (i ? 1 : -1) * (ROAD_WIDTH / 2 + 0.02),
         0,
-        -49,
+        -21,
         0.075,
         0.015,
-        126,
+        76,
       );
     this.scene.add(
       this.road,
@@ -184,27 +187,7 @@ export class View {
       ) * this.quality;
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(width, height, false);
-    this.camera.aspect = width / height;
-    this.camera.fov = 68;
-    // One portrait camera only. Orbit the previous camera +10 degrees around
-    // its look-at target, preserving radius rather than merely changing FOV.
-    const distance = Math.max(
-      9.5,
-      (ROAD_WIDTH / 2 + 0.9) /
-        (Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.aspect),
-    );
-    const dy = distance * 0.65 - 0.5,
-      dz = distance + 12;
-    const radius = Math.hypot(dy, dz);
-    this.basePitch = Math.atan2(dy, dz);
-    this.cameraPitch = this.basePitch + THREE.MathUtils.degToRad(10);
-    this.camera.position.set(
-      0,
-      0.5 + Math.sin(this.cameraPitch) * radius,
-      -12 + Math.cos(this.cameraPitch) * radius,
-    );
-    this.camera.lookAt(0, 0.5, -12);
-    this.camera.updateProjectionMatrix();
+    frameCamera(this.camera, width / height);
   }
 
   adapt(dt: number) {
@@ -241,11 +224,15 @@ export class View {
       THREE.MathUtils.lerp(game.previousY, game.y, alpha) +
       (game.y === 0 ? Math.abs(Math.sin(game.distance * 3)) * 0.025 : 0);
     this.player.rotation.z = Math.sin(game.distance * 3) * 0.025;
+    // Translate the existing camera orientation; no new vectors or lookAt per frame.
+    this.camera.position.x = this.player.position.x * CAMERA_FOLLOW;
+    this.visibility.update(this.camera);
+    this.nearestRenderedRowZ = Infinity;
     let count = 0;
     for (let i = 0; i < ROW_COUNT; i++) {
-      if (game.rowZ[i] > 105 || game.rowZ[i] < -4) continue;
       for (let lane = 0; lane < LANES; lane++) {
-        if (game.masks[i] & (1 << lane))
+        if ((game.masks[i] & (1 << lane)) && this.visibility.intersects(laneX(lane), game.rowZ[i])) {
+          this.nearestRenderedRowZ = Math.min(this.nearestRenderedRowZ, game.rowZ[i]);
           this.place(
             this.blocks,
             count++,
@@ -256,6 +243,7 @@ export class View {
             CUBE_SIZE,
             CUBE_SIZE,
           );
+        }
       }
     }
     this.blocks.count = count;
@@ -306,13 +294,18 @@ export class View {
       separatorCount: 0,
       playerHeadingDegrees: THREE.MathUtils.radToDeg(this.player.rotation.y),
       obstacleCapacity: this.blocks.instanceMatrix.count,
-      cameraExtraPitchDegrees: THREE.MathUtils.radToDeg(
-        this.cameraPitch - this.basePitch,
-      ),
+      cameraFov: this.camera.fov,
+      cameraFar: this.camera.far,
+      cameraX: this.camera.position.x,
+      cameraY: this.camera.position.y,
+      cameraZ: this.camera.position.z,
+      fogEnd: FOG_END,
+      visibleObstacles: this.blocks.count,
+      nearestRenderedRowZ: this.nearestRenderedRowZ,
       terrainSize: this.terrainTexture.image.width,
       terrainLayers: this.terrainTexture.image.depth,
       terrainOffset: this.roadMaterial.uniforms.scroll.value,
-      laneEdgeNdc: new THREE.Vector3(ROAD_WIDTH / 2, 0, 0).project(this.camera)
+      playerNdcX: new THREE.Vector3(this.player.position.x, 0, 0).project(this.camera)
         .x,
     };
   }

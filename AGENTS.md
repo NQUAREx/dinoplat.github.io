@@ -15,7 +15,7 @@
 - Crossing the screen midpoint during a hold reverses direction. Up-swipe jumps before finger release, suppressing lateral steering for the rest of that gesture. Clear held input on pause, reset, collision, visibility loss, orientation changes and lost capture. Never restore a stale hold after resume.
 - Turn the dinosaur smoothly to ±45° while actually moving sideways, and back to 0° when moving straight. Its body collider is rotation-invariant; visual pose does not change collision rules. Collision checks follow actual swept position, including positions between obstacle columns.
 - White low-poly dinosaur and white cube obstacles. Sixteen cartoon pixel terrains based on `art/terrain-reference.png`: sand, clay, rock, grass, volcanic stone. Preserve the reference style; no photographic textures. Keep obstacle contrast and readability.
-- Camera looks 10 degrees further down than the original camera; keep the entire road width visible at the player in narrow portrait views.
+- Close portrait camera: vertical FOV 50°, position Y=10/Z=12, look at Y=1/Z=-5, far plane 64m. Follow 75% of the rendered player's X so edge positions remain visible without pulling the camera away to fit the entire road. The road may extend past the sides near the player; do not restore the old distant all-road framing. Fog depth 24–56m must match the custom ground shader and finish before the far plane.
 
 ## Implementation and performance
 
@@ -23,6 +23,7 @@
 - Fixed-step simulation, actual-position swept collisions, pooled typed arrays, instanced obstacles. No allocations or creation/disposal of objects in the game loop.
 - Derive road width, player bounds, pool capacity and obstacle-column X positions from constants. Rows must always have at least one obstacle and at least one safe column; the safe column changes at most one column per row. Player position and steering must not depend on column indices.
 - Prefer one draw call for the dinosaur and one for all obstacles. No shadows, postprocessing, normal maps or physics engines.
+- Cull each cube with its full AABB against the actual camera frustum, using reused bounds/matrices. Never remove a still-visible trailing cube at a fixed near-player cutoff. Recycle rows only behind `ROW_RECYCLE_Z=-16`; camera tests must prove all cubes are offscreen before that point, including camera X follow and narrow/short phone aspects.
 - Ground: one local 512×512 atlas, decoded once into one 16-layer DataArrayTexture (128×128 each, sRGB, mipmaps, nearest magnification). Correct edge seams offline, no whole-tile mirroring or texture atlas bleeding. Keep square world-space texels, bounded UVs, one road draw call; sample two layers only in transition bands. `npm run terrain:build` reproduces the optimized WebP; authoring PNGs must not enter dist.
 - Covering changes every 500m; `terrain.ts` owns an independent seeded weighted RNG, with all 16 weights currently 1. Exclude the current covering from the next draw. Keep previous/current/next states so the spatial 16m transition stays continuous across a segment boundary; never swap the entire visible road at once. This is visual only and cannot change obstacle generation or collisions.
 - Font is local WOFF2; preserve upstream licences and attribution.
