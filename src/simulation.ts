@@ -7,9 +7,14 @@ export const ROW_COUNT = 12;
 export const ROW_GAP = 18;
 export const MAX_SPEED = 24;
 export const STEP = 1 / 120;
-export const SIDE_SPEED = 13;
+export const SIDE_SPEED = 8;
+export const MOVE_INCREMENT = 1;
 export const CUBE_SIZE = 1.2;
-export const PLAYER_RADIUS = 0.27;
+// Rotation-invariant body collider; decorative tail is excluded.
+export const PLAYER_RADIUS = 0.32;
+export const MAX_PLAYER_X = ROAD_WIDTH / 2 - PLAYER_RADIUS;
+export const MAX_HEADING = Math.PI / 4;
+const TURN_SPEED = Math.PI * 5;
 export const laneX = (lane: number) => (lane - (LANES - 1) / 2) * LANE_WIDTH;
 export type Phase = "ready" | "running" | "paused" | "over";
 
@@ -18,8 +23,10 @@ export class Simulation {
   readonly masks = new Uint8Array(ROW_COUNT);
   readonly safeLanes = new Uint8Array(ROW_COUNT);
   phase: Phase = "ready";
-  lane = CENTER_LANE;
-  x = laneX(CENTER_LANE);
+  x = 0;
+  targetX = 0;
+  heading = 0;
+  movingX = 0;
   y = 0;
   velocityY = 0;
   distance = 0;
@@ -33,8 +40,8 @@ export class Simulation {
   reset(seed: number) {
     this.state = seed >>> 0 || 1;
     this.phase = "ready";
-    this.lane = this.safeLane = CENTER_LANE;
-    this.x = laneX(CENTER_LANE);
+    this.safeLane = CENTER_LANE;
+    this.x = this.targetX = this.heading = this.movingX = 0;
     this.y = this.velocityY = this.distance = 0;
     this.speed = 12;
     for (let i = 0; i < ROW_COUNT; i++) {
@@ -71,7 +78,13 @@ export class Simulation {
 
   move(direction: number) {
     if (this.phase === "running")
-      this.lane = Math.max(0, Math.min(LANES - 1, this.lane + direction));
+      this.targetX = Math.max(
+        -MAX_PLAYER_X,
+        Math.min(
+          MAX_PLAYER_X,
+          this.targetX + Math.sign(direction) * MOVE_INCREMENT,
+        ),
+      );
   }
   jump() {
     if (this.phase === "running" && this.y === 0) this.velocityY = 8.6;
@@ -81,8 +94,12 @@ export class Simulation {
     if (this.phase !== "running") return;
     const oldX = this.x,
       oldY = this.y;
-    const delta = laneX(this.lane) - this.x;
+    const delta = this.targetX - this.x;
     this.x += Math.sign(delta) * Math.min(Math.abs(delta), SIDE_SPEED * dt);
+    this.movingX = Math.sign(this.x - oldX);
+    const targetHeading = -this.movingX * MAX_HEADING;
+    const turn = targetHeading - this.heading;
+    this.heading += Math.sign(turn) * Math.min(Math.abs(turn), TURN_SPEED * dt);
     if (this.y > 0 || this.velocityY > 0) {
       this.y = Math.max(0, this.y + this.velocityY * dt - 11 * dt * dt);
       this.velocityY -= 22 * dt;
@@ -96,7 +113,7 @@ export class Simulation {
       const before = this.rowZ[i],
         after = before - travel;
       this.rowZ[i] = after;
-      // Swept AABB: collide with actual position, not the target lane.
+      // Swept body AABB: actual continuous X/Z/Y, never targetX or a column index.
       if (after <= extent && before >= -extent) {
         const enter = Math.max(0, (before - extent) / travel);
         const leave = Math.min(1, (before + extent) / travel);

@@ -63,10 +63,10 @@ try {
   assert.equal(report.design.centred, true);
   assert.equal(report.design.pixelFontLoaded, true);
   assert.equal(report.design.buttonRadius, "0px");
-  assert.equal(report.design.lanes, 5);
-  assert.equal(report.design.separatorCount, 4);
+  assert.equal(report.design.obstacleColumns, 5);
+  assert.equal(report.design.separatorCount, 0);
   assert.equal(report.design.obstacleCapacity, 48);
-  assert.equal(report.design.sandSize, 256);
+  assert.equal(report.design.sandSize, 128);
   assert.ok(Math.abs(report.design.cameraExtraPitchDegrees - 10) < 1e-6);
   assert.ok(report.design.laneEdgeNdc < 0.95);
   assert.equal(
@@ -79,10 +79,50 @@ try {
   );
   await page.screenshot({ path: "test-results/desktop-menu.png" });
   await page.click("#action");
+  // Isolate input/pose checks from random obstacles; collision is tested below.
+  await page.evaluate(() => window.__runner.game.masks.fill(0));
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(220);
-  assert.equal(await page.evaluate(() => window.__runner.game.lane), 3);
-  await page.keyboard.press("ArrowLeft");
+  assert.equal(await page.evaluate(() => window.__runner.game.targetX), 1);
+  assert.equal(await page.evaluate(() => window.__runner.game.x), 1);
+  // Batch real key events so even a slow software renderer sees a long turn.
+  await page.evaluate(() => {
+    const canvas = document.querySelector("#game");
+    for (let i = 0; i < 4; i++)
+      canvas.dispatchEvent(
+        new KeyboardEvent("keydown", { code: "ArrowRight", bubbles: true }),
+      );
+  });
+  await page.waitForFunction(
+    () => window.__runner.stats().playerHeadingDegrees === -45,
+  );
+  report.rightTurn = await page.evaluate(
+    () => window.__runner.stats().playerHeadingDegrees,
+  );
+  await page.screenshot({ path: "test-results/right-turn.png" });
+  await page.waitForFunction(
+    () =>
+      window.__runner.game.x === window.__runner.game.targetX &&
+      window.__runner.stats().playerHeadingDegrees === 0,
+  );
+  await page.evaluate(() => {
+    const canvas = document.querySelector("#game");
+    for (let i = 0; i < 10; i++)
+      canvas.dispatchEvent(
+        new KeyboardEvent("keydown", { code: "ArrowLeft", bubbles: true }),
+      );
+  });
+  await page.waitForFunction(
+    () => window.__runner.stats().playerHeadingDegrees === 45,
+  );
+  report.leftTurn = await page.evaluate(
+    () => window.__runner.stats().playerHeadingDegrees,
+  );
+  await page.waitForFunction(
+    () =>
+      window.__runner.game.x === window.__runner.game.targetX &&
+      window.__runner.stats().playerHeadingDegrees === 0,
+  );
   await page.keyboard.press("Space");
   await page.waitForTimeout(150);
   assert.ok(await page.evaluate(() => window.__runner.game.y > 0.6));
@@ -97,9 +137,9 @@ try {
   await page.evaluate(() => {
     const g = window.__runner.game;
     g.y = g.velocityY = 0;
-    g.x = (g.lane - 2) * 2.1;
+    g.x = g.targetX = 0;
     g.rowZ[0] = 1.1;
-    g.masks[0] = 1 << g.lane;
+    g.masks[0] = 1 << 2;
   });
   await page.waitForFunction(() => window.__runner.game.phase === "over");
   assert.equal(await page.locator("#result").isVisible(), true);
@@ -138,7 +178,7 @@ try {
   assert.equal(report.memoryBefore.textures, 1);
   assert.equal(report.memoryAfter.textures, 1);
   assert.ok(report.memoryAfter.heap - report.memoryBefore.heap < 2_000_000);
-  // Actual rendered run: autopilot only supplies lane input; rules stay enabled.
+  // Actual rendered run: free-coordinate input only; collision rules stay enabled.
   report.performance = await page.evaluate(async () => {
     const samples = [];
     let previous = performance.now();
@@ -159,7 +199,9 @@ try {
             next = i;
             z = g.rowZ[i];
           }
-        g.move(Math.sign(g.safeLanes[next] - g.lane));
+        g.move(
+          Math.sign(Math.round((g.safeLanes[next] - 2) * 2.1) - g.targetX),
+        );
         samples.push(now - previous);
         previous = now;
         if (now - began < 12000) requestAnimationFrame(tick);
@@ -179,7 +221,7 @@ try {
     });
   });
   assert.equal(report.performance.failed, undefined);
-  assert.ok(report.performance.calls <= 6);
+  assert.ok(report.performance.calls <= 5);
   await page.screenshot({ path: "test-results/desktop-game.png" });
   // GPU context recovery pauses and retains the run.
   await page.evaluate(() => {
@@ -211,9 +253,9 @@ try {
   await mobile.screenshot({ path: "test-results/mobile-menu.png" });
   await mobile.tap("#action");
   await mobile.touchscreen.tap(330, 650);
-  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 3);
+  assert.equal(await mobile.evaluate(() => window.__runner.game.targetX), 1);
   await mobile.touchscreen.tap(60, 650);
-  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 2);
+  assert.equal(await mobile.evaluate(() => window.__runner.game.targetX), 0);
   const touch = await mobile.context().newCDPSession(mobile);
   async function swipe(x, y, endX, endY) {
     await touch.send("Input.dispatchTouchEvent", {
@@ -232,9 +274,9 @@ try {
   await swipe(190, 650, 190, 510);
   await mobile.waitForTimeout(130);
   assert.ok(await mobile.evaluate(() => window.__runner.game.y > 0.4));
-  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 2);
+  assert.equal(await mobile.evaluate(() => window.__runner.game.targetX), 0);
   await swipe(190, 650, 300, 650);
-  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 3);
+  assert.equal(await mobile.evaluate(() => window.__runner.game.targetX), 1);
   await mobile.tap("#pause");
   await mobile.waitForTimeout(300);
   await mobile.waitForFunction(() => window.__runner.game.phase === "paused");
@@ -292,7 +334,7 @@ try {
   await small.evaluate(() => {
     const g = window.__runner.game;
     g.rowZ[0] = 0.9;
-    g.masks[0] = 1 << g.lane;
+    g.masks[0] = 1 << 2;
   });
   await small.waitForFunction(() => window.__runner.game.phase === "over");
   await small.screenshot({ path: "test-results/small-game-over.png" });
@@ -367,7 +409,7 @@ try {
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(
-    "PASS: five lanes, +10° camera, centred pixel UI, font, sand, portrait/rotation suspension, input, collisions, restart, 100 restarts, GPU recovery and error handling.",
+    "PASS: free X movement, +/-45° turns, no lane lines, cartoon sand, input, collisions, restart, 100 restarts, portrait/rotation suspension, GPU recovery and error handling.",
   );
 } finally {
   await browser.close();

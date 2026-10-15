@@ -3,9 +3,7 @@ import {
   CUBE_SIZE,
   LANES,
   ROW_COUNT,
-  CENTER_LANE,
   ROAD_WIDTH,
-  LANE_WIDTH,
   laneX,
   type Simulation,
 } from "./simulation";
@@ -21,11 +19,11 @@ export class View {
     flatShading: true,
   });
   private readonly roadMaterial = new THREE.MeshBasicMaterial({
-    // Warm the neutral CC0 albedo without adding another texture or shader pass.
-    color: new THREE.Color().setRGB(1.65, 1.4, 0.95),
+    // Warm cel-painted dunes; tint uses the existing unlit material, no extra pass.
+    color: new THREE.Color().setRGB(1.35, 1.7, 1.4),
   });
-  private readonly lineMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffedc5,
+  private readonly markerMaterial = new THREE.MeshBasicMaterial({
+    color: 0x9fbd71,
   });
   private readonly accentMaterial = new THREE.MeshBasicMaterial({
     color: 0xd69a57,
@@ -41,11 +39,6 @@ export class View {
     this.white,
     ROW_COUNT * (LANES - 1),
   );
-  private readonly lines = new THREE.InstancedMesh(
-    this.cube,
-    this.lineMaterial,
-    LANES - 1,
-  );
   private readonly edges = new THREE.InstancedMesh(
     this.cube,
     this.accentMaterial,
@@ -53,7 +46,7 @@ export class View {
   );
   private readonly markers = new THREE.InstancedMesh(
     this.cube,
-    this.lineMaterial,
+    this.markerMaterial,
     36,
   );
   private readonly matrix = new THREE.Matrix4();
@@ -87,23 +80,12 @@ export class View {
     this.scene.add(light);
     this.road.scale.set(ROAD_WIDTH, 0.1, 126);
     this.road.position.set(0, -0.06, -49);
-    this.player.position.set(laneX(CENTER_LANE), 0, 0);
-    this.player.rotation.y = -0.25;
+    this.player.position.set(0, 0, 0);
+    this.player.rotation.y = 0;
     this.blocks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.markers.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     // Dynamic bounds would otherwise become stale when pooled instances recycle.
     this.blocks.frustumCulled = this.markers.frustumCulled = false;
-    for (let i = 0; i < LANES - 1; i++)
-      this.place(
-        this.lines,
-        i,
-        -ROAD_WIDTH / 2 + (i + 1) * LANE_WIDTH,
-        0,
-        -49,
-        0.035,
-        0.01,
-        126,
-      );
     for (let i = 0; i < 2; i++)
       this.place(
         this.edges,
@@ -119,7 +101,6 @@ export class View {
       this.road,
       this.player,
       this.blocks,
-      this.lines,
       this.edges,
       this.markers,
     );
@@ -200,6 +181,7 @@ export class View {
     // The texture scrolls with the world. Modulo avoids unbounded UV offsets.
     this.sand.offset.y = (game.distance / (126 / 24)) % 1;
     this.player.position.x = game.x;
+    this.player.rotation.y = game.heading;
     // Rigid-mesh stride: no skeleton, per-vertex uploads or per-frame allocation.
     this.player.position.y =
       game.y +
@@ -266,8 +248,9 @@ export class View {
         (this.dinosaur.index?.count ??
           this.dinosaur.attributes.position.count) / 3,
       playerTextures: 0,
-      lanes: LANES,
-      separatorCount: this.lines.count,
+      obstacleColumns: LANES,
+      separatorCount: 0,
+      playerHeadingDegrees: THREE.MathUtils.radToDeg(this.player.rotation.y),
       obstacleCapacity: this.blocks.instanceMatrix.count,
       cameraExtraPitchDegrees: THREE.MathUtils.radToDeg(
         this.cameraPitch - this.basePitch,
@@ -281,7 +264,6 @@ export class View {
 
   dispose() {
     this.blocks.dispose();
-    this.lines.dispose();
     this.edges.dispose();
     this.markers.dispose();
     this.cube.dispose();
@@ -290,7 +272,7 @@ export class View {
     this.white.dispose();
     this.roadMaterial.dispose();
     this.sand.dispose();
-    this.lineMaterial.dispose();
+    this.markerMaterial.dispose();
     this.accentMaterial.dispose();
     this.renderer.dispose();
   }

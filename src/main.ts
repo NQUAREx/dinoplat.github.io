@@ -117,8 +117,8 @@ async function boot() {
     }
     element("hint").textContent =
       phase === "running"
-        ? "← → ПОЛОСЫ · ↑ ПРЫЖОК"
-        : "ПЯТЬ ПОЛОС · ТЫСЯЧА ПРИКЛЮЧЕНИЙ";
+        ? "← → ДВИЖЕНИЕ · ↑ ПРЫЖОК"
+        : "БЕГИ СВОБОДНО · ПРЫГАЙ ДАЛЬШЕ";
     element("menu-best").textContent = String(best);
     shownPhase = phase;
   }
@@ -291,8 +291,10 @@ async function boot() {
         stats: () => view.stats(),
         snapshot: () => ({
           phase: game.phase,
-          lane: game.lane,
           x: game.x,
+          targetX: game.targetX,
+          heading: game.heading,
+          movingX: game.movingX,
           y: game.y,
           distance: game.distance,
           speed: game.speed,

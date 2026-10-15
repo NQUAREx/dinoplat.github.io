@@ -22,7 +22,12 @@ export class Input {
           )
         )
           event.preventDefault();
-        if (event.repeat) return;
+        // Repeated horizontal keydowns continue shifting X; jump/pause never repeat.
+        if (
+          event.repeat &&
+          !["ArrowLeft", "KeyA", "ArrowRight", "KeyD"].includes(event.code)
+        )
+          return;
         if (event.code === "ArrowLeft" || event.code === "KeyA") move(-1);
         if (event.code === "ArrowRight" || event.code === "KeyD") move(1);
         if (
