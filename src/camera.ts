@@ -1,7 +1,7 @@
 import { Box3, Frustum, Matrix4, PerspectiveCamera } from "three";
 import { CUBE_SIZE } from "./simulation";
 
-export const CAMERA_FOV = 50;
+export const CAMERA_FOV = 30;
 export const CAMERA_FAR = 64;
 export const CAMERA_FOLLOW = 0.75;
 export const FOG_START = 24;
