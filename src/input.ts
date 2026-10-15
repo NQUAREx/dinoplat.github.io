@@ -5,15 +5,16 @@ export class Input {
   private readonly abort = new AbortController();
   private readonly gesture: GestureRecognizer;
   private pointer = -1;
+  private midpoint = 0;
   constructor(
-    canvas: HTMLCanvasElement,
+    private readonly canvas: HTMLCanvasElement,
     steer: (direction: number) => void,
     jump: () => void,
   ) {
     this.gesture = new GestureRecognizer(steer, jump);
+    this.resize();
     const options = { signal: this.abort.signal };
-    const direction = (x: number) =>
-      x < canvas.getBoundingClientRect().left + canvas.clientWidth / 2 ? -1 : 1;
+    const direction = (x: number) => (x < this.midpoint ? -1 : 1);
     canvas.addEventListener(
       "pointerdown",
       (event) => {
@@ -79,8 +80,15 @@ export class Input {
   update(now: number) {
     this.gesture.update(now);
   }
+  resize() {
+    const bounds = this.canvas.getBoundingClientRect();
+    this.midpoint = bounds.left + bounds.width / 2;
+  }
   clear() {
+    const pointer = this.pointer;
     this.pointer = -1;
+    if (pointer !== -1 && this.canvas.hasPointerCapture(pointer))
+      this.canvas.releasePointerCapture(pointer);
     this.gesture.clear();
   }
   dispose() {

@@ -11,8 +11,10 @@
     "test": "tsx --test tests/*.test.ts",
     "model:build": "node tools/build-reference-models.mjs",
     "icons:build": "node tools/prepare-icons.mjs",
+    "app-icons:build": "node tools/build-app-icons.mjs",
     "terrain:build": "node tools/prepare_terrains.mjs",
-    "test:browser": "node tests/browser.mjs"
+    "test:browser": "node tests/browser.mjs",
+    "test:mobile": "node tests/mobile.mjs"
   },
   "dependencies": {
     "three": "0.186.1"

@@ -15,6 +15,16 @@
 - HUD coin, diamond, heart, trophy and pause icons come from the original DinoPlat. Keep original files under art/hud-icons; publish only <=32px optimized versions. Sources/licences belong in ASSETS.md.
 - Touch-only, portrait-only. Desktop gets a phone prompt without allocating a renderer or loading game models/terrain. Landscape pauses simulation and RAF; returning needs explicit resume. No keyboard/mouse game handlers or desktop layout.
 
+## Mobile browser shell
+
+- Support current iOS Safari/WebKit and Android Chromium browsers with WebGL 2 (target Safari/iOS 16+). Detect touch/any coarse pointer, including touch iPadOS reporting MacIntel; no UA-only gate. Do not claim support for old browsers without WebGL 2.
+- Fullscreen API requires a trusted activation. Request it synchronously from Play/Resume or the pause-settings fullscreen button; feature-detect standard/WebKit API, catch denials and never prevent playing. No fullscreen requests on load, timers, synthetic activation or repeated prompts. Pause on leaving native fullscreen.
+- iPhone Safari cannot be forced into fullscreen in an ordinary tab. Provide relative-path `manifest.webmanifest` (fullscreen/standalone fallback, portrait, start/scope ./), local 192/512 PNG icons and Apple 180 icon/meta. Explain Share → Add to Home Screen in pause settings/README. Do not promise automatic installation, offline play, hidden OS bars/gestures or successful orientation lock on every device. No service worker/stale asset cache added just for fullscreen.
+- `MobileBrowser` owns viewport/fullscreen/long-press/lifecycle integration. Fixed document, no scroll/overscroll, user selection, callout, image drag, tap flash or pinch/double-tap zoom. Cancel document contextmenu/selectstart/dragstart/WebKit gesture events; nonpassive touchmove guard must exempt a single native range touch. Preserve working slider/buttons/attribution links and accessible labels.
+- Use visualViewport dimensions (only at scale≈1), dvh/CSS fallback and safe-area envs. Coalesce browser chrome resize events in one RAF; do not resize the WebGL buffer if CSS dimensions and DPR are unchanged. Change dimensions + DPR once via setDrawingBufferSize. Cache touch midpoint on resize instead of querying layout in pointermove.
+- Pagehide/freeze/background/fullscreen exit clear pointer capture, pause physics, stop RAF/vibration and suspend Web Audio. BFCache pageshow redraws but must not auto-resume the run or held input. Resume audio/fullscreen only on user activation; dispose all shell listeners/RAF on teardown.
+- Run `npm run test:mobile` after building, with Playwright Chromium/WebKit installed. Engine/device emulation is not testing physical iOS/Android hardware; report that limitation. Home-screen modes and missing/denied fullscreen need separate tests.
+
 ## World and collision rules
 
 - **No road boundaries and no fixed lane count.** X is continuous and unbounded in both directions. Forward is logical world Z; Y is jump height. Never restore X clamping, white lines, edge rails or a road-shaped ground mesh.

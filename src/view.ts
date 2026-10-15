@@ -33,6 +33,10 @@ export class View {
   private maximumRelativeX = 0;
   private worldFov = 0;
   private worldCameraX = 0;
+  private viewportWidth = 0;
+  private viewportHeight = 0;
+  private pixelRatio = 0;
+  private bufferResizes = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -90,14 +94,25 @@ export class View {
     const canvas = this.renderer.domElement,
       width = Math.max(1, canvas.clientWidth),
       height = Math.max(1, canvas.clientHeight);
-    this.renderer.setPixelRatio(
+    const ratio =
       Math.min(
         devicePixelRatio || 1,
         1.25,
         Math.sqrt(900000 / (width * height)),
-      ) * this.quality,
-    );
-    this.renderer.setSize(width, height, false);
+      ) * this.quality;
+    if (
+      width === this.viewportWidth &&
+      height === this.viewportHeight &&
+      ratio === this.pixelRatio
+    )
+      return;
+    this.viewportWidth = width;
+    this.viewportHeight = height;
+    this.pixelRatio = ratio;
+    this.bufferResizes++;
+    // Change size + DPR together: setPixelRatio followed by setSize resets a
+    // mobile canvas twice. CSS already owns the displayed dimensions.
+    this.renderer.setDrawingBufferSize(width, height, ratio);
     this.rig.resize(width / height);
     this.game.world.setVisibleHalfWidth(
       (this.rig.camera.far *
@@ -204,6 +219,7 @@ export class View {
       quality: this.quality,
       width: this.renderer.domElement.width,
       height: this.renderer.domElement.height,
+      bufferResizes: this.bufferResizes,
       threeRevision: THREE.REVISION,
       cameraFov: this.rig.camera.fov,
       cameraFar: this.rig.camera.far,

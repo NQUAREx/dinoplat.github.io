@@ -60,6 +60,11 @@ export class GameSound {
     this.gain.gain.cancelScheduledValues(this.context.currentTime);
     this.gain.gain.setValueAtTime(0, this.context.currentTime);
   }
+  suspend() {
+    this.stop();
+    if (this.context && this.context.state !== "closed")
+      void this.context.suspend().catch(() => {});
+  }
   stats() {
     return {
       enabled: this.enabled,

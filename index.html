@@ -4,9 +4,22 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
+      content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"
     />
     <meta name="theme-color" content="#73d8ff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="DinoPlat 3D" />
+    <meta
+      name="format-detection"
+      content="telephone=no,date=no,address=no,email=no,url=no"
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <meta
       name="description"
       content="Удерживай экран и веди динозавра по 16 пиксельным мирам. Светлый мобильный 3D-раннер Dino Plat."
@@ -164,6 +177,10 @@
           <button id="settings-back" class="pixel-button settings-link">
             ← НАЗАД
           </button>
+          <button id="fullscreen" class="pixel-button settings-link" hidden>
+            НА ВЕСЬ ЭКРАН
+          </button>
+          <p id="install-help" hidden></p>
         </section>
       </main>
       <footer class="bottom">

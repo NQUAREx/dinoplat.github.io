@@ -9,6 +9,7 @@ import { GameUI } from "./ui";
 import { Haptics } from "./haptics";
 import { GameSettings } from "./settings";
 import { GameSound } from "./sound";
+import { MobileBrowser } from "./mobile-browser";
 
 class GameApplication {
   readonly game = new Simulation(1979);
@@ -23,6 +24,7 @@ class GameApplication {
   private readonly settings = new GameSettings();
   private view?: View;
   private input?: Input;
+  private mobile?: MobileBrowser;
   private alive = true;
   private contextLost = false;
   private previous = 0;
@@ -31,13 +33,17 @@ class GameApplication {
   private readonly debug = new URLSearchParams(location.search).has("debug");
 
   async initialize() {
-    if (
-      navigator.maxTouchPoints < 1 ||
-      !matchMedia("(pointer: coarse)").matches
-    ) {
+    if (!MobileBrowser.supported()) {
       document.body.dataset.device = "unsupported";
       return;
     }
+    this.mobile = new MobileBrowser(
+      () => this.resizeViewport(),
+      () => {
+        this.pause();
+        this.stopFrames();
+      },
+    );
     this.ui.loading();
     try {
       if (!WebGL.isWebGL2Available())
@@ -92,6 +98,7 @@ class GameApplication {
             camera: this.view.rig,
             settings: this.settings,
             audio: () => this.sound.stats(),
+            mobile: () => this.mobile!.stats(),
             snapshot: () => ({
               phase: this.game.phase,
               x: this.game.x,
@@ -144,6 +151,12 @@ class GameApplication {
       );
     };
     touchButton(this.ui.action, () => this.start());
+    touchButton(
+      document.getElementById("fullscreen") as HTMLButtonElement,
+      () => {
+        void this.mobile?.enterFullscreen();
+      },
+    );
     touchButton(this.ui.pauseButton, () =>
       this.game.phase === "paused" ? this.start() : this.pause(),
     );
@@ -177,16 +190,11 @@ class GameApplication {
       },
       options,
     );
-    const resize = () => {
-      if (this.landscape.matches) {
-        this.pause();
-        this.stopFrames();
-      }
-      this.view?.resize();
-      this.schedule();
-    };
-    window.addEventListener("resize", resize, options);
-    this.landscape.addEventListener("change", resize, options);
+    this.landscape.addEventListener(
+      "change",
+      () => this.mobile?.requestResize(),
+      options,
+    );
     window.addEventListener("blur", () => this.pause(), options);
     document.addEventListener(
       "visibilitychange",
@@ -228,11 +236,20 @@ class GameApplication {
       options,
     );
   }
+  private resizeViewport() {
+    if (this.landscape.matches) {
+      this.pause();
+      this.stopFrames();
+    }
+    this.view?.resize();
+    this.input?.resize();
+    this.schedule();
+  }
   private applySettings() {
     this.haptics.enabled = this.settings.vibration;
     this.sound.enabled = this.settings.sound;
     if (!this.haptics.enabled) this.haptics.stop();
-    if (!this.sound.enabled) this.sound.stop();
+    if (!this.sound.enabled) this.sound.suspend();
     if (this.view) this.view.rig.shakeMultiplier = this.settings.shake;
     for (const key of ["vibration", "sound"] as const) {
       const button = document.getElementById(key)!;
@@ -254,6 +271,7 @@ class GameApplication {
       this.game.phase === "running"
     )
       return;
+    void this.mobile?.enterFullscreen();
     if (this.game.phase !== "paused")
       this.game.reset((Math.random() * 0xffffffff) >>> 0);
     this.game.phase = "running";
@@ -267,7 +285,7 @@ class GameApplication {
   pause() {
     this.input?.clear();
     this.haptics.stop();
-    this.sound.stop();
+    this.sound.suspend();
     if (this.game.phase !== "running") return;
     this.game.phase = "paused";
     this.previous = this.accumulator = 0;
@@ -325,6 +343,7 @@ class GameApplication {
     this.alive = false;
     this.stopFrames();
     this.abort.abort();
+    this.mobile?.dispose();
     this.input?.dispose();
     this.haptics.dispose();
     this.sound.dispose();
