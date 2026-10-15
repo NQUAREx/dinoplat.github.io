@@ -1,0 +1,131 @@
+// Independent of Three.js and DOM: replace presentation without changing rules.
+export const LANES = 4;
+export const LANE_WIDTH = 2.1;
+export const ROW_COUNT = 12;
+export const ROW_GAP = 18;
+export const MAX_SPEED = 24;
+export const STEP = 1 / 120;
+export const SIDE_SPEED = 13;
+export const CUBE_SIZE = 1.2;
+export const PLAYER_RADIUS = 0.27;
+export const laneX = (lane: number) => (lane - 1.5) * LANE_WIDTH;
+export type Phase = "ready" | "running" | "paused" | "over";
+
+export class Simulation {
+  readonly rowZ = new Float64Array(ROW_COUNT);
+  readonly masks = new Uint8Array(ROW_COUNT);
+  readonly safeLanes = new Uint8Array(ROW_COUNT);
+  phase: Phase = "ready";
+  lane = 1;
+  x = laneX(1);
+  y = 0;
+  velocityY = 0;
+  distance = 0;
+  speed = 12;
+  private state = 1;
+  private safeLane = 1;
+  constructor(seed = 1) {
+    this.reset(seed);
+  }
+
+  reset(seed: number) {
+    this.state = seed >>> 0 || 1;
+    this.phase = "ready";
+    this.lane = this.safeLane = 1;
+    this.x = laneX(1);
+    this.y = this.velocityY = this.distance = 0;
+    this.speed = 12;
+    for (let i = 0; i < ROW_COUNT; i++) {
+      this.rowZ[i] = 42 + i * ROW_GAP;
+      this.generate(i);
+    }
+  }
+
+  private random() {
+    let s = this.state;
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    this.state = s >>> 0;
+    return this.state / 4294967296;
+  }
+
+  private generate(i: number) {
+    this.safeLane = Math.max(
+      0,
+      Math.min(3, this.safeLane + Math.floor(this.random() * 3) - 1),
+    );
+    this.safeLanes[i] = this.safeLane;
+    let mask = 0;
+    for (let lane = 0; lane < LANES; lane++) {
+      if (lane !== this.safeLane && this.random() < 0.64) mask |= 1 << lane;
+    }
+    if (!mask)
+      mask = 1 << ((this.safeLane + 1 + Math.floor(this.random() * 3)) % LANES);
+    this.masks[i] = mask;
+  }
+
+  move(direction: number) {
+    if (this.phase === "running")
+      this.lane = Math.max(0, Math.min(3, this.lane + direction));
+  }
+  jump() {
+    if (this.phase === "running" && this.y === 0) this.velocityY = 8.6;
+  }
+
+  step(dt: number) {
+    if (this.phase !== "running") return;
+    const oldX = this.x,
+      oldY = this.y;
+    const delta = laneX(this.lane) - this.x;
+    this.x += Math.sign(delta) * Math.min(Math.abs(delta), SIDE_SPEED * dt);
+    if (this.y > 0 || this.velocityY > 0) {
+      this.y = Math.max(0, this.y + this.velocityY * dt - 11 * dt * dt);
+      this.velocityY -= 22 * dt;
+      if (this.y === 0) this.velocityY = 0;
+    }
+    this.speed = Math.min(MAX_SPEED, 12 + this.distance * 0.008);
+    const travel = this.speed * dt;
+    this.distance += travel;
+    const extent = CUBE_SIZE / 2 + PLAYER_RADIUS;
+    for (let i = 0; i < ROW_COUNT; i++) {
+      const before = this.rowZ[i],
+        after = before - travel;
+      this.rowZ[i] = after;
+      // Swept AABB: collide with actual position, not the target lane.
+      if (after <= extent && before >= -extent) {
+        const enter = Math.max(0, (before - extent) / travel);
+        const leave = Math.min(1, (before + extent) / travel);
+        for (let lane = 0; lane < LANES; lane++) {
+          if (!(this.masks[i] & (1 << lane))) continue;
+          const dx = this.x - oldX,
+            center = laneX(lane);
+          let low = enter,
+            high = leave;
+          if (Math.abs(dx) < 1e-9) {
+            if (Math.abs(oldX - center) >= extent) continue;
+          } else {
+            const a = (center - extent - oldX) / dx,
+              b = (center + extent - oldX) / dx;
+            low = Math.max(low, Math.min(a, b));
+            high = Math.min(high, Math.max(a, b));
+          }
+          if (
+            low <= high &&
+            Math.min(
+              oldY + (this.y - oldY) * low,
+              oldY + (this.y - oldY) * high,
+            ) < CUBE_SIZE
+          ) {
+            this.phase = "over";
+            return;
+          }
+        }
+      }
+      if (after < -8) {
+        this.rowZ[i] += ROW_COUNT * ROW_GAP;
+        this.generate(i);
+      }
+    }
+  }
+}

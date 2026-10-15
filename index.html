@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#101b23" />
+    <meta
+      name="description"
+      content="Четыре полосы. Один бесконечный забег. Лёгкий 3D-раннер Dino Plat."
+    />
+    <title>Dino Plat — Endless Run</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath fill='%23c8f583' d='M20 3L38 36H2Z'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <canvas
+      id="game"
+      aria-label="Игра: четыре полосы, белый конус и препятствия"
+      tabindex="0"
+    ></canvas>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Dino Plat, главная"
+        ><span class="brand-icon">△</span> DINO PLAT<span class="edition">
+          / 3D</span
+        ></a
+      >
+      <div class="top-right">
+        <span class="status"><i></i> ENDLESS RUN</span
+        ><button id="pause" class="icon-button" aria-label="Пауза" disabled>
+          Ⅱ
+        </button>
+      </div>
+    </header>
+    <section class="hud" aria-label="Результат забега">
+      <div>
+        <span class="eyebrow">ДИСТАНЦИЯ</span>
+        <div class="distance">
+          <span id="distance">0</span><span class="unit">м</span>
+        </div>
+      </div>
+      <div class="best">
+        <span class="eyebrow">ЛИЧНЫЙ РЕКОРД</span
+        ><span><span id="best">0</span> <small>м</small></span>
+      </div>
+    </section>
+    <main id="overlay">
+      <section class="panel" aria-labelledby="title">
+        <div class="chapter">
+          <span class="chapter-line"></span
+          ><span id="chapter">01 / БЕСКОНЕЧНЫЙ ЗАБЕГ</span>
+        </div>
+        <h1 id="title">Поймай<br /><em>свой ритм.</em></h1>
+        <p id="description">
+          Четыре полосы. Только вперёд.<br />Обходи препятствия и побей свой
+          рекорд.
+        </p>
+        <div id="result" hidden>
+          <span id="final-distance">0</span><span>метров за этот забег</span>
+        </div>
+        <button id="action" class="primary">Начать забег <span>→</span></button>
+        <div class="controls">
+          <div><kbd>←</kbd><kbd>→</kbd><span>сменить полосу</span></div>
+          <div><kbd>↑</kbd><span>прыжок</span></div>
+        </div>
+        <p class="touch-help">
+          На телефоне: касайся слева или справа,<br />смахни вверх, чтобы
+          прыгнуть.
+        </p>
+      </section>
+    </main>
+    <div class="bottom">
+      <span id="hint">ТВОЙ ТЕМП. ТВОЙ РЕКОРД.</span
+      ><span class="lane-mark"
+        >I &nbsp; I &nbsp; I &nbsp; I <span>04 LANES</span></span
+      >
+    </div>
+    <div id="live" class="sr-only" role="status" aria-live="polite"></div>
+    <noscript>Для игры включите JavaScript в браузере.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
