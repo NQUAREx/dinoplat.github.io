@@ -2,6 +2,8 @@ import "./style.css";
 import { Simulation, STEP, type Phase } from "./simulation";
 import { Input } from "./input";
 import { View } from "./view";
+import WebGL from "three/addons/capabilities/WebGL.js";
+import { loadDinosaurGeometry } from "./dinosaur";
 
 const element = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -23,9 +25,35 @@ try {
   /* Storage is optional. */
 }
 bestText.textContent = String(Math.floor(best));
+let superseded = false;
+if (import.meta.hot)
+  import.meta.hot.dispose(() => {
+    superseded = true;
+  });
 
-function boot() {
-  const view = new View(canvas);
+async function boot() {
+  if (!WebGL.isWebGL2Available())
+    throw new Error(
+      "Для этой версии игры нужен WebGL 2. Включи аппаратное ускорение или попробуй более новый браузер.",
+    );
+  const initialAction = action.innerHTML;
+  action.disabled = true;
+  action.textContent = "Загружаем динозавра…";
+  const geometry = await loadDinosaurGeometry();
+  // HMR can replace the module while its model request is still in flight.
+  if (superseded) {
+    geometry.dispose();
+    return;
+  }
+  let view: View;
+  try {
+    view = new View(canvas, geometry);
+  } catch (error) {
+    geometry.dispose();
+    throw error;
+  }
+  action.innerHTML = initialAction;
+  action.disabled = false;
   const abort = new AbortController();
   let previous = 0,
     accumulator = 0,
@@ -256,13 +284,15 @@ function boot() {
   if (import.meta.hot) import.meta.hot.dispose(dispose);
 }
 
-try {
-  boot();
-} catch (error) {
+boot().catch((error: unknown) => {
+  if (superseded) return;
   title.textContent = "Не удалось запустить 3D";
   description.textContent =
-    "Нужен браузер с WebGL. Проверь аппаратное ускорение или попробуй другой браузер.";
+    error instanceof Error
+      ? error.message
+      : "Нужен браузер с WebGL 2. Попробуй перезагрузить страницу.";
+  action.disabled = false;
   action.textContent = "Попробовать снова";
   action.addEventListener("click", () => location.reload());
   console.error(error);
-}
+});

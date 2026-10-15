@@ -13,7 +13,6 @@ export class View {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(56, 1, 0.2, 115);
   private readonly cube = new THREE.BoxGeometry(1, 1, 1);
-  private readonly cone = new THREE.ConeGeometry(0.33, 1.25, 8);
   private readonly white = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     flatShading: true,
@@ -28,7 +27,11 @@ export class View {
     color: 0xc8f583,
   });
   private readonly road = new THREE.Mesh(this.cube, this.roadMaterial);
-  private readonly player = new THREE.Mesh(this.cone, this.white);
+  private readonly dinosaurMaterial = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    flatShading: true,
+  });
+  private readonly player: THREE.Mesh;
   private readonly blocks = new THREE.InstancedMesh(
     this.cube,
     this.white,
@@ -55,7 +58,11 @@ export class View {
   private sampleFrames = 0;
   private cooldown = 0;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    private readonly dinosaur: THREE.BufferGeometry,
+  ) {
+    this.player = new THREE.Mesh(dinosaur, this.dinosaurMaterial);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
@@ -72,7 +79,8 @@ export class View {
     this.scene.add(light);
     this.road.scale.set(8.4, 0.1, 126);
     this.road.position.set(0, -0.06, -49);
-    this.player.position.set(laneX(1), 0.625, 0);
+    this.player.position.set(laneX(1), 0, 0);
+    this.player.rotation.y = -0.25;
     this.blocks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.markers.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     // Dynamic bounds would otherwise become stale when pooled instances recycle.
@@ -153,7 +161,11 @@ export class View {
 
   draw(game: Simulation) {
     this.player.position.x = game.x;
-    this.player.position.y = game.y + 0.625;
+    // Rigid-mesh stride: no skeleton, per-vertex uploads or per-frame allocation.
+    this.player.position.y =
+      game.y +
+      (game.y === 0 ? Math.abs(Math.sin(game.distance * 3)) * 0.025 : 0);
+    this.player.rotation.z = Math.sin(game.distance * 3) * 0.025;
     let count = 0;
     for (let i = 0; i < ROW_COUNT; i++) {
       if (game.rowZ[i] > 105 || game.rowZ[i] < -4) continue;
@@ -192,6 +204,11 @@ export class View {
       quality: this.quality,
       width: this.renderer.domElement.width,
       height: this.renderer.domElement.height,
+      threeRevision: THREE.REVISION,
+      playerTriangles:
+        (this.dinosaur.index?.count ??
+          this.dinosaur.attributes.position.count) / 3,
+      playerTextures: 0,
     };
   }
 
@@ -201,7 +218,8 @@ export class View {
     this.edges.dispose();
     this.markers.dispose();
     this.cube.dispose();
-    this.cone.dispose();
+    this.dinosaur.dispose();
+    this.dinosaurMaterial.dispose();
     this.white.dispose();
     this.roadMaterial.dispose();
     this.lineMaterial.dispose();

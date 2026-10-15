@@ -2,3 +2,5 @@ node_modules/
 dist/
 test-results/
 *.local
+*.blend1
+__pycache__/

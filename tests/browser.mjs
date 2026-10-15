@@ -42,6 +42,14 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${url}/?debug`);
   await page.waitForFunction(() => window.__runner?.stats().calls > 0);
+  assert.equal(
+    await page.evaluate(() => window.__runner.stats().threeRevision),
+    "186",
+  );
+  assert.equal(
+    await page.evaluate(() => window.__runner.stats().playerTriangles),
+    288,
+  );
   await page.screenshot({ path: "test-results/desktop-menu.png" });
   await page.click("#action");
   await page.keyboard.press("ArrowRight");
@@ -209,15 +217,10 @@ try {
   assert.ok(report.mobile.width * report.mobile.height <= 900000);
   await mobile.close();
 
-  // Force WebGL 1 fallback and deny localStorage, both supported paths.
+  // Storage remains optional even with asynchronous model loading.
   const legacy = await browser.newPage();
   legacy.on("pageerror", (e) => errors.push(e.message));
   await legacy.addInitScript(() => {
-    const getContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
-      if (type === "webgl2") return null;
-      return getContext.call(this, type, ...args);
-    };
     Object.defineProperty(window, "localStorage", {
       get() {
         throw new Error("denied");
@@ -227,14 +230,46 @@ try {
   await legacy.goto(`${url}/?debug`);
   await legacy.waitForFunction(() => window.__runner?.stats().calls > 0);
   await legacy.click("#action");
-  report.webgl1 = await legacy.evaluate(() => window.__runner.snapshot());
+  report.noStorage = await legacy.evaluate(() => window.__runner.snapshot());
   await legacy.close();
+  // Latest Three.js requires WebGL 2: a readable fallback, not a blank canvas.
+  const unsupported = await browser.newPage();
+  unsupported.on("pageerror", (e) => errors.push(e.message));
+  await unsupported.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+      if (type === "webgl2") return null;
+      return getContext.call(this, type, ...args);
+    };
+  });
+  await unsupported.goto(url);
+  await unsupported.waitForFunction(() =>
+    document.querySelector("#description").textContent.includes("WebGL 2"),
+  );
+  assert.equal(await unsupported.locator("#action").isEnabled(), true);
+  report.webgl2Required = true;
+  await unsupported.close();
+  // Asset failure is reported and leaves an explicit retry button.
+  const missing = await browser.newPage();
+  missing.on("pageerror", (e) => errors.push(e.message));
+  await missing.route("**/*.glb", (route) =>
+    route.fulfill({ status: 503, body: "unavailable" }),
+  );
+  await missing.goto(url);
+  await missing.waitForFunction(() =>
+    document
+      .querySelector("#description")
+      .textContent.includes("Не удалось загрузить динозавра"),
+  );
+  assert.equal(await missing.locator("#action").isEnabled(), true);
+  report.modelFailureHandled = true;
+  await missing.close();
   assert.deepEqual(errors, []);
   report.errors = errors;
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(
-    "PASS: desktop/mobile input, jump, collision, restart, record, pause, resize, 100 restarts, GPU recovery, WebGL 1.",
+    "PASS: dinosaur, desktop/mobile input, jump, collision, restart, record, pause, resize, 100 restarts, GPU recovery, WebGL 2 requirement, storage and model failure.",
   );
 } finally {
   await browser.close();
