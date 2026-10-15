@@ -1,338 +1,290 @@
 import "./style.css";
-import { Simulation, STEP, type Phase } from "./simulation";
-import { Input } from "./input";
-import { View } from "./view";
 import WebGL from "three/addons/capabilities/WebGL.js";
-import { loadDinosaurGeometry } from "./dinosaur";
-import { loadTerrainTexture } from "./terrain-texture";
+import { Simulation, STEP } from "./simulation";
+import { Input } from "./input";
+import { ModelLibrary } from "./models";
+import { TerrainTexture } from "./terrain-texture";
+import { View } from "./view";
+import { GameUI } from "./ui";
+import { Haptics } from "./haptics";
 
-const element = <T extends HTMLElement>(id: string) =>
-  document.getElementById(id) as T;
-const canvas = element<HTMLCanvasElement>("game");
-const overlay = element("overlay");
-const action = element<HTMLButtonElement>("action");
-const pauseButton = element<HTMLButtonElement>("pause");
-const distanceText = element("distance");
-const bestText = element("best");
-const title = element("title");
-const description = element("description");
-const chapter = element("chapter");
-const result = element("result");
-const app = element("app");
-const game = new Simulation(1979);
-let best = 0;
-try {
-  best = Math.max(0, Number(localStorage.getItem("dinoplat-3d-best")) || 0);
-} catch {
-  /* Storage is optional. */
-}
-bestText.textContent = String(Math.floor(best));
-let superseded = false;
-if (import.meta.hot)
-  import.meta.hot.dispose(() => {
-    superseded = true;
-  });
+class GameApplication {
+  readonly game = new Simulation(1979);
+  private readonly ui = new GameUI();
+  private readonly canvas = document.getElementById(
+    "game",
+  ) as HTMLCanvasElement;
+  private readonly abort = new AbortController();
+  private readonly landscape = matchMedia("(orientation: landscape)");
+  private readonly haptics = new Haptics(this.game.events);
+  private view?: View;
+  private input?: Input;
+  private alive = true;
+  private contextLost = false;
+  private previous = 0;
+  private accumulator = 0;
+  private raf = 0;
+  private readonly debug = new URLSearchParams(location.search).has("debug");
 
-async function boot() {
-  // No desktop game, mouse controls, or keyboard bindings. No GPU allocated there.
-  if (navigator.maxTouchPoints < 1 || !matchMedia("(pointer: coarse)").matches) {
-    document.body.dataset.device = "unsupported";
-    return;
-  }
-  if (!WebGL.isWebGL2Available())
-    throw new Error(
-      "Для этой версии игры нужен WebGL 2. Включи аппаратное ускорение или попробуй более новый браузер.",
-    );
-  const initialAction = action.innerHTML;
-  action.disabled = true;
-  action.textContent = "ЗАГРУЗКА…";
-  const [modelResult, terrainResult] = await Promise.allSettled([
-    loadDinosaurGeometry(),
-    loadTerrainTexture(),
-  ]);
-  if (modelResult.status === "rejected" || terrainResult.status === "rejected") {
-    if (modelResult.status === "fulfilled") modelResult.value.dispose();
-    if (terrainResult.status === "fulfilled") terrainResult.value.dispose();
-    throw modelResult.status === "rejected"
-      ? modelResult.reason
-      : (terrainResult as PromiseRejectedResult).reason;
-  }
-  const geometry = modelResult.value,
-    terrainTexture = terrainResult.value;
-  // HMR can replace the module while its model request is still in flight.
-  if (superseded) {
-    geometry.dispose();
-    terrainTexture.dispose();
-    return;
-  }
-  let view: View;
-  try {
-    view = new View(canvas, geometry, terrainTexture);
-  } catch (error) {
-    geometry.dispose();
-    terrainTexture.dispose();
-    throw error;
-  }
-  action.innerHTML = initialAction;
-  action.disabled = false;
-  const abort = new AbortController();
-  let previous = 0,
-    accumulator = 0,
-    raf = 0;
-  let shownPhase: Phase = "ready";
-  let displayedDistance = -1;
-  let contextLost = false;
-  let alive = true;
-  const landscapeQuery = matchMedia(
-    "(orientation: landscape) and (pointer: coarse)",
-  );
-  let orientationBlocked = landscapeQuery.matches;
-
-  function show() {
-    const phase = game.phase;
-    if (phase !== "running") input.clear();
-    app.dataset.phase = phase;
-    overlay.hidden = phase === "running";
-    pauseButton.disabled = phase !== "running" && phase !== "paused";
-    pauseButton.setAttribute(
-      "aria-label",
-      phase === "paused" ? "Продолжить" : "Пауза",
-    );
-    pauseButton.textContent = phase === "paused" ? "ПРОДОЛЖИТЬ" : "ПАУЗА";
-    result.hidden = phase !== "over";
-    if (phase === "over") {
-      const meters = Math.floor(game.distance);
-      best = Math.max(best, meters);
-      try {
-        localStorage.setItem("dinoplat-3d-best", String(best));
-      } catch {
-        /* Optional. */
-      }
-      bestText.textContent = String(best);
-      title.innerHTML = "Вот это<br /><em>забег!</em>";
-      description.textContent = "Дино готов к новому приключению!";
-      chapter.textContent = "МОЛОДЕЦ!";
-      element("final-distance").textContent = String(meters);
-      action.innerHTML = 'ЕЩЁ ЗАБЕГ <span aria-hidden="true">→</span>';
-      element("live").textContent = `Конец игры. ${meters} метров.`;
-    } else if (phase === "paused") {
-      title.innerHTML = "Отдохнём?<br /><em>Дино ждёт!</em>";
-      description.textContent = "Набирайся сил и беги дальше.";
-      chapter.textContent = "ПАУЗА";
-      action.innerHTML = 'ПРОДОЛЖИТЬ <span aria-hidden="true">→</span>';
-    }
-    element("hint").textContent =
-      phase === "running"
-        ? "УДЕРЖИВАЙ СЛЕВА / СПРАВА · СВАЙП ↑"
-        : "БЕГИ СВОБОДНО · ПРЫГАЙ ДАЛЬШЕ";
-    element("menu-best").textContent = String(best);
-    shownPhase = phase;
-  }
-
-  function schedule() {
+  async initialize() {
     if (
-      !raf &&
-      alive &&
-      !document.hidden &&
-      !contextLost &&
-      !orientationBlocked
-    )
-      raf = requestAnimationFrame(frame);
-  }
-  function start() {
-    if (contextLost || orientationBlocked || game.phase === "running") return;
-    if (game.phase !== "paused") game.reset((Math.random() * 0xffffffff) >>> 0);
-    game.phase = "running";
-    input.clear();
-    previous = accumulator = 0;
-    show();
-    schedule();
-  }
-  function pause() {
-    if (game.phase === "paused") {
-      start();
+      navigator.maxTouchPoints < 1 ||
+      !matchMedia("(pointer: coarse)").matches
+    ) {
+      document.body.dataset.device = "unsupported";
       return;
     }
-    if (game.phase !== "running") return;
-    game.phase = "paused";
-    input.clear();
-    previous = accumulator = 0;
-    show();
-  }
-  function frame(now: number) {
-    raf = 0;
-    if (!alive || document.hidden || contextLost || orientationBlocked) return;
-    const dt = previous ? (now - previous) / 1000 : 0;
-    previous = now;
-    // Treat a large interruption as a pause instead of an unseen fatal advance.
-    if (dt > 0.5 && game.phase === "running") pause();
-    if (game.phase === "running") {
-      accumulator += Math.min(dt, 0.25);
-      while (accumulator >= STEP && game.phase === "running") {
-        game.step(STEP);
-        accumulator -= STEP;
+    this.ui.loading();
+    try {
+      if (!WebGL.isWebGL2Available())
+        throw new Error("Для игры нужен мобильный браузер с WebGL 2.");
+      const [model, ground] = await Promise.allSettled([
+        ModelLibrary.load(),
+        TerrainTexture.load(),
+      ]);
+      if (
+        model.status === "rejected" ||
+        ground.status === "rejected" ||
+        !this.alive
+      ) {
+        if (model.status === "fulfilled") model.value.dispose();
+        if (ground.status === "fulfilled") ground.value.dispose();
+        if (!this.alive) return;
+        throw model.status === "rejected"
+          ? model.reason
+          : (ground as PromiseRejectedResult).reason;
       }
-      view.adapt(dt);
+      try {
+        this.view = new View(this.canvas, model.value, ground.value, this.game);
+      } catch (error) {
+        model.value.dispose();
+        ground.value.dispose();
+        throw error;
+      }
+      await this.view.initialize();
+      if (!this.alive) return;
+      this.input = new Input(
+        this.canvas,
+        (direction) => {
+          if (!this.landscape.matches || direction === 0)
+            this.game.move(direction);
+        },
+        () => {
+          if (!this.landscape.matches) this.game.jump();
+        },
+      );
+      this.bind();
+      this.ui.show(this.game);
+      this.schedule();
+      if (this.debug)
+        Object.assign(window, {
+          __runner: {
+            game: this.game,
+            start: () => this.start(),
+            pause: () => this.pause(),
+            stats: () => this.view!.stats(),
+            render: () => this.view!.draw(),
+            camera: this.view.rig,
+            snapshot: () => ({
+              phase: this.game.phase,
+              x: this.game.x,
+              y: this.game.y,
+              steering: this.game.steering,
+              distance: this.game.distance,
+              speed: this.game.speed,
+              lives: this.game.health.lives,
+              coins: this.game.wallet.coins,
+              diamonds: this.game.wallet.diamonds,
+              orientationBlocked: this.landscape.matches,
+              terrainSegment: this.game.terrain.segment,
+              terrainCurrent: this.game.terrain.current,
+              terrainNext: this.game.terrain.next,
+              ...this.view!.stats(),
+            }),
+          },
+        });
+    } catch (error) {
+      if (!this.alive) return;
+      this.view?.dispose();
+      this.view = undefined;
+      this.ui.error(error);
+      this.ui.action.addEventListener(
+        "pointerup",
+        (event) => {
+          if (event.pointerType === "touch") location.reload();
+        },
+        { signal: this.abort.signal },
+      );
+      console.error(error);
     }
-    if (shownPhase !== game.phase) show();
-    const meters = Math.floor(game.distance);
-    if (meters !== displayedDistance) {
-      distanceText.textContent = String(meters);
-      displayedDistance = meters;
-    }
-    view.draw(game, game.phase === "running" ? accumulator / STEP : 1);
-    if (game.phase === "running") schedule();
   }
-
-  const input = new Input(
-    canvas,
-    (direction) => {
-      if (!orientationBlocked || direction === 0) game.move(direction);
-    },
-    () => {
-      if (!orientationBlocked) game.jump();
-    },
-  );
-  const options = { signal: abort.signal };
-  // Touch release only; compatibility mouse/keyboard clicks are intentionally ignored.
-  function bindButton(button: HTMLButtonElement, handler: () => void) {
-    button.addEventListener(
-      "pointerup",
+  private bind() {
+    const options = { signal: this.abort.signal };
+    const touchButton = (button: HTMLButtonElement, handler: () => void) => {
+      button.addEventListener(
+        "pointerup",
+        (event) => {
+          if (
+            event.pointerType !== "touch" ||
+            !event.isPrimary ||
+            button.disabled
+          )
+            return;
+          event.preventDefault();
+          handler();
+        },
+        options,
+      );
+    };
+    touchButton(this.ui.action, () => this.start());
+    touchButton(this.ui.pauseButton, () =>
+      this.game.phase === "paused" ? this.start() : this.pause(),
+    );
+    const vibration = document.getElementById("vibration") as HTMLButtonElement;
+    touchButton(vibration, () => {
+      this.haptics.enabled = !this.haptics.enabled;
+      vibration.setAttribute("aria-pressed", String(this.haptics.enabled));
+      vibration.textContent = `ВИБРАЦИЯ: ${this.haptics.enabled ? "ДА" : "НЕТ"}`;
+      if (!this.haptics.enabled) this.haptics.stop();
+    });
+    const resize = () => {
+      if (this.landscape.matches) {
+        this.pause();
+        this.stopFrames();
+      }
+      this.view?.resize();
+      this.schedule();
+    };
+    window.addEventListener("resize", resize, options);
+    this.landscape.addEventListener("change", resize, options);
+    window.addEventListener("blur", () => this.pause(), options);
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        if (document.hidden) {
+          this.pause();
+          this.stopFrames();
+        } else this.schedule();
+      },
+      options,
+    );
+    this.canvas.addEventListener(
+      "webglcontextlost",
       (event) => {
-        if (
-          event.pointerType !== "touch" ||
-          !event.isPrimary ||
-          button.disabled
-        )
-          return;
         event.preventDefault();
-        handler();
+        this.contextLost = true;
+        this.pause();
+        this.stopFrames();
+        this.ui.graphicsLost();
+      },
+      options,
+    );
+    this.canvas.addEventListener(
+      "webglcontextrestored",
+      () => {
+        this.contextLost = false;
+        if (this.game.phase === "ready") this.game.phase = "paused";
+        this.ui.show(this.game);
+        this.view?.resize();
+        this.schedule();
+      },
+      options,
+    );
+    window.addEventListener(
+      "pagehide",
+      (event) => {
+        if (!event.persisted) this.dispose();
       },
       options,
     );
   }
-  bindButton(action, start);
-  bindButton(pauseButton, pause);
-  function resizePortrait() {
-    orientationBlocked = landscapeQuery.matches;
-    if (orientationBlocked) {
-      if (game.phase === "running") pause();
-      cancelAnimationFrame(raf);
-      raf = previous = accumulator = 0;
+  start() {
+    if (
+      !this.alive ||
+      this.contextLost ||
+      this.landscape.matches ||
+      this.game.phase === "running"
+    )
+      return;
+    if (this.game.phase !== "paused")
+      this.game.reset((Math.random() * 0xffffffff) >>> 0);
+    this.game.phase = "running";
+    this.haptics.stop();
+    this.input?.clear();
+    this.previous = this.accumulator = 0;
+    this.ui.show(this.game);
+    this.schedule();
+  }
+  pause() {
+    this.input?.clear();
+    this.haptics.stop();
+    if (this.game.phase !== "running") return;
+    this.game.phase = "paused";
+    this.previous = this.accumulator = 0;
+    this.ui.show(this.game);
+  }
+  private stopFrames() {
+    cancelAnimationFrame(this.raf);
+    this.raf = this.previous = this.accumulator = 0;
+  }
+  private schedule() {
+    if (
+      !this.raf &&
+      this.alive &&
+      !document.hidden &&
+      !this.contextLost &&
+      !this.landscape.matches
+    )
+      this.raf = requestAnimationFrame(this.frame);
+  }
+  private readonly frame = (now: number) => {
+    this.raf = 0;
+    if (
+      !this.alive ||
+      !this.view ||
+      document.hidden ||
+      this.contextLost ||
+      this.landscape.matches
+    )
+      return;
+    const dt = this.previous ? (now - this.previous) / 1000 : 0;
+    this.previous = now;
+    if (dt > 0.5 && this.game.phase === "running") this.pause();
+    this.input?.update(now);
+    if (this.game.phase === "running") {
+      this.accumulator += Math.min(dt, 0.25);
+      while (this.accumulator >= STEP && this.game.phase === "running") {
+        this.game.step(STEP);
+        this.accumulator -= STEP;
+      }
+      this.view.adapt(dt);
     }
-    view.resize();
-    schedule();
+    if (this.ui.phase !== this.game.phase) {
+      this.input?.clear();
+      this.ui.show(this.game);
+    }
+    this.ui.update(this.game);
+    this.view.draw(
+      this.game.phase === "running" ? this.accumulator / STEP : 1,
+      Math.min(dt, 0.25),
+    );
+    if (this.game.phase === "running") this.schedule();
+  };
+  dispose() {
+    if (!this.alive) return;
+    this.alive = false;
+    this.stopFrames();
+    this.abort.abort();
+    this.input?.dispose();
+    this.haptics.dispose();
+    this.view?.dispose();
+    this.view = undefined;
+    this.game.events.dispose();
+    if (this.debug)
+      delete (window as unknown as Record<string, unknown>).__runner;
   }
-  window.addEventListener("resize", resizePortrait, options);
-  landscapeQuery.addEventListener("change", resizePortrait, options);
-  document.addEventListener(
-    "visibilitychange",
-    () => {
-      if (document.hidden) {
-        if (game.phase === "running") pause();
-        cancelAnimationFrame(raf);
-        raf = previous = accumulator = 0;
-      } else schedule();
-    },
-    options,
-  );
-  window.addEventListener(
-    "blur",
-    () => {
-      if (game.phase === "running") pause();
-    },
-    options,
-  );
-  canvas.addEventListener(
-    "webglcontextlost",
-    (event) => {
-      event.preventDefault();
-      contextLost = true;
-      if (game.phase === "running") pause();
-      cancelAnimationFrame(raf);
-      raf = 0;
-      overlay.hidden = false;
-      action.disabled = true;
-      title.textContent = "Графика на паузе";
-      description.textContent = "Ждём восстановления графического контекста…";
-    },
-    options,
-  );
-  canvas.addEventListener(
-    "webglcontextrestored",
-    () => {
-      contextLost = false;
-      action.disabled = false;
-      previous = 0;
-      if (game.phase === "ready") game.phase = "paused";
-      show();
-      view.resize();
-      schedule();
-    },
-    options,
-  );
-  show();
-  schedule();
-
-  // Explicit diagnostics opt-in; no automation or mutable game state in normal play.
-  const debug = new URLSearchParams(location.search).has("debug");
-  if (debug) {
-    Object.assign(window, {
-      __runner: {
-        game,
-        start,
-        pause,
-        stats: () => view.stats(),
-        render: () => view.draw(game),
-        snapshot: () => ({
-          phase: game.phase,
-          x: game.x,
-          steering: game.steering,
-          terrainSegment: game.terrain.segment,
-          terrainCurrent: game.terrain.current,
-          terrainNext: game.terrain.next,
-          terrainPrevious: game.terrain.previous,
-          heading: game.heading,
-          movingX: game.movingX,
-          y: game.y,
-          distance: game.distance,
-          speed: game.speed,
-          orientationBlocked,
-          ...view.stats(),
-        }),
-      },
-    });
-  }
-  function dispose() {
-    alive = false;
-    cancelAnimationFrame(raf);
-    abort.abort();
-    input.dispose();
-    view.dispose();
-    if (debug) delete (window as unknown as Record<string, unknown>).__runner;
-  }
-  window.addEventListener(
-    "pagehide",
-    (event) => {
-      if (!event.persisted) dispose();
-    },
-    options,
-  );
-  if (import.meta.hot) import.meta.hot.dispose(dispose);
 }
 
-boot().catch((error: unknown) => {
-  if (superseded) return;
-  app.dataset.phase = "error";
-  title.innerHTML = "Ой!<br /><em>Не вышло</em>";
-  description.textContent =
-    error instanceof Error
-      ? error.message
-      : "Нужен браузер с WebGL 2. Попробуй перезагрузить страницу.";
-  action.disabled = false;
-  action.textContent = "Попробовать снова";
-  action.addEventListener("pointerup", event => {
-    if (event.pointerType === "touch") location.reload();
-  });
-  console.error(error);
-});
+const application = new GameApplication();
+void application.initialize();
+if (import.meta.hot) import.meta.hot.dispose(() => application.dispose());

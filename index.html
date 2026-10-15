@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width,initial-scale=1,viewport-fit=cover"
     />
-    <meta name="theme-color" content="#d6f2ec" />
+    <meta name="theme-color" content="#73d8ff" />
     <meta
       name="description"
       content="Удерживай экран и веди динозавра по 16 пиксельным мирам. Светлый мобильный 3D-раннер Dino Plat."
@@ -21,7 +21,7 @@
     <div id="app" data-phase="ready">
       <canvas
         id="game"
-        aria-label="Свободно движущийся белый динозавр и кубы на песчаной дорожке"
+        aria-label="Динозавр и кактусы в бесконечном пиксельном мире"
       ></canvas>
       <header class="topbar">
         <a class="brand" href="./" aria-label="Dino Plat, главная"
@@ -30,15 +30,37 @@
         <span class="subtitle">МАЛЕНЬКИЙ ДИНО · БОЛЬШОЙ ЗАБЕГ</span>
       </header>
       <section class="hud" aria-label="Результат забега">
-        <div class="score-box">
-          <span class="eyebrow">ПРОБЕЖАЛ</span>
-          <div class="distance">
-            <span id="distance">0</span><small>м</small>
-          </div>
+        <div class="score-box" aria-label="Монеты" title="Монеты">
+          <img src="/src/assets/icons/coin.png" alt="" /><span id="coins"
+            >0</span
+          >
         </div>
-        <div class="score-box best">
-          <span class="eyebrow">РЕКОРД</span>
-          <div><span id="best">0</span><small>м</small></div>
+        <div class="score-box" aria-label="Алмазы" title="Алмазы">
+          <img src="/src/assets/icons/diamond.png" alt="" /><span id="diamonds"
+            >0</span
+          >
+        </div>
+        <div class="score-box" aria-label="Жизни" title="Жизни">
+          <img src="/src/assets/icons/live.png" alt="" /><span id="lives"
+            >3</span
+          >
+        </div>
+        <div
+          class="score-box"
+          aria-label="Дистанция в метрах"
+          title="Дистанция"
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path
+              fill="#334d65"
+              d="M2 12h4V8h4V4h4v4h-2v4H8v4H4v2H2zM12 14h4v-4h2v8h-6z"
+            /></svg
+          ><span id="distance">0</span>
+        </div>
+        <div class="score-box" aria-label="Рекорд" title="Рекорд">
+          <img src="/src/assets/icons/record.png" alt="" /><span id="best"
+            >0</span
+          >
         </div>
       </section>
       <main id="overlay">
@@ -67,8 +89,7 @@
           <div id="chapter" class="chapter">МИР ПРИКЛЮЧЕНИЙ</div>
           <h1 id="title">Дино,<br /><em>вперёд!</em></h1>
           <p id="description">
-            Беги свободно навстречу приключениям!<br />Обходи кубы и прыгай всё
-            дальше.
+            Целый мир без границ!<br />Обходи кактусы и прыгай дальше.
           </p>
           <div id="result" hidden>
             <span id="final-distance">0</span><span>метров за забег</span>
@@ -77,10 +98,26 @@
             ИГРАТЬ <span aria-hidden="true">→</span>
           </button>
           <p class="touch-help">
-            Удерживай слева или справа — беги вбок.<br />Отпусти — остановись. Свайп вверх — прыжок!
+            Удерживай слева или справа — беги вбок.<br />Отпусти палец.
+            Отдельный свайп вверх — прыжок!
           </p>
           <p class="record-note">
             Твой рекорд: <span id="menu-best">0</span> м
+          </p>
+          <button id="vibration" class="vibration-button" aria-pressed="true">
+            ВИБРАЦИЯ: ДА
+          </button>
+          <p class="licence-note">
+            <a
+              href="https://github.com/NQUAREx/DinoPlat3d"
+              target="_blank"
+              rel="noopener"
+              >Исходники</a
+            >
+            ·
+            <a href="./licenses/GPL-3.0.txt" target="_blank" rel="noopener"
+              >GPLv3, без гарантий</a
+            ><br />Модели: © 2020 Abraham Tugalov / dino3d
           </p>
         </section>
       </main>
@@ -91,10 +128,8 @@
           aria-label="Пауза"
           disabled
         >
-          ПАУЗА
+          <img src="/src/assets/icons/pause.png" alt="" />
         </button>
-        <span id="hint">БЕГИ СВОБОДНО · ПРЫГАЙ ДАЛЬШЕ</span>
-        <span class="lane-mark" aria-hidden="true">✦</span>
       </footer>
       <div id="live" class="sr-only" role="status" aria-live="polite"></div>
     </div>
@@ -114,7 +149,10 @@
       <div class="rotate-card">
         <span class="phone-pixel" aria-hidden="true"></span>
         <h2>Открой на телефоне</h2>
-        <p>Дино слушается пальцев!<br />Нужен сенсорный экран<br />и вертикальное положение.</p>
+        <p>
+          Дино слушается пальцев!<br />Нужен сенсорный экран<br />и вертикальное
+          положение.
+        </p>
       </div>
     </aside>
     <noscript>Для игры включите JavaScript в браузере.</noscript>

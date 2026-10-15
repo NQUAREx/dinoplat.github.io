@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { Terrain, TERRAIN_WEIGHTS, TERRAIN_LENGTH } from "../src/terrain.ts";
 
 test("terrain changes at exact 500m boundaries, does not repeat and resets deterministically", () => {
-  const terrain = new Terrain(1979), replay = new Terrain(1979);
+  const terrain = new Terrain(1979),
+    replay = new Terrain(1979);
   assert.equal(TERRAIN_LENGTH, 500);
   assert.equal(TERRAIN_WEIGHTS.length, 16);
-  assert.ok(TERRAIN_WEIGHTS.every(weight => weight === 1));
+  assert.ok(TERRAIN_WEIGHTS.every((weight) => weight === 1));
   const first = terrain.current;
   const next = terrain.next;
   terrain.advance(499.999);
@@ -32,5 +33,6 @@ test("all 16 equally weighted terrains have comparable long-run frequency", () =
     terrain.advance(i * 500);
     counts[terrain.current]++;
   }
-  for (const count of counts) assert.ok(count > 850 && count < 1150, String(count));
+  for (const count of counts)
+    assert.ok(count > 850 && count < 1150, String(count));
 });

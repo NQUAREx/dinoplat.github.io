@@ -2,13 +2,15 @@
   "name": "dinoplat-runner",
   "version": "1.0.0",
   "private": true,
+  "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "tsx --test tests/*.test.ts",
-    "model:build": "blender --background --factory-startup --python tools/create_dinosaur.py",
+    "model:build": "node tools/build-reference-models.mjs",
+    "icons:build": "node tools/prepare-icons.mjs",
     "terrain:build": "node tools/prepare_terrains.mjs",
     "test:browser": "node tests/browser.mjs"
   },

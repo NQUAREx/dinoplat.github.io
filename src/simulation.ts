@@ -1,157 +1,165 @@
+import { Rules } from "./config";
+import { GameEvent, GameEvents } from "./events";
+import { BonusSystem, Currency, Health, Wallet } from "./progression";
+import { ObjectKind, ObjectRegistry, WorldSpawner } from "./world";
 import { Terrain } from "./terrain";
-// Independent of Three.js and DOM: replace presentation without changing rules.
-export const LANES = 5;
-export const LANE_WIDTH = 2.1;
-export const CENTER_LANE = Math.floor(LANES / 2);
-export const ROAD_WIDTH = LANES * LANE_WIDTH;
-export const ROW_COUNT = 12;
-export const ROW_GAP = 18;
-// Must remain behind the complete cube's screen exit; camera tests verify this.
-export const ROW_RECYCLE_Z = -16;
-export const MAX_SPEED = 24;
-export const STEP = 1 / 120;
-export const SIDE_SPEED = 8;
-export const CUBE_SIZE = 1.2;
-// Rotation-invariant body collider; decorative tail is excluded.
-export const PLAYER_RADIUS = 0.32;
-export const MAX_PLAYER_X = ROAD_WIDTH / 2 - PLAYER_RADIUS;
-export const MAX_HEADING = Math.PI / 4;
-const TURN_SPEED = Math.PI * 5;
-export const laneX = (lane: number) => (lane - (LANES - 1) / 2) * LANE_WIDTH;
-export type Phase = "ready" | "running" | "paused" | "over";
 
+export type Phase = "ready" | "running" | "paused" | "over";
+export const STEP = Rules.step;
+
+/** Pure numerical simulation. World coordinates are Float64; the renderer uses
+ * a moving player-centred origin before uploading any Float32 GPU positions. */
 export class Simulation {
+  readonly events = new GameEvents();
   readonly terrain = new Terrain();
-  readonly rowZ = new Float64Array(ROW_COUNT);
-  readonly masks = new Uint8Array(ROW_COUNT);
-  readonly safeLanes = new Uint8Array(ROW_COUNT);
+  readonly wallet = new Wallet(this.events);
+  readonly health = new Health(this.events);
+  readonly bonuses = new BonusSystem(this.events);
+  readonly world: WorldSpawner;
   phase: Phase = "ready";
+  seed = 1;
   x = 0;
   previousX = 0;
-  previousY = 0;
-  previousHeading = 0;
-  steering = 0;
-  heading = 0;
-  movingX = 0;
   y = 0;
+  previousY = 0;
+  heading = 0;
+  previousHeading = 0;
+  movingX = 0;
+  steering = 0;
   velocityY = 0;
   distance = 0;
+  previousDistance = 0;
   speed = 12;
-  private state = 1;
-  private safeLane = CENTER_LANE;
-  constructor(seed = 1) {
+  time = 0;
+  private nextStep = 0;
+  constructor(seed = 1, registry = ObjectRegistry.defaults()) {
+    this.world = new WorldSpawner(registry);
     this.reset(seed);
   }
-
   reset(seed: number) {
-    this.terrain.reset(seed);
-    this.state = seed >>> 0 || 1;
+    this.seed = seed >>> 0 || 1;
     this.phase = "ready";
-    this.safeLane = CENTER_LANE;
-    this.x = this.steering = this.heading = this.movingX = 0;
-    this.previousX = this.previousY = this.previousHeading = 0;
-    this.y = this.velocityY = this.distance = 0;
+    this.x = this.previousX = this.y = this.previousY = 0;
+    this.heading = this.previousHeading = this.movingX = this.steering = 0;
+    this.velocityY = this.distance = this.previousDistance = this.time = 0;
     this.speed = 12;
-    for (let i = 0; i < ROW_COUNT; i++) {
-      this.rowZ[i] = 42 + i * ROW_GAP;
-      this.generate(i);
-    }
+    this.nextStep = Rules.stepStride;
+    this.world.reset(this.seed);
+    this.world.update(0, 0);
+    this.terrain.reset(this.seed);
+    this.health.reset();
+    this.wallet.reset();
+    this.bonuses.reset();
+    this.events.emit(GameEvent.Start);
   }
-
-  private random() {
-    let s = this.state;
-    s ^= s << 13;
-    s ^= s >>> 17;
-    s ^= s << 5;
-    this.state = s >>> 0;
-    return this.state / 4294967296;
-  }
-
-  private generate(i: number) {
-    this.safeLane = Math.max(
-      0,
-      Math.min(LANES - 1, this.safeLane + Math.floor(this.random() * 3) - 1),
-    );
-    this.safeLanes[i] = this.safeLane;
-    let mask = 0;
-    for (let lane = 0; lane < LANES; lane++) {
-      if (lane !== this.safeLane && this.random() < 0.64) mask |= 1 << lane;
-    }
-    if (!mask)
-      mask =
-        1 <<
-        ((this.safeLane + 1 + Math.floor(this.random() * (LANES - 1))) % LANES);
-    this.masks[i] = mask;
-  }
-
   move(direction: number) {
-    // Held axis, not a destination. Release stops at any fractional coordinate.
     this.steering = this.phase === "running" ? Math.sign(direction) : 0;
   }
   jump() {
-    if (this.phase === "running" && this.y === 0) this.velocityY = 8.6;
+    if (this.phase !== "running" || this.y !== 0) return;
+    this.velocityY = Rules.jumpSpeed * this.bonuses.jumpFactor;
+    this.events.emit(GameEvent.Jump);
   }
-
   step(dt: number) {
     if (this.phase !== "running") return;
-    const oldX = this.x,
-      oldY = this.y;
-    this.previousX = oldX;
-    this.previousY = oldY;
+    this.previousX = this.x;
+    this.previousY = this.y;
     this.previousHeading = this.heading;
-    this.x = Math.max(-MAX_PLAYER_X, Math.min(MAX_PLAYER_X,
-      this.x + this.steering * SIDE_SPEED * dt));
-    this.movingX = Math.sign(this.x - oldX);
-    const targetHeading = -this.movingX * MAX_HEADING;
-    const turn = targetHeading - this.heading;
-    this.heading += Math.sign(turn) * Math.min(Math.abs(turn), TURN_SPEED * dt);
-    if (this.y > 0 || this.velocityY > 0) {
-      this.y = Math.max(0, this.y + this.velocityY * dt - 11 * dt * dt);
-      this.velocityY -= 22 * dt;
-      if (this.y === 0) this.velocityY = 0;
-    }
-    this.speed = Math.min(MAX_SPEED, 12 + this.distance * 0.008);
-    const travel = this.speed * dt;
-    this.distance += travel;
-    this.terrain.advance(this.distance);
-    const extent = CUBE_SIZE / 2 + PLAYER_RADIUS;
-    for (let i = 0; i < ROW_COUNT; i++) {
-      const before = this.rowZ[i],
-        after = before - travel;
-      this.rowZ[i] = after;
-      // Swept body AABB: actual continuous X/Z/Y, never a column index.
-      if (after <= extent && before >= -extent) {
-        const enter = Math.max(0, (before - extent) / travel);
-        const leave = Math.min(1, (before + extent) / travel);
-        for (let lane = 0; lane < LANES; lane++) {
-          if (!(this.masks[i] & (1 << lane))) continue;
-          const dx = this.x - oldX,
-            center = laneX(lane);
-          let low = enter,
-            high = leave;
-          if (Math.abs(dx) < 1e-9) {
-            if (Math.abs(oldX - center) >= extent) continue;
-          } else {
-            const a = (center - extent - oldX) / dx,
-              b = (center + extent - oldX) / dx;
-            low = Math.max(low, Math.min(a, b));
-            high = Math.min(high, Math.max(a, b));
-          }
-          if (
-            low <= high &&
-            Math.min(
-              oldY + (this.y - oldY) * low,
-              oldY + (this.y - oldY) * high,
-            ) < CUBE_SIZE
-          ) {
-            this.phase = "over";
-            return;
-          }
-        }
+    this.previousDistance = this.distance;
+    this.time += dt;
+    this.health.step(dt);
+    this.bonuses.step(dt);
+    this.x += this.steering * Rules.sideSpeed * dt; // Deliberately no lateral bounds.
+    this.movingX = this.steering;
+    const turn = (-this.movingX * Math.PI) / 4 - this.heading;
+    this.heading +=
+      Math.sign(turn) * Math.min(Math.abs(turn), Math.PI * 5 * dt);
+    const airborne = this.y > 0 || this.velocityY > 0;
+    if (airborne) {
+      this.y = Math.max(
+        0,
+        this.y + this.velocityY * dt - (Rules.gravity * dt * dt) / 2,
+      );
+      this.velocityY -= Rules.gravity * dt;
+      if (!this.y) {
+        this.velocityY = 0;
+        this.events.emit(GameEvent.Land);
       }
-      if (after < ROW_RECYCLE_Z) {
-        this.rowZ[i] += ROW_COUNT * ROW_GAP;
-        this.generate(i);
+    }
+    // Future speed bonuses must stay inside the generator's proven timing budget.
+    this.speed = Math.min(
+      Rules.maxSpeed,
+      (12 + this.distance * 0.008) * this.bonuses.speedFactor,
+    );
+    this.distance += this.speed * dt;
+    this.world.update(this.x, this.distance);
+    this.terrain.advance(this.distance);
+    this.collisions();
+    if (this.distance >= this.nextStep) {
+      this.nextStep = this.distance + Rules.stepStride;
+      if (!this.y && !this.velocityY) this.events.emit(GameEvent.Step);
+    }
+  }
+  private collisions() {
+    const pool = this.world,
+      dx = this.x - this.previousX,
+      dz = this.distance - this.previousDistance;
+    for (let i = 0; i < pool.active.length; i++) {
+      if (!pool.active[i]) continue;
+      const extentX = pool.halfX[i] + Rules.playerRadius,
+        extentZ = pool.halfZ[i] + Rules.playerRadius;
+      if (
+        pool.z[i] < this.previousDistance - extentZ ||
+        pool.z[i] > this.distance + extentZ
+      )
+        continue;
+      let enter = Math.max(
+        0,
+        (pool.z[i] - extentZ - this.previousDistance) / dz,
+      );
+      let leave = Math.min(
+        1,
+        (pool.z[i] + extentZ - this.previousDistance) / dz,
+      );
+      if (Math.abs(dx) < 1e-9) {
+        if (Math.abs(this.previousX - pool.x[i]) >= extentX) continue;
+      } else {
+        const a = (pool.x[i] - extentX - this.previousX) / dx,
+          b = (pool.x[i] + extentX - this.previousX) / dx;
+        enter = Math.max(enter, Math.min(a, b));
+        leave = Math.min(leave, Math.max(a, b));
+      }
+      if (enter > leave) continue;
+      const yEnter = this.previousY + (this.y - this.previousY) * enter;
+      const yLeave = this.previousY + (this.y - this.previousY) * leave;
+      if (
+        Math.min(yEnter, yLeave) >= pool.baseY[i] + pool.height[i] ||
+        Math.max(yEnter, yLeave) + Rules.playerBodyHeight <= pool.baseY[i]
+      )
+        continue;
+      const definition = pool.registry.get(pool.kinds[i]);
+      if (!definition) continue;
+      if (definition.blocking) {
+        if (
+          !this.bonuses.shield &&
+          this.health.damage() &&
+          !this.health.lives
+        ) {
+          this.phase = "over";
+          this.move(0);
+          return;
+        }
+      } else {
+        if (definition.kind === ObjectKind.Coin)
+          this.wallet.add(Currency.Coin, definition.reward ?? 1);
+        else if (definition.kind === ObjectKind.Diamond)
+          this.wallet.add(Currency.Diamond, definition.reward ?? 1);
+        else if (
+          definition.kind === ObjectKind.Bonus &&
+          definition.bonusId !== undefined
+        )
+          this.bonuses.activate(definition.bonusId);
+        pool.consume(i);
       }
     }
   }

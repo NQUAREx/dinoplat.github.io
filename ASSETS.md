@@ -1,27 +1,39 @@
-# Local assets and licences
+# Local assets and attribution
 
-All assets are served from this static site. No runtime calls to OpenGameArt, Google Fonts or other CDNs.
+All runtime assets are local static files, with no third-party CDN requests.
 
-## Pixel terrain array
+## dino3d voxel models — GPLv3
 
-- File: `src/assets/terrains.webp`, 512×512, **108 282 bytes**, 16 cells in a 4×4 grid, 128×128 per material.
-- Reference supplied by the user: https://chatgpt.com/s/m_6ad0f47f37dc8191bb6ba760102e41b4 . Original 1536×1024 image is preserved in `art/terrain-reference.png`. Treat this as user-provided reference art, not an asserted CC0 asset; its upstream copyright/licence has not been independently established.
-- `art/terrain-atlas-source.png`: AI-assisted production adaptation of that reference. The sixteen original material identities, row-major order, palette and pixel-art style were retained; ragged patches on black were extended into fully filled square cells. No black background remains in the runtime atlas.
-- `npm run terrain:build` runs `tools/prepare_terrains.mjs`: nearest-neighbour reduction to 512×512, matching opposing edges within an 8px strip, 128-colour quantisation without dithering and lossless WebP compression. Narrow edge matching avoids the obvious symmetry of full-tile mirroring. Original art PNGs are not included in the site build.
-- Runtime: decode once into a `DataArrayTexture`, 16 independent 128×128 sRGB layers, nearest magnification, trilinear mipmaps, anisotropy 1. Approximate RGBA GPU memory including mipmaps: **1.33 MiB** (implementation dependent). One texture object, no per-segment loading, allocations or new draw calls. Browser resource tests verify all 16 layers and stable resource counts across 100 restarts.
-- Each square spans 5.25×5.25 world metres; UV scroll is bounded. The road's small unlit shader takes one texture sample outside transitions, two within a spatial 16m transition, and adds distance fog. No normal / bump / displacement maps, PBR, postprocessing or extra lights.
-- Coverings are independently seeded and change every 500m. All sixteen configurable weights are 1; the current material is excluded from the next draw, so remaining candidates each have probability 1/15. Previous/current/next IDs preserve the boundary when the player crosses it.
-- The former OpenGameArt sand asset was removed; it is not shipped or requested anymore.
+- Source: https://github.com/hushenghao/dino3d , commit **cae7ed3da5646839e6aaa24f698b8c07cc3ffc85**. Original upstream author: **© 2020 Abraham Tugalov**, https://howdyho.net . See upstream README for other contributors. Licence: **GNU GPL version 3**; preserved in LICENSE and public/licenses/GPL-3.0.txt.
+- The project owner explicitly approved distributing DinoPlat3d under compatible GPLv3 terms. The menu links the licence/source and states the lack of warranty.
+- Original preferred editable files are preserved in `art/reference-models/t-rex/` (0–7.vox and death.vox, upstream other/wow.vox) and `art/reference-models/cactus/` (six upstream cactus/fcactus variants). The original author used MagicaVoxel. No upstream game code, old Three.js, Howler, vox.js or Nebula is included in this game.
+- Modified adaptation by DinoPlat3d, 2026-10-15: original `tools/build-reference-models.mjs` reads VOX, emits only exposed coloured surfaces, greedily merges coplanar same-colour faces, indexes shared vertices, stores normalized vertex colours and converts axes/scales for our rear camera.
+- Runtime: `src/assets/voxel-models.glb`, **595 972 bytes**, 15 meshes: eight running poses, one death pose, six cactus variants. 550–830 triangles per model; no images, texture maps, skeleton, Draco/KTX decoders or runtime VOX parser. Source editable geometry stays in the repo, not in dist.
+- Run/jump/death integration and foot dust are written for this project. Running swaps cached poses; jumping chooses takeoff/falling poses, with height controlled by our simulation; foot dust uses one fixed instanced pool. Upstream animation/gameplay implementation is not copied.
+- `src/assets/model-colliders.json` is regenerated with the model library and holds normalized variant bounds. Cactus yaw is included in collision extents. The retired hand-made Blender dinosaur, GLB and generator were removed from the current tree; history retains them.
+
+## Cartoon terrain and painted connectors
+
+- User-provided reference: https://chatgpt.com/s/m_6ad0f47f37dc8191bb6ba760102e41b4 . Preserved in `art/terrain-reference.png` (1536×1024). This is user-supplied art, not an asserted CC0 asset; independent upstream rights have not been established.
+- `art/terrain-atlas-source.png`: AI-assisted adaptation into 16 filled swatches, keeping the supplied identities/order and pixel-art style. `art/terrain-transitions-source.png`: AI-assisted hand-drawn-style material-to-common-stone connectors; the organic pixel borders are opaque art, not runtime material overlays. `art/terrain-stone-source.png` supplies the one common stone tile.
+- `tools/prepare_terrains.mjs` and `tools/pixel-quilter.mjs` perform authoring-time size/palette preparation and minimum-error hard-cut quilting. Opposite edges continue into natural neighbouring pixels, not averaged blurry bands. Four rotated/phase-shifted interiors share edge phases; the painted connector masks bake phase-continuous base/stone patterns and preserve border rubble. No mirroring or runtime overlay. Build with `npm run terrain:build` (ImageMagick).
+- Runtime atlas: `src/assets/terrains.webp`, **349 814 bytes**, 9×9 cells of 128×128. It decodes once into **81 DataArrayTexture layers**: 64 base variants, one shared stone, 16 material→stone borders. Independent mipmaps prevent texture-layer bleeding. RGBA memory including mipmaps is about **6.75 MiB**, implementation dependent.
+- A base tile covers **20×20 world metres**, with a seeded per-cell variant, nearest magnification and nearest mip selection. Transition strips cover 10m into stone and 10m out, around a 20m common-stone stripe. The shader uses one opaque sample per pixel; no blending between biome maps or N² transition combinations.
+- No normal/bump/displacement maps, PBR, postprocessing or shadow maps. Source PNGs never enter the static build. The old single-sand assets are not requested.
+
+## Original DinoPlat HUD icons
+
+- User-owned original repository: https://github.com/NQUAREx/dinoplat.github.io/tree/main/resources/images/icons . Requested icons: coin.png, diamond.png, live.png, record.png, pause.png. No changes are published to the original repository.
+- Original PNGs are preserved in `art/hud-icons/`; optimized runtime copies are under `src/assets/icons/`. `npm run icons:build` nearest-resizes them to at most 32×32 and strips metadata. In particular, the original 1600×1600 pause icon is not decoded at that size during gameplay.
+- These are supplied from the user's project at their request; no unverified third-party licence is claimed. The distance footsteps SVG and menu mascot are project-authored. DOM images/SVGs are not WebGL texture objects.
 
 ## Pixel font
 
-- File: `src/assets/fonts/press-start-2p.woff2` (29 920 bytes).
-- Font: **Press Start 2P**, copyright 2012 The Press Start 2P Project Authors (cody@zone38.net).
-- Source: [Google Fonts, Press Start 2P](https://github.com/google/fonts/tree/main/ofl/pressstart2p).
-- Original TTF: https://raw.githubusercontent.com/google/fonts/main/ofl/pressstart2p/PressStart2P-Regular.ttf.
-- Licence: **SIL Open Font License 1.1**. Full notice and licence are included in `src/assets/fonts/OFL.txt` and distributed as `public/licenses/OFL-PressStart2P.txt` (copied to `dist/licenses/` on build).
-- Losslessly converted from TTF to WOFF2 with fontTools / Brotli. No glyph changes or subsetting. Cyrillic, Latin, digits and arrows are retained. Locally hosted, no third-party font requests.
+- `src/assets/fonts/press-start-2p.woff2`, **29 920 bytes**, Press Start 2P, © 2012 The Press Start 2P Project Authors (cody@zone38.net).
+- Source: https://github.com/google/fonts/tree/main/ofl/pressstart2p . **SIL Open Font License 1.1**, preserved in src/assets/fonts/OFL.txt and public/licenses/OFL-PressStart2P.txt. Cyrillic/Latin/digits retained; locally hosted WOFF2, no glyph modifications.
 
-## Original project assets
+## Libraries and developer skills
 
-`src/assets/dinosaur.glb`, `art/dinosaur.blend`, the Python generator and the small pixel dinosaur SVG in `index.html` were authored for this project. The dinosaur GLB has vertex colours and no textures; the only Three.js texture object is the terrain array. The UI font and SVG do not add WebGL texture objects.
+Three.js retains its MIT licence in npm distribution; Vite, TypeScript and test tools remain development dependencies as listed in package-lock.json. No imported reference-game runtime dependencies were added.
+
+Development used installed threejs-loaders and threejs-geometry skills from CloudAI-X/threejs-skills (commit b1c623076c661fc9b03dac19292e825a5d106823): async one-time asset loading, explicit geometry/material ownership, greedy/indexed meshes and pooled instancing. These are development guidance, not game dependencies.

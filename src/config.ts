@@ -1,0 +1,34 @@
+/** Shared numeric rules, no rendering or browser dependencies. Forward is world Z. */
+export class Rules {
+  static readonly step = 1 / 120;
+  static readonly sideSpeed = 8;
+  static readonly maxSpeed = 24;
+  static readonly columnWidth = 2.8;
+  static readonly rowGap = 20;
+  static readonly firstRow = 40;
+  static readonly rowSlots = 6;
+  static readonly maxColumns = 33;
+  static readonly poolSize = Rules.rowSlots * Rules.maxColumns;
+  static readonly playerRadius = 0.32;
+  static readonly playerBodyHeight = 1.3;
+  static readonly gravity = 22;
+  static readonly jumpSpeed = 9.4;
+  static readonly runFramesPerMetre = 0.9;
+  static readonly stepStride = 4 / Rules.runFramesPerMetre;
+}
+export class Palette {
+  static readonly sky = 0x73d8ff;
+  static readonly dust = 0xf4c66a;
+  static readonly shade = 0x9a743f;
+}
+export class GridMath {
+  static mod(value: number, divisor: number) {
+    return ((value % divisor) + divisor) % divisor;
+  }
+  static hash(x: number, z: number, seed: number) {
+    let h = Math.imul(x | 0, 0x1f123bb5) ^ Math.imul(z | 0, 0x5f356495) ^ seed;
+    h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
+    h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
+    return (h ^ (h >>> 16)) >>> 0;
+  }
+}

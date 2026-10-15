@@ -1,12 +1,35 @@
 /** Independent randomness, editable weights, no immediate repeats. */
 export const TERRAIN_LENGTH = 500;
-export const TERRAIN_TRANSITION = 16;
-export const TERRAIN_WEIGHTS = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const;
+export const TERRAIN_TRANSITION = 40;
+export class TerrainLayout {
+  static readonly tileSize = 128;
+  static readonly atlasColumns = 9;
+  static readonly layers = 81;
+  static readonly variants = 4;
+  static readonly stoneLayer = 64;
+  static readonly transitionLayer = 65;
+  static readonly worldTileSize = 20;
+}
+export const TERRAIN_WEIGHTS = [
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+] as const;
 export const TERRAIN_NAMES = [
-  "Светлые дюны", "Золотой песок", "Рыжие дюны", "Песок с галькой",
-  "Терракота", "Каменистая земля", "Песчаные валуны", "Песчаник",
-  "Красный сланец", "Серая галька", "Лиловая земля", "Сухая земля",
-  "Травяная тропа", "Оазис", "Мшистая земля", "Вулканический камень",
+  "Светлые дюны",
+  "Золотой песок",
+  "Рыжие дюны",
+  "Песок с галькой",
+  "Терракота",
+  "Каменистая земля",
+  "Песчаные валуны",
+  "Песчаник",
+  "Красный сланец",
+  "Серая галька",
+  "Лиловая земля",
+  "Сухая земля",
+  "Травяная тропа",
+  "Оазис",
+  "Мшистая земля",
+  "Вулканический камень",
 ] as const;
 export class Terrain {
   segment = 0;
@@ -14,7 +37,9 @@ export class Terrain {
   current = 0;
   next = 0;
   private state = 1;
-  constructor(seed = 1) { this.reset(seed); }
+  constructor(seed = 1) {
+    this.reset(seed);
+  }
   reset(seed: number) {
     this.state = (seed ^ 0x9e3779b9) >>> 0 || 1;
     this.segment = 0;
@@ -24,12 +49,14 @@ export class Terrain {
   }
   private pick(exclude: number) {
     let value = this.state;
-    value ^= value << 13; value ^= value >>> 17; value ^= value << 5;
+    value ^= value << 13;
+    value ^= value >>> 17;
+    value ^= value << 5;
     this.state = value >>> 0;
     let total = 0;
     for (let i = 0; i < TERRAIN_WEIGHTS.length; i++)
       if (i !== exclude) total += TERRAIN_WEIGHTS[i];
-    let threshold = this.state / 4294967296 * total;
+    let threshold = (this.state / 4294967296) * total;
     for (let i = 0; i < TERRAIN_WEIGHTS.length; i++) {
       if (i === exclude) continue;
       threshold -= TERRAIN_WEIGHTS[i];
