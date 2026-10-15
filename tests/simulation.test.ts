@@ -11,6 +11,8 @@ import {
   CUBE_SIZE,
   PLAYER_RADIUS,
   laneX,
+  LANES,
+  CENTER_LANE,
 } from "../src/simulation.ts";
 
 function emptyGame() {
@@ -20,18 +22,22 @@ function emptyGame() {
   return game;
 }
 
-test("four lanes, bounded movement and smooth actual position", () => {
+test("five symmetric lanes, centre start, bounded movement and smooth actual position", () => {
   const game = emptyGame();
+  assert.equal(LANES, 5);
+  assert.equal(game.lane, 2);
+  assert.equal(game.x, 0);
+  assert.equal(laneX(0), -laneX(LANES - 1));
   game.move(1);
-  assert.equal(game.x, laneX(1));
+  assert.equal(game.x, laneX(CENTER_LANE));
   game.step(STEP);
-  assert.ok(game.x > laneX(1) && game.x < laneX(2));
+  assert.ok(game.x > laneX(CENTER_LANE) && game.x < laneX(CENTER_LANE + 1));
   for (let i = 0; i < 100; i++) {
     game.move(1);
     game.step(STEP);
   }
-  assert.equal(game.lane, 3);
-  assert.equal(game.x, laneX(3));
+  assert.equal(game.lane, LANES - 1);
+  assert.equal(game.x, laneX(LANES - 1));
   for (let i = 0; i < 100; i++) {
     game.move(-1);
     game.step(STEP);
@@ -43,16 +49,49 @@ test("four lanes, bounded movement and smooth actual position", () => {
 test("collision uses real x even after a late lane input", () => {
   const game = emptyGame();
   game.rowZ[0] = 0.9;
-  game.masks[0] = 1 << 1;
+  game.masks[0] = 1 << CENTER_LANE;
   game.move(1);
   game.step(STEP);
   assert.equal(game.phase, "over");
 });
 
+test("collisions work in every lane, including the fifth", () => {
+  for (let lane = 0; lane < LANES; lane++) {
+    const game = emptyGame();
+    game.lane = lane;
+    game.x = laneX(lane);
+    game.rowZ[0] = 0.9;
+    game.masks[0] = 1 << lane;
+    game.step(STEP);
+    assert.equal(game.phase, "over", `lane ${lane}`);
+  }
+});
+
+test("generator uses all five lanes and never exceeds its five-bit mask", () => {
+  let blocked = 0,
+    safe = 0,
+    densest = 0;
+  for (let seed = 1; seed <= 1000; seed++) {
+    const game = new Simulation(seed);
+    for (let i = 0; i < ROW_COUNT; i++) {
+      const mask = game.masks[i];
+      assert.ok(mask > 0 && mask < (1 << LANES) - 1);
+      blocked |= mask;
+      safe |= 1 << game.safeLanes[i];
+      let count = 0;
+      for (let lane = 0; lane < LANES; lane++) if (mask & (1 << lane)) count++;
+      densest = Math.max(densest, count);
+    }
+  }
+  assert.equal(blocked, (1 << LANES) - 1);
+  assert.equal(safe, (1 << LANES) - 1);
+  assert.equal(densest, LANES - 1);
+});
+
 test("swept collision catches a cube crossed within one step", () => {
   const game = emptyGame();
   game.rowZ[0] = 2;
-  game.masks[0] = 1 << 1;
+  game.masks[0] = 1 << CENTER_LANE;
   game.step(0.25);
   assert.equal(game.phase, "over");
 });
@@ -62,7 +101,7 @@ test("a well-timed jump clears a cube at both minimum and maximum speeds", () =>
     const game = emptyGame();
     game.distance = distance;
     game.rowZ[0] = distance ? 8 : 4;
-    game.masks[0] = 1 << 1;
+    game.masks[0] = 1 << CENTER_LANE;
     game.jump();
     game.step(STEP);
     const velocity = game.velocityY;
@@ -90,7 +129,7 @@ test("pause freezes simulation and restart resets all state without replacing po
   assert.equal(game.distance, 0);
   assert.equal(game.y, 0);
   assert.equal(game.velocityY, 0);
-  assert.equal(game.lane, 1);
+  assert.equal(game.lane, CENTER_LANE);
   assert.equal(game.phase, "ready");
   assert.equal(game.rowZ, rows);
   assert.equal(game.masks, masks);
@@ -114,7 +153,8 @@ test("100 seeds: follow guaranteed route for 5 minutes at maximum speed, no jump
       let next = -1,
         nearest = Infinity;
       for (let i = 0; i < ROW_COUNT; i++) {
-        assert.ok(game.masks[i] > 0 && game.masks[i] < 15);
+        assert.ok(game.masks[i] > 0 && game.masks[i] < (1 << LANES) - 1);
+        assert.ok(game.safeLanes[i] < LANES);
         assert.equal(game.masks[i] & (1 << game.safeLanes[i]), 0);
         if (game.rowZ[i] > -0.9 && game.rowZ[i] < nearest) {
           nearest = game.rowZ[i];

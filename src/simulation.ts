@@ -1,6 +1,8 @@
 // Independent of Three.js and DOM: replace presentation without changing rules.
-export const LANES = 4;
+export const LANES = 5;
 export const LANE_WIDTH = 2.1;
+export const CENTER_LANE = Math.floor(LANES / 2);
+export const ROAD_WIDTH = LANES * LANE_WIDTH;
 export const ROW_COUNT = 12;
 export const ROW_GAP = 18;
 export const MAX_SPEED = 24;
@@ -8,7 +10,7 @@ export const STEP = 1 / 120;
 export const SIDE_SPEED = 13;
 export const CUBE_SIZE = 1.2;
 export const PLAYER_RADIUS = 0.27;
-export const laneX = (lane: number) => (lane - 1.5) * LANE_WIDTH;
+export const laneX = (lane: number) => (lane - (LANES - 1) / 2) * LANE_WIDTH;
 export type Phase = "ready" | "running" | "paused" | "over";
 
 export class Simulation {
@@ -16,14 +18,14 @@ export class Simulation {
   readonly masks = new Uint8Array(ROW_COUNT);
   readonly safeLanes = new Uint8Array(ROW_COUNT);
   phase: Phase = "ready";
-  lane = 1;
-  x = laneX(1);
+  lane = CENTER_LANE;
+  x = laneX(CENTER_LANE);
   y = 0;
   velocityY = 0;
   distance = 0;
   speed = 12;
   private state = 1;
-  private safeLane = 1;
+  private safeLane = CENTER_LANE;
   constructor(seed = 1) {
     this.reset(seed);
   }
@@ -31,8 +33,8 @@ export class Simulation {
   reset(seed: number) {
     this.state = seed >>> 0 || 1;
     this.phase = "ready";
-    this.lane = this.safeLane = 1;
-    this.x = laneX(1);
+    this.lane = this.safeLane = CENTER_LANE;
+    this.x = laneX(CENTER_LANE);
     this.y = this.velocityY = this.distance = 0;
     this.speed = 12;
     for (let i = 0; i < ROW_COUNT; i++) {
@@ -53,7 +55,7 @@ export class Simulation {
   private generate(i: number) {
     this.safeLane = Math.max(
       0,
-      Math.min(3, this.safeLane + Math.floor(this.random() * 3) - 1),
+      Math.min(LANES - 1, this.safeLane + Math.floor(this.random() * 3) - 1),
     );
     this.safeLanes[i] = this.safeLane;
     let mask = 0;
@@ -61,13 +63,15 @@ export class Simulation {
       if (lane !== this.safeLane && this.random() < 0.64) mask |= 1 << lane;
     }
     if (!mask)
-      mask = 1 << ((this.safeLane + 1 + Math.floor(this.random() * 3)) % LANES);
+      mask =
+        1 <<
+        ((this.safeLane + 1 + Math.floor(this.random() * (LANES - 1))) % LANES);
     this.masks[i] = mask;
   }
 
   move(direction: number) {
     if (this.phase === "running")
-      this.lane = Math.max(0, Math.min(3, this.lane + direction));
+      this.lane = Math.max(0, Math.min(LANES - 1, this.lane + direction));
   }
   jump() {
     if (this.phase === "running" && this.y === 0) this.velocityY = 8.6;

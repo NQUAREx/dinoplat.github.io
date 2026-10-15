@@ -42,6 +42,33 @@ try {
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`${url}/?debug`);
   await page.waitForFunction(() => window.__runner?.stats().calls > 0);
+  await page.evaluate(() => document.fonts.ready);
+  report.design = await page.evaluate(() => {
+    const app = document.querySelector("#app").getBoundingClientRect();
+    const button = document.querySelector("#action").getBoundingClientRect();
+    return {
+      portrait: app.width < app.height,
+      centred:
+        Math.abs(button.x + button.width / 2 - (app.x + app.width / 2)) < 1,
+      pixelFontLoaded: document.fonts.check(
+        '12px "Press Start 2P"',
+        "Дино вперёд!",
+      ),
+      buttonRadius: getComputedStyle(document.querySelector("#action"))
+        .borderRadius,
+      ...window.__runner.stats(),
+    };
+  });
+  assert.equal(report.design.portrait, true);
+  assert.equal(report.design.centred, true);
+  assert.equal(report.design.pixelFontLoaded, true);
+  assert.equal(report.design.buttonRadius, "0px");
+  assert.equal(report.design.lanes, 5);
+  assert.equal(report.design.separatorCount, 4);
+  assert.equal(report.design.obstacleCapacity, 48);
+  assert.equal(report.design.sandSize, 256);
+  assert.ok(Math.abs(report.design.cameraExtraPitchDegrees - 10) < 1e-6);
+  assert.ok(report.design.laneEdgeNdc < 0.95);
   assert.equal(
     await page.evaluate(() => window.__runner.stats().threeRevision),
     "186",
@@ -54,7 +81,7 @@ try {
   await page.click("#action");
   await page.keyboard.press("ArrowRight");
   await page.waitForTimeout(220);
-  assert.equal(await page.evaluate(() => window.__runner.game.lane), 2);
+  assert.equal(await page.evaluate(() => window.__runner.game.lane), 3);
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Space");
   await page.waitForTimeout(150);
@@ -70,7 +97,7 @@ try {
   await page.evaluate(() => {
     const g = window.__runner.game;
     g.y = g.velocityY = 0;
-    g.x = (g.lane - 1.5) * 2.1;
+    g.x = (g.lane - 2) * 2.1;
     g.rowZ[0] = 1.1;
     g.masks[0] = 1 << g.lane;
   });
@@ -85,6 +112,7 @@ try {
     ),
   );
   await page.reload();
+  await page.waitForFunction(() => window.__runner?.stats().calls > 0);
   assert.equal(await page.locator("#best").textContent(), record);
   await page.click("#action");
   // Repeat natural, rendered restarts with collection between measurements.
@@ -107,7 +135,8 @@ try {
     ...window.__runner.stats(),
   }));
   assert.equal(report.memoryAfter.geometries, report.memoryBefore.geometries);
-  assert.equal(report.memoryAfter.textures, 0);
+  assert.equal(report.memoryBefore.textures, 1);
+  assert.equal(report.memoryAfter.textures, 1);
   assert.ok(report.memoryAfter.heap - report.memoryBefore.heap < 2_000_000);
   // Actual rendered run: autopilot only supplies lane input; rules stay enabled.
   report.performance = await page.evaluate(async () => {
@@ -178,12 +207,13 @@ try {
   mobile.on("pageerror", (e) => errors.push(e.message));
   await mobile.goto(`${url}/?debug`);
   await mobile.waitForFunction(() => window.__runner?.stats().calls > 0);
+  await mobile.evaluate(() => document.fonts.ready);
   await mobile.screenshot({ path: "test-results/mobile-menu.png" });
   await mobile.tap("#action");
   await mobile.touchscreen.tap(330, 650);
-  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 2);
+  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 3);
   await mobile.touchscreen.tap(60, 650);
-  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 1);
+  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 2);
   const touch = await mobile.context().newCDPSession(mobile);
   async function swipe(x, y, endX, endY) {
     await touch.send("Input.dispatchTouchEvent", {
@@ -202,20 +232,74 @@ try {
   await swipe(190, 650, 190, 510);
   await mobile.waitForTimeout(130);
   assert.ok(await mobile.evaluate(() => window.__runner.game.y > 0.4));
-  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 1);
-  await swipe(190, 650, 300, 650);
   assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 2);
+  await swipe(190, 650, 300, 650);
+  assert.equal(await mobile.evaluate(() => window.__runner.game.lane), 3);
   await mobile.tap("#pause");
   await mobile.waitForTimeout(300);
   await mobile.waitForFunction(() => window.__runner.game.phase === "paused");
+  await mobile.tap("#action");
+  await mobile.screenshot({ path: "test-results/mobile-game.png" });
+  // Rotation itself must suspend a running game, not just hide its canvas.
   await mobile.setViewportSize({ width: 844, height: 390 });
+  await mobile.waitForFunction(
+    () =>
+      window.__runner.snapshot().orientationBlocked &&
+      window.__runner.game.phase === "paused",
+  );
   await mobile.screenshot({ path: "test-results/landscape.png" });
-  assert.equal(await mobile.locator("#action").isVisible(), true);
+  assert.equal(await mobile.locator("#rotate").isVisible(), true);
+  assert.equal(await mobile.locator("#action").isVisible(), false);
+  const stoppedDistance = await mobile.evaluate(
+    () => window.__runner.game.distance,
+  );
+  await mobile.keyboard.press("Enter");
+  await mobile.keyboard.press("ArrowRight");
+  await mobile.waitForTimeout(250);
+  assert.equal(
+    await mobile.evaluate(() => window.__runner.game.distance),
+    stoppedDistance,
+  );
+  await mobile.setViewportSize({ width: 390, height: 844 });
+  await mobile.waitForFunction(
+    () => !window.__runner.snapshot().orientationBlocked,
+  );
+  assert.equal(
+    await mobile.evaluate(() => window.__runner.game.phase),
+    "paused",
+  );
   await mobile.tap("#action");
   report.mobile = await mobile.evaluate(() => window.__runner.snapshot());
-  await mobile.screenshot({ path: "test-results/mobile-game.png" });
+  report.portraitOnly = true;
   assert.ok(report.mobile.width * report.mobile.height <= 900000);
   await mobile.close();
+  const small = await browser.newPage({
+    viewport: { width: 320, height: 568 },
+    hasTouch: true,
+    isMobile: true,
+  });
+  small.on("pageerror", (e) => errors.push(e.message));
+  await small.goto(`${url}/?debug`);
+  await small.waitForFunction(() => window.__runner?.stats().calls > 0);
+  await small.evaluate(() => document.fonts.ready);
+  await small.screenshot({ path: "test-results/small-menu.png" });
+  const smallBounds = await small.locator(".panel").boundingBox();
+  assert.ok(smallBounds.y >= 65 && smallBounds.y + smallBounds.height <= 550);
+  assert.ok(
+    await small.evaluate(() => window.__runner.stats().laneEdgeNdc < 0.95),
+  );
+  await small.click("#action");
+  await small.evaluate(() => {
+    const g = window.__runner.game;
+    g.rowZ[0] = 0.9;
+    g.masks[0] = 1 << g.lane;
+  });
+  await small.waitForFunction(() => window.__runner.game.phase === "over");
+  await small.screenshot({ path: "test-results/small-game-over.png" });
+  const overBounds = await small.locator(".panel").boundingBox();
+  assert.ok(overBounds.y >= 65 && overBounds.y + overBounds.height <= 550);
+  report.smallPortraitFits = true;
+  await small.close();
 
   // Storage remains optional even with asynchronous model loading.
   const legacy = await browser.newPage();
@@ -264,12 +348,26 @@ try {
   assert.equal(await missing.locator("#action").isEnabled(), true);
   report.modelFailureHandled = true;
   await missing.close();
+  const missingSand = await browser.newPage();
+  missingSand.on("pageerror", (e) => errors.push(e.message));
+  await missingSand.route("**/*.webp", (route) =>
+    route.fulfill({ status: 503, body: "unavailable" }),
+  );
+  await missingSand.goto(url);
+  await missingSand.waitForFunction(() =>
+    document
+      .querySelector("#description")
+      .textContent.includes("Не удалось загрузить песчаную дорожку"),
+  );
+  assert.equal(await missingSand.locator("#action").isEnabled(), true);
+  report.sandFailureHandled = true;
+  await missingSand.close();
   assert.deepEqual(errors, []);
   report.errors = errors;
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(
-    "PASS: dinosaur, desktop/mobile input, jump, collision, restart, record, pause, resize, 100 restarts, GPU recovery, WebGL 2 requirement, storage and model failure.",
+    "PASS: five lanes, +10° camera, centred pixel UI, font, sand, portrait/rotation suspension, input, collisions, restart, 100 restarts, GPU recovery and error handling.",
   );
 } finally {
   await browser.close();

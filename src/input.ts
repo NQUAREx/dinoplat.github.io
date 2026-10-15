@@ -67,7 +67,12 @@ export class Input {
           Math.abs(dy) < 20 &&
           performance.now() - this.started < 500
         )
-          move(this.startX < innerWidth / 2 ? -1 : 1);
+          move(
+            this.startX <
+              canvas.getBoundingClientRect().left + canvas.clientWidth / 2
+              ? -1
+              : 1,
+          );
       },
       options,
     );

@@ -4,6 +4,7 @@ import { Input } from "./input";
 import { View } from "./view";
 import WebGL from "three/addons/capabilities/WebGL.js";
 import { loadDinosaurGeometry } from "./dinosaur";
+import { loadSandTexture } from "./sand";
 
 const element = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -17,6 +18,7 @@ const title = element("title");
 const description = element("description");
 const chapter = element("chapter");
 const result = element("result");
+const app = element("app");
 const game = new Simulation(1979);
 let best = 0;
 try {
@@ -38,18 +40,32 @@ async function boot() {
     );
   const initialAction = action.innerHTML;
   action.disabled = true;
-  action.textContent = "Загружаем динозавра…";
-  const geometry = await loadDinosaurGeometry();
+  action.textContent = "ЗАГРУЗКА…";
+  const [modelResult, sandResult] = await Promise.allSettled([
+    loadDinosaurGeometry(),
+    loadSandTexture(),
+  ]);
+  if (modelResult.status === "rejected" || sandResult.status === "rejected") {
+    if (modelResult.status === "fulfilled") modelResult.value.dispose();
+    if (sandResult.status === "fulfilled") sandResult.value.dispose();
+    throw modelResult.status === "rejected"
+      ? modelResult.reason
+      : (sandResult as PromiseRejectedResult).reason;
+  }
+  const geometry = modelResult.value,
+    sand = sandResult.value;
   // HMR can replace the module while its model request is still in flight.
   if (superseded) {
     geometry.dispose();
+    sand.dispose();
     return;
   }
   let view: View;
   try {
-    view = new View(canvas, geometry);
+    view = new View(canvas, geometry, sand);
   } catch (error) {
     geometry.dispose();
+    sand.dispose();
     throw error;
   }
   action.innerHTML = initialAction;
@@ -62,17 +78,21 @@ async function boot() {
   let displayedDistance = -1;
   let contextLost = false;
   let alive = true;
+  const landscapeQuery = matchMedia(
+    "(orientation: landscape) and (pointer: coarse)",
+  );
+  let orientationBlocked = landscapeQuery.matches;
 
   function show() {
     const phase = game.phase;
+    app.dataset.phase = phase;
     overlay.hidden = phase === "running";
     pauseButton.disabled = phase !== "running" && phase !== "paused";
     pauseButton.setAttribute(
       "aria-label",
       phase === "paused" ? "Продолжить" : "Пауза",
     );
-    pauseButton.textContent = "";
-    pauseButton.classList.toggle("is-paused", phase === "paused");
+    pauseButton.textContent = phase === "paused" ? "ПРОДОЛЖИТЬ" : "ПАУЗА";
     result.hidden = phase !== "over";
     if (phase === "over") {
       const meters = Math.floor(game.distance);
@@ -83,31 +103,38 @@ async function boot() {
         /* Optional. */
       }
       bestText.textContent = String(best);
-      title.innerHTML = "Ещё<br /><em>попытку?</em>";
-      description.textContent = "Каждый забег — новая возможность.";
-      chapter.textContent = "ЗАБЕГ ЗАВЕРШЁН";
+      title.innerHTML = "Вот это<br /><em>забег!</em>";
+      description.textContent = "Дино готов к новому приключению!";
+      chapter.textContent = "МОЛОДЕЦ!";
       element("final-distance").textContent = String(meters);
-      action.innerHTML = "Бежать снова <span>→</span>";
+      action.innerHTML = 'ЕЩЁ ЗАБЕГ <span aria-hidden="true">→</span>';
       element("live").textContent = `Конец игры. ${meters} метров.`;
     } else if (phase === "paused") {
-      title.innerHTML = "Можно<br /><em>выдохнуть.</em>";
-      description.textContent = "Твой забег на паузе. Продолжим?";
+      title.innerHTML = "Отдохнём?<br /><em>Дино ждёт!</em>";
+      description.textContent = "Набирайся сил и беги дальше.";
       chapter.textContent = "ПАУЗА";
-      action.innerHTML = "Продолжить <span>→</span>";
+      action.innerHTML = 'ПРОДОЛЖИТЬ <span aria-hidden="true">→</span>';
     }
     element("hint").textContent =
       phase === "running"
-        ? "← → / A D · ПОЛОСЫ     ↑ / ПРОБЕЛ · ПРЫЖОК"
-        : "ТВОЙ ТЕМП. ТВОЙ РЕКОРД.";
+        ? "← → ПОЛОСЫ · ↑ ПРЫЖОК"
+        : "ПЯТЬ ПОЛОС · ТЫСЯЧА ПРИКЛЮЧЕНИЙ";
+    element("menu-best").textContent = String(best);
     shownPhase = phase;
   }
 
   function schedule() {
-    if (!raf && alive && !document.hidden && !contextLost)
+    if (
+      !raf &&
+      alive &&
+      !document.hidden &&
+      !contextLost &&
+      !orientationBlocked
+    )
       raf = requestAnimationFrame(frame);
   }
   function start() {
-    if (contextLost || game.phase === "running") return;
+    if (contextLost || orientationBlocked || game.phase === "running") return;
     if (game.phase !== "paused") game.reset((Math.random() * 0xffffffff) >>> 0);
     game.phase = "running";
     previous = accumulator = 0;
@@ -127,7 +154,7 @@ async function boot() {
   }
   function frame(now: number) {
     raf = 0;
-    if (!alive || document.hidden || contextLost) return;
+    if (!alive || document.hidden || contextLost || orientationBlocked) return;
     const dt = previous ? (now - previous) / 1000 : 0;
     previous = now;
     // Treat a large interruption as a pause instead of an unseen fatal advance.
@@ -152,8 +179,12 @@ async function boot() {
 
   const input = new Input(
     canvas,
-    (direction) => game.move(direction),
-    () => game.jump(),
+    (direction) => {
+      if (!orientationBlocked) game.move(direction);
+    },
+    () => {
+      if (!orientationBlocked) game.jump();
+    },
     pause,
     start,
   );
@@ -188,14 +219,18 @@ async function boot() {
   }
   bindButton(action, start);
   bindButton(pauseButton, pause);
-  window.addEventListener(
-    "resize",
-    () => {
-      view.resize();
-      schedule();
-    },
-    options,
-  );
+  function resizePortrait() {
+    orientationBlocked = landscapeQuery.matches;
+    if (orientationBlocked) {
+      if (game.phase === "running") pause();
+      cancelAnimationFrame(raf);
+      raf = previous = accumulator = 0;
+    }
+    view.resize();
+    schedule();
+  }
+  window.addEventListener("resize", resizePortrait, options);
+  landscapeQuery.addEventListener("change", resizePortrait, options);
   document.addEventListener(
     "visibilitychange",
     () => {
@@ -261,6 +296,7 @@ async function boot() {
           y: game.y,
           distance: game.distance,
           speed: game.speed,
+          orientationBlocked,
           ...view.stats(),
         }),
       },
@@ -286,7 +322,8 @@ async function boot() {
 
 boot().catch((error: unknown) => {
   if (superseded) return;
-  title.textContent = "Не удалось запустить 3D";
+  app.dataset.phase = "error";
+  title.innerHTML = "Ой!<br /><em>Не вышло</em>";
   description.textContent =
     error instanceof Error
       ? error.message
