@@ -10,8 +10,9 @@ export class Input {
     private readonly canvas: HTMLCanvasElement,
     steer: (direction: number) => void,
     jump: () => void,
+    down: () => void,
   ) {
-    this.gesture = new GestureRecognizer(steer, jump);
+    this.gesture = new GestureRecognizer(steer, jump, down);
     this.resize();
     const options = { signal: this.abort.signal };
     const direction = (x: number) => (x < this.midpoint ? -1 : 1);

@@ -2,7 +2,7 @@
 export class GestureRecognizer {
   static readonly holdDelay = 40;
   private active = false;
-  private state: "pending" | "hold" | "jump" = "pending";
+  private state: "pending" | "hold" | "vertical" = "pending";
   private startX = 0;
   private startY = 0;
   private started = 0;
@@ -11,6 +11,7 @@ export class GestureRecognizer {
   constructor(
     private readonly steer: (value: number) => void,
     private readonly jump: () => void,
+    private readonly down: () => void = () => {},
   ) {}
   begin(x: number, y: number, now: number, direction: number) {
     this.clear();
@@ -27,17 +28,18 @@ export class GestureRecognizer {
     const dx = x - this.startX,
       dy = y - this.startY;
     this.direction = direction;
-    if (this.state === "jump") return;
+    if (this.state === "vertical") return;
     // Classification is exclusive. A confirmed hold cannot later become a jump;
     // release it and start a fresh swipe. Thus jumping never inherits steering.
     if (this.state === "hold") {
       this.steer(direction);
       return;
     }
-    if (dy < -24 && -dy > Math.abs(dx) * 1.15) {
-      this.state = "jump";
+    if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx) * 1.15) {
+      this.state = "vertical";
       this.steer(0);
-      this.jump();
+      if (dy < 0) this.jump();
+      else this.down();
       return;
     }
     if (Math.abs(dy) > 2 || Math.abs(dx) > 2) this.moved = true;

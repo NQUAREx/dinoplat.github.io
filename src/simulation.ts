@@ -27,6 +27,10 @@ export class Simulation {
   movingX = 0;
   steering = 0;
   velocityY = 0;
+  diving = false;
+  crouch = 0;
+  previousCrouch = 0;
+  crouchRemaining = 0;
   distance = 0;
   previousDistance = 0;
   speed = Rules.startSpeed;
@@ -42,6 +46,8 @@ export class Simulation {
     this.x = this.previousX = this.y = this.previousY = 0;
     this.heading = this.previousHeading = this.movingX = this.steering = 0;
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
+    this.diving = false;
+    this.crouch = this.previousCrouch = this.crouchRemaining = 0;
     this.speed = Rules.startSpeed;
     this.nextStep = Rules.stepStride;
     this.world.reset(this.seed);
@@ -58,23 +64,51 @@ export class Simulation {
   jump() {
     if (this.phase !== "running" || this.y !== 0) return;
     this.velocityY = Rules.jumpSpeed * this.bonuses.jumpFactor;
+    this.diving = false;
+    this.crouch = this.previousCrouch = this.crouchRemaining = 0;
     this.events.emit(GameEvent.Jump);
+  }
+  get bodyHeight() {
+    return (
+      Rules.playerBodyHeight +
+      (Rules.duckBodyHeight - Rules.playerBodyHeight) * this.crouch
+    );
+  }
+  down() {
+    if (this.phase !== "running") return;
+    if (this.y > 0 || this.velocityY > 0) {
+      this.velocityY = Math.min(this.velocityY, -Rules.diveSpeed);
+      if (!this.diving) this.events.emit(GameEvent.Dive);
+      this.diving = true;
+    } else {
+      this.crouchRemaining = Rules.duckDuration;
+      this.events.emit(GameEvent.Duck);
+    }
   }
   step(dt: number) {
     if (this.phase !== "running") return;
     this.previousX = this.x;
     this.previousY = this.y;
+    this.previousCrouch = this.crouch;
     this.previousHeading = this.heading;
     this.previousDistance = this.distance;
     this.time += dt;
     this.health.step(dt);
     this.bonuses.step(dt);
+    const ducking = this.crouchRemaining > 0;
+    this.crouchRemaining = Math.max(0, this.crouchRemaining - dt);
+    this.crouch +=
+      Math.sign((ducking ? 1 : 0) - this.crouch) *
+      Math.min(
+        Math.abs((ducking ? 1 : 0) - this.crouch),
+        Rules.duckBlendSpeed * dt,
+      );
     this.x += this.steering * Rules.sideSpeed * dt; // Deliberately no lateral bounds.
     this.movingX = this.steering;
     const turn = (-this.movingX * Math.PI) / 4 - this.heading;
     this.heading +=
       Math.sign(turn) * Math.min(Math.abs(turn), Math.PI * 5 * dt);
-    const airborne = this.y > 0 || this.velocityY > 0;
+    const airborne = this.y > 0 || this.velocityY > 0 || this.diving;
     if (airborne) {
       this.y = Math.max(
         0,
@@ -83,6 +117,7 @@ export class Simulation {
       this.velocityY -= Rules.gravity * dt;
       if (!this.y) {
         this.velocityY = 0;
+        this.diving = false;
         this.events.emit(GameEvent.Land);
       }
     }
@@ -143,9 +178,16 @@ export class Simulation {
       if (enter > leave) continue;
       const yEnter = this.previousY + (this.y - this.previousY) * enter;
       const yLeave = this.previousY + (this.y - this.previousY) * leave;
+      const previousTop =
+        this.previousY +
+        Rules.playerBodyHeight +
+        (Rules.duckBodyHeight - Rules.playerBodyHeight) * this.previousCrouch;
+      const top = this.y + this.bodyHeight;
+      const topEnter = previousTop + (top - previousTop) * enter;
+      const topLeave = previousTop + (top - previousTop) * leave;
       if (
         Math.min(yEnter, yLeave) >= pool.baseY[i] + pool.height[i] ||
-        Math.max(yEnter, yLeave) + Rules.playerBodyHeight <= pool.baseY[i]
+        Math.max(topEnter, topLeave) <= pool.baseY[i]
       )
         continue;
       if (definition.blocking) {

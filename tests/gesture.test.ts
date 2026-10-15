@@ -50,3 +50,25 @@ test("horizontal intent commits on its first small move without waiting for hold
   assert.equal(direction, 1);
   assert.ok(GestureRecognizer.holdDelay <= 40);
 });
+test("up and down swipes resolve once and never inherit sideways steering", () => {
+  for (const dy of [-100, 100])
+    for (const delay of [30, 300]) {
+      const directions: number[] = [];
+      let up = 0,
+        down = 0;
+      const gesture = new GestureRecognizer(
+        (v) => directions.push(v),
+        () => up++,
+        () => down++,
+      );
+      gesture.begin(330, 500, 0, 1);
+      gesture.move(331, 500 + Math.sign(dy) * 12, 1);
+      gesture.update(delay);
+      gesture.move(332, 500 + dy, 1);
+      gesture.move(40, 500 - dy, -1);
+      gesture.clear();
+      assert.equal(up, dy < 0 ? 1 : 0);
+      assert.equal(down, dy > 0 ? 1 : 0);
+      assert.ok(directions.every((v) => v === 0));
+    }
+});

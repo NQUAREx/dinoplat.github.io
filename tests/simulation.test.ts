@@ -183,6 +183,59 @@ test("jump clears tall cactus, double jump is rejected, landing emits exactly on
     assert.equal(landed, 1);
   }
 });
+test("down swipe dives with swept descent, lands once and does not teleport", () => {
+  const game = emptyGame();
+  let landings = 0;
+  game.events.on(GameEvent.Land, () => landings++);
+  game.jump();
+  for (let i = 0; i < 30; i++) game.step(STEP);
+  const height = game.y;
+  assert.ok(height > 2);
+  game.down();
+  assert.equal(game.diving, true);
+  assert.ok(game.velocityY <= -22);
+  game.step(STEP);
+  assert.ok(game.y > 0 && game.y < height);
+  for (let i = 0; i < 30; i++) game.step(STEP);
+  assert.equal(game.y, 0);
+  assert.equal(game.diving, false);
+  assert.equal(landings, 1);
+  game.jump();
+  game.down();
+  game.step(STEP);
+  assert.equal(game.y, 0);
+  assert.equal(game.diving, false);
+  assert.equal(landings, 2);
+});
+test("ground down swipe ducks for a bounded duration, with a real shorter collision body", () => {
+  for (const duck of [false, true]) {
+    const game = emptyGame();
+    obstacle(game, 0, 4, 1);
+    game.world.baseY[0] = 0.9;
+    if (duck) game.down();
+    for (let i = 0; i < 50; i++) game.step(STEP);
+    assert.equal(game.health.lives, duck ? 3 : 2);
+    if (duck) {
+      assert.equal(game.crouch, 1);
+      assert.equal(game.bodyHeight, Rules.duckBodyHeight);
+      game.phase = "paused";
+      const remaining = game.crouchRemaining;
+      game.step(10);
+      assert.equal(game.crouchRemaining, remaining);
+      game.phase = "running";
+      game.world.active.fill(0);
+      for (let i = 0; i < 100; i++) game.step(STEP);
+      assert.equal(game.crouch, 0);
+      assert.equal(game.bodyHeight, Rules.playerBodyHeight);
+      game.down();
+      game.jump();
+      assert.equal(game.crouchRemaining, 0);
+      game.reset(123);
+      assert.equal(game.crouch, 0);
+      assert.equal(game.diving, false);
+    }
+  }
+});
 test("lives, damage immunity, game over, pause and reset retain bounded pools", () => {
   const game = emptyGame(),
     pool = game.world.active;

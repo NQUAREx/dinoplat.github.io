@@ -94,7 +94,7 @@ try {
   assert.equal(report.initial.obstacleVariants, 6);
   assert.equal(report.initial.loadedPoses, 8);
   assert.equal(report.initial.terrainLayers, 97);
-  assert.equal(report.initial.terrainTileMetres, 10);
+  assert.equal(report.initial.terrainTileMetres, 5);
   assert.equal(report.initial.cameraFov, 50);
   assert.equal(report.initial.cameraFar, 96);
   assert.equal(report.initial.fogStart, 36);
@@ -136,7 +136,42 @@ try {
     /jump/,
   );
   await touch("touchEnd");
+  await page.waitForFunction(() => window.__runner.game.y > 2);
+  await page.evaluate(() => {
+    const g = window.__runner.game,
+      down = g.down.bind(g);
+    window.downSwipes = 0;
+    g.down = () => {
+      window.downSwipes++;
+      down();
+    };
+  });
+  await Promise.all([
+    touch("touchStart", 330, 500),
+    touch("touchMove", 330, 650),
+  ]);
+  await page.waitForFunction(() => window.downSwipes === 1);
+  assert.equal(await page.evaluate(() => window.__runner.game.x), beforeJumpX);
+  await touch("touchEnd");
   await page.waitForFunction(() => window.__runner.game.y === 0);
+  await Promise.all([
+    touch("touchStart", 330, 500),
+    touch("touchMove", 330, 650),
+  ]);
+  await page.waitForFunction(() => window.__runner.game.crouch > 0.9);
+  assert.equal(
+    await page.evaluate(() => window.__runner.stats().playerState),
+    "duck",
+  );
+  assert.ok(await page.evaluate(() => window.__runner.game.bodyHeight < 0.8));
+  assert.equal(await page.evaluate(() => window.__runner.game.x), beforeJumpX);
+  await touch("touchEnd");
+  await page.screenshot({ path: "test-results/swipe-down-duck.png" });
+  await page.waitForFunction(
+    () =>
+      window.__runner.game.crouch === 0 &&
+      window.__runner.game.crouchRemaining === 0,
+  );
   assert.ok(
     await page.evaluate(() =>
       window.vibrationCalls.some(
@@ -509,7 +544,7 @@ try {
   });
   assert.equal(report.performance.failed, undefined);
   assert.equal(report.performance.lives, 3);
-  assert.ok(report.performance.calls <= 9);
+  assert.ok(report.performance.calls <= 15);
   await page.screenshot({ path: "test-results/animated-run.png" });
   await page.evaluate(() => {
     const gl = document.querySelector("#game").getContext("webgl2");

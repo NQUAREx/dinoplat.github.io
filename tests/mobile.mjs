@@ -19,6 +19,143 @@ const server = spawn(
   { stdio: "pipe" },
 );
 const results = {};
+async function checkLighting(context, engine) {
+  const page = await context.newPage();
+  try {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(`${url}/?debug&time=9`);
+    await page.waitForFunction(() => window.__runner?.stats().textures === 1);
+    await page.evaluate(() => {
+      const r = window.__runner,
+        g = r.game;
+      g.phase = "paused";
+      g.x = g.previousX = 0;
+      g.distance = g.previousDistance = 200;
+      g.health.immunity = 0;
+      g.y = g.previousY = 0;
+      g.velocityY = 0;
+      g.terrain.reset(1979);
+      g.terrain.advance(g.distance);
+      g.world.active.fill(0);
+      const defs = g.world.registry.get(0).colliders;
+      for (let i = 0; i < 3; i++) {
+        const variant = [0, 2, 5][i],
+          bounds = defs[variant];
+        g.world.active[i] = 1;
+        g.world.kinds[i] = 0;
+        g.world.variants[i] = variant;
+        g.world.angles[i] = 0;
+        g.world.x[i] = (i - 1) * 3;
+        g.world.z[i] = g.distance + 6 + i * 4;
+        g.world.halfX[i] = bounds.halfX;
+        g.world.halfZ[i] = bounds.halfZ;
+        g.world.height[i] = bounds.height;
+        g.world.baseY[i] = 0;
+      }
+      for (const selector of ["#overlay", ".topbar", ".bottom"])
+        document.querySelector(selector).hidden = true;
+    });
+    const frames = {};
+    for (const hour of [9, 15, 18, 0]) {
+      const probe = await page.evaluate((hour) => {
+        const r = window.__runner;
+        r.lighting.setTimeOfDay(hour);
+        r.lighting.shadowsEnabled = true;
+        r.render();
+        const canvas = document.querySelector("#game"),
+          gl = canvas.getContext("webgl2");
+        const on = new Uint8Array(canvas.width * canvas.height * 4),
+          off = new Uint8Array(on.length);
+        gl.readPixels(
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          on,
+        );
+        const stats = r.stats();
+        r.lighting.shadowsEnabled = false;
+        r.render();
+        gl.readPixels(
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          off,
+        );
+        let changed = 0,
+          sumX = 0,
+          brighter = 0;
+        for (let i = 0; i < on.length; i += 4) {
+          if (
+            Math.max(
+              off[i] - on[i],
+              off[i + 1] - on[i + 1],
+              off[i + 2] - on[i + 2],
+            ) > 6
+          ) {
+            changed++;
+            sumX += (i / 4) % canvas.width;
+          }
+          if (
+            Math.max(
+              on[i] - off[i],
+              on[i + 1] - off[i + 1],
+              on[i + 2] - off[i + 2],
+            ) > 2
+          )
+            brighter++;
+        }
+        r.lighting.shadowsEnabled = true;
+        r.render();
+        return {
+          changed,
+          centroid: changed ? sumX / changed : 0,
+          brighter,
+          error: gl.getError(),
+          stats,
+        };
+      }, hour);
+      assert.equal(probe.error, 0);
+      // Identical coplanar UVs can differ by a texel at a few triangle-edge
+      // helper lanes due to GPU derivative precision; reject any broad repaint.
+      assert.ok(
+        probe.brighter <= 16,
+        `shadow sampling changed ${probe.brighter} bright edge pixels`,
+      );
+      if (hour === 9 || hour === 15) {
+        assert.ok(
+          probe.changed > 50,
+          `${engine}: sun must create visible ground shadows`,
+        );
+        assert.ok(probe.stats.shadows > 0);
+      }
+      if (hour === 0) assert.equal(probe.changed, 0);
+      assert.ok(probe.stats.calls <= 15);
+      assert.equal(probe.stats.textures, 1);
+      frames[hour] = probe;
+      await page.screenshot({
+        path: `test-results/${engine}-time-${hour}.png`,
+      });
+    }
+    assert.notEqual(frames[0].stats.fogColour, frames[9].stats.fogColour);
+    assert.notEqual(frames[18].stats.fogColour, frames[9].stats.fogColour);
+    assert.ok(Math.abs(frames[9].centroid - frames[15].centroid) > 2);
+    await page.evaluate(() => {
+      const r = window.__runner;
+      r.lighting.setSunPosition(-8, 12, 4);
+      r.render();
+    });
+    assert.equal(await page.evaluate(() => window.__runner.stats().sunX), -8);
+    return frames;
+  } finally {
+    await page.close();
+  }
+}
 try {
   for (let i = 0; i < 50; i++) {
     try {
@@ -113,8 +250,29 @@ try {
       await page.waitForFunction(
         () => window.__runner.game.x > 1 && window.__runner.game.y > 0.5,
       );
-      await page.evaluate(() => window.__runner.game.move(0));
+      const dive = await page.evaluate(() => {
+        const g = window.__runner.game;
+        g.move(0);
+        g.down();
+        return { diving: g.diving, velocity: g.velocityY };
+      });
+      assert.equal(dive.diving, true);
+      assert.ok(dive.velocity <= -22);
       await page.waitForFunction(() => window.__runner.game.y === 0);
+      await page.evaluate(() => window.__runner.game.down());
+      await page.waitForFunction(() => window.__runner.game.crouch > 0.9);
+      assert.equal(
+        await page.evaluate(() => window.__runner.stats().playerState),
+        "duck",
+      );
+      assert.ok(
+        await page.evaluate(() => window.__runner.game.bodyHeight < 0.8),
+      );
+      await page.waitForFunction(
+        () =>
+          window.__runner.game.crouch === 0 &&
+          window.__runner.game.crouchRemaining === 0,
+      );
       const resizes = await page.evaluate(
         () => window.__runner.stats().bufferResizes,
       );
@@ -236,6 +394,7 @@ try {
         stats: await page.evaluate(() => window.__runner.stats()),
         errors,
       };
+      results[engine].lighting = await checkLighting(context, engine);
       // iPhone-like missing Fullscreen API and denied embedded/fullscreen policy.
       for (const mode of ["missing", "denied", "standalone"]) {
         const fallback = await context.newPage();

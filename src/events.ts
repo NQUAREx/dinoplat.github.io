@@ -7,13 +7,15 @@ export enum GameEvent {
   Death,
   Pickup,
   BonusChanged,
+  Duck,
+  Dive,
 }
 export type EventListener = (value: number) => void;
 
 /** Subscribers are installed once. Emit numeric payloads without frame garbage. */
 export class GameEvents {
   private readonly listeners = Array.from(
-    { length: 8 },
+    { length: GameEvent.Dive + 1 },
     () => new Set<EventListener>(),
   );
   on(type: GameEvent, listener: EventListener) {

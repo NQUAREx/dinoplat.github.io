@@ -82,6 +82,9 @@ class GameApplication {
         () => {
           if (!this.landscape.matches) this.game.jump();
         },
+        () => {
+          if (!this.landscape.matches) this.game.down();
+        },
       );
       this.bind();
       this.applySettings();
@@ -96,6 +99,7 @@ class GameApplication {
             stats: () => this.view!.stats(),
             render: () => this.view!.draw(),
             camera: this.view.rig,
+            lighting: this.view.lighting,
             settings: this.settings,
             audio: () => this.sound.stats(),
             mobile: () => this.mobile!.stats(),
@@ -103,6 +107,9 @@ class GameApplication {
               phase: this.game.phase,
               x: this.game.x,
               y: this.game.y,
+              diving: this.game.diving,
+              crouch: this.game.crouch,
+              bodyHeight: this.game.bodyHeight,
               steering: this.game.steering,
               distance: this.game.distance,
               speed: this.game.speed,

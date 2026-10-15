@@ -6,6 +6,7 @@ import { Rules } from "./config";
 export class InstancedObjectType {
   readonly meshes: THREE.InstancedMesh[];
   private readonly counts: Uint16Array;
+  private readonly uploadRanges: { start: number; count: number }[];
   private readonly matrix = new THREE.Matrix4();
   constructor(
     readonly kind: ObjectKind,
@@ -14,6 +15,7 @@ export class InstancedObjectType {
     scene: THREE.Scene,
   ) {
     this.counts = new Uint16Array(geometries.length);
+    this.uploadRanges = geometries.map(() => ({ start: 0, count: 0 }));
     this.meshes = geometries.map((geometry) => {
       const mesh = new THREE.InstancedMesh(geometry, material, Rules.poolSize);
       mesh.frustumCulled = false;
@@ -35,8 +37,18 @@ export class InstancedObjectType {
   }
   finish() {
     for (let i = 0; i < this.meshes.length; i++) {
-      this.meshes[i].count = this.counts[i];
-      this.meshes[i].instanceMatrix.needsUpdate = true;
+      const mesh = this.meshes[i],
+        count = this.counts[i];
+      mesh.count = count;
+      mesh.visible = count > 0;
+      if (!count) continue;
+      const range = this.uploadRanges[i];
+      range.count = count * 16;
+      // WebGL clears updateRanges after upload. Reinsert the same cached object,
+      // never addUpdateRange (which allocates), and upload only visible matrices.
+      mesh.instanceMatrix.updateRanges[0] = range;
+      mesh.instanceMatrix.updateRanges.length = 1;
+      mesh.instanceMatrix.needsUpdate = true;
     }
   }
   get visible() {

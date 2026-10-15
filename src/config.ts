@@ -15,6 +15,10 @@ export class Rules {
     Rules.rowSlots * Rules.maxColumns * Rules.candidatesPerChunk;
   static readonly playerRadius = 0.32;
   static readonly playerBodyHeight = 1.3;
+  static readonly duckBodyHeight = 0.65;
+  static readonly duckDuration = 0.85;
+  static readonly duckBlendSpeed = 12;
+  static readonly diveSpeed = 22;
   static readonly gravity = 22;
   // Preserve jump clearance after doubling cactus height (v² / 2g).
   static readonly jumpSpeed = 13.3;

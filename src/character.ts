@@ -43,12 +43,16 @@ export class AnimatedDinosaur {
       game.phase === "over"
         ? "dead"
         : airborne
-          ? game.velocityY > 0
-            ? "jump-up"
-            : "jump-down"
-          : game.phase === "running"
-            ? "run"
-            : "idle";
+          ? game.diving
+            ? "dive"
+            : game.velocityY > 0
+              ? "jump-up"
+              : "jump-down"
+          : game.crouch > 0
+            ? "duck"
+            : game.phase === "running"
+              ? "run"
+              : "idle";
     this.frame = airborne
       ? game.velocityY > 0
         ? 2
@@ -57,17 +61,31 @@ export class AnimatedDinosaur {
     this.mesh.geometry =
       game.phase === "over" ? this.models.death : this.models.run[this.frame];
     this.mesh.position.set(
-      THREE.MathUtils.lerp(game.previousX, game.x, alpha) - game.x,
+      0,
       THREE.MathUtils.lerp(game.previousY, game.y, alpha),
-      game.distance - distance,
+      0,
     );
     this.mesh.rotation.set(
-      airborne ? (game.velocityY > 0 ? -0.055 : 0.045) : 0,
+      airborne
+        ? game.diving
+          ? 0.18
+          : game.velocityY > 0
+            ? -0.055
+            : 0.045
+        : game.crouch * 0.12,
       THREE.MathUtils.lerp(game.previousHeading, game.heading, alpha),
       0,
     );
     const squash = Math.max(0, 1 - (game.time - this.landedAt) / 0.12) * 0.06;
-    this.mesh.scale.set(1 + squash * 0.3, 1 - squash, 1 + squash * 0.3);
+    const duck =
+      game.phase === "over"
+        ? 0
+        : THREE.MathUtils.lerp(game.previousCrouch, game.crouch, alpha);
+    this.mesh.scale.set(
+      1 + squash * 0.3 + duck * 0.12,
+      (1 - squash) * (1 - duck * 0.55),
+      1 + squash * 0.3 + duck * 0.12,
+    );
     this.material.opacity =
       game.phase !== "over" &&
       game.health.immunity > 0 &&
@@ -125,15 +143,21 @@ export class FootDust {
       this.spread[i] = spread;
     }
   }
-  update(game: Simulation, dt: number, visibility: ObjectVisibility) {
+  update(
+    game: Simulation,
+    dt: number,
+    visibility: ObjectVisibility,
+    renderX = game.x,
+    renderDistance = game.distance,
+  ) {
     let count = 0;
     for (let i = 0; i < this.life.length; i++) {
       this.life[i] = Math.max(0, this.life[i] - dt);
       if (!this.life[i]) continue;
       const age = 0.38 - this.life[i],
         size = (0.12 * this.life[i]) / 0.38;
-      const x = this.worldX[i] - game.x + this.spread[i] * age;
-      const z = game.distance - this.worldZ[i] + age * 0.6;
+      const x = this.worldX[i] - renderX + this.spread[i] * age;
+      const z = renderDistance - this.worldZ[i] + age * 0.6;
       const y = 0.04 + age * 0.55;
       if (
         !visibility.intersects(x, -z, size / 2, size / 2, size, y - size / 2)

@@ -3,7 +3,7 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
   NearestFilter,
-  NearestMipmapNearestFilter,
+  NearestMipmapLinearFilter,
 } from "three";
 import terrainUrl from "./assets/terrains.webp?url";
 import { TerrainLayout } from "./terrain";
@@ -46,7 +46,7 @@ export class TerrainTexture {
       texture.colorSpace = SRGBColorSpace;
       texture.wrapS = texture.wrapT = RepeatWrapping;
       texture.magFilter = NearestFilter;
-      texture.minFilter = NearestMipmapNearestFilter;
+      texture.minFilter = NearestMipmapLinearFilter;
       texture.anisotropy = 1;
       texture.generateMipmaps = true;
       texture.needsUpdate = true;

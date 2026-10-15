@@ -9,11 +9,17 @@ import { InstancedObjectType, ObjectRendererRegistry } from "./object-renderer";
 import { TerrainLayout } from "./terrain";
 import type { Simulation } from "./simulation";
 import type { ModelLibrary } from "./models";
+import { LightingRig } from "./lighting";
+import { RenderPose } from "./render-pose";
+import { CactusShadows } from "./shadows";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
   readonly renderer: THREE.WebGLRenderer;
   readonly rig: CameraRig;
+  readonly lighting = new LightingRig();
+  private readonly pose = new RenderPose();
+  private readonly shadows: CactusShadows;
   private readonly scene = new THREE.Scene();
   private readonly ground: Ground;
   private readonly dinosaur: AnimatedDinosaur;
@@ -48,29 +54,36 @@ export class View {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     this.rig = new CameraRig(reducedMotion);
-    this.ground = new Ground(texture);
+    this.ground = new Ground(texture, this.lighting);
     this.dinosaur = new AnimatedDinosaur(models, game);
     this.dust = new FootDust(game, reducedMotion);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
       alpha: false,
-      stencil: false,
+      stencil: true,
       powerPreference: "low-power",
     });
     this.renderer.setClearColor(Palette.sky);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene.fog = new THREE.Fog(Palette.sky, FOG_START, FOG_END);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xc49754, 2));
-    const light = new THREE.DirectionalLight(0xffffff, 1.5);
-    light.position.set(-5, 10, 6);
-    this.scene.add(light);
+    this.scene.add(
+      this.lighting.sun,
+      this.lighting.sun.target,
+      this.lighting.ambient,
+    );
+    const time = new URLSearchParams(location.search).get("time");
+    if (time !== null && time.trim() !== "" && Number.isFinite(Number(time)))
+      this.lighting.setTimeOfDay(Number(time));
     this.registerObjectType(
       ObjectKind.Cactus,
       models.cacti,
       this.cactusMaterial,
     );
     this.scene.add(this.ground.mesh, this.dinosaur.mesh, this.dust.mesh);
+    this.shadows = new CactusShadows(models.cacti, this.ground, this.scene);
+    for (const mesh of this.objectRenderers.get(ObjectKind.Cactus)!.meshes)
+      mesh.renderOrder = 2;
     this.off = [
       game.events.on(GameEvent.Hit, () => this.rig.impulse(0.075, 0.22)),
       game.events.on(GameEvent.Land, () => this.rig.impulse(0.015, 0.1)),
@@ -147,18 +160,24 @@ export class View {
   }
   draw(alpha = 1, dt = 0) {
     const game = this.game;
-    this.ground.update(game);
+    this.pose.update(game, alpha);
+    this.lighting.qualityShadows = this.quality > 0.55;
+    this.lighting.update(game.time);
+    this.renderer.setClearColor(this.lighting.fogColour);
+    (this.scene.fog as THREE.Fog).color.copy(this.lighting.fogColour);
+    this.ground.update(game, this.pose);
     this.dinosaur.update(game, alpha);
     const moving = game.phase === "running" && !game.y && !game.velocityY;
     const activeDt = game.phase === "running" ? dt : 0;
-    this.rig.update(
-      THREE.MathUtils.lerp(game.previousDistance, game.distance, alpha),
-      this.dinosaur.mesh.position.x,
-      activeDt,
-      moving,
-    );
+    this.rig.update(this.pose.distance, 0, activeDt, moving);
     this.visibility.update(this.rig.camera);
-    this.dust.update(game, activeDt, this.visibility);
+    this.dust.update(
+      game,
+      activeDt,
+      this.visibility,
+      this.pose.x,
+      this.pose.distance,
+    );
     if (
       Math.abs(this.worldFov - this.rig.camera.fov) > 0.05 ||
       Math.abs(this.worldCameraX - this.rig.camera.position.x) > 0.1
@@ -174,6 +193,7 @@ export class View {
       this.worldCameraX = camera.position.x;
     }
     this.objectRenderers.begin();
+    this.shadows.begin();
     this.nearestRenderedForward = Infinity;
     this.maximumRelativeX = 0;
     const world = game.world;
@@ -181,8 +201,24 @@ export class View {
       if (!world.active[i]) continue;
       const renderer = this.objectRenderers.get(world.kinds[i]);
       if (!renderer) continue;
-      const x = world.x[i] - game.x,
-        forward = world.z[i] - game.distance;
+      const x = world.x[i] - this.pose.x,
+        forward = world.z[i] - this.pose.distance;
+      if (
+        this.lighting.shadowStrength > 0.001 &&
+        world.kinds[i] === ObjectKind.Cactus
+      )
+        this.shadows.place(
+          world.variants[i],
+          x,
+          forward,
+          world.angles[i],
+          world.halfX[i],
+          world.halfZ[i],
+          world.height[i],
+          world.baseY[i],
+          this.lighting,
+          this.visibility,
+        );
       if (
         !this.visibility.intersects(
           x,
@@ -208,6 +244,7 @@ export class View {
       this.maximumRelativeX = Math.max(this.maximumRelativeX, Math.abs(x));
     }
     this.objectRenderers.finish();
+    this.shadows.finish();
     this.renderer.render(this.scene, this.rig.camera);
   }
   stats() {
@@ -244,16 +281,27 @@ export class View {
       playerState: this.dinosaur.state,
       dustCount: this.dust.mesh.count,
       loadedPoses: this.models.run.length,
+      hours: this.lighting.cycle.hours,
+      fogColour: this.lighting.fogColour.getHex(),
+      sunX: this.lighting.sun.position.x,
+      sunY: this.lighting.sun.position.y,
+      sunZ: this.lighting.sun.position.z,
+      shadows: this.shadows.visible,
+      shadowStrength: this.lighting.shadowStrength,
+      renderX: this.pose.x,
+      renderDistance: this.pose.distance,
     };
   }
   dispose() {
     for (const off of this.off) off();
     this.objectRenderers.dispose();
+    this.shadows.dispose();
     this.cactusMaterial.dispose();
     this.dinosaur.dispose();
     this.dust.dispose();
     this.ground.dispose();
     this.models.dispose();
+    this.lighting.dispose();
     this.renderer.dispose();
   }
 }
