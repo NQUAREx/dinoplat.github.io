@@ -4,7 +4,7 @@ import { Input } from "./input";
 import { View } from "./view";
 import WebGL from "three/addons/capabilities/WebGL.js";
 import { loadDinosaurGeometry } from "./dinosaur";
-import { loadSandTexture } from "./sand";
+import { loadTerrainTexture } from "./terrain-texture";
 
 const element = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -34,6 +34,11 @@ if (import.meta.hot)
   });
 
 async function boot() {
+  // No desktop game, mouse controls, or keyboard bindings. No GPU allocated there.
+  if (navigator.maxTouchPoints < 1 || !matchMedia("(pointer: coarse)").matches) {
+    document.body.dataset.device = "unsupported";
+    return;
+  }
   if (!WebGL.isWebGL2Available())
     throw new Error(
       "Для этой версии игры нужен WebGL 2. Включи аппаратное ускорение или попробуй более новый браузер.",
@@ -41,31 +46,31 @@ async function boot() {
   const initialAction = action.innerHTML;
   action.disabled = true;
   action.textContent = "ЗАГРУЗКА…";
-  const [modelResult, sandResult] = await Promise.allSettled([
+  const [modelResult, terrainResult] = await Promise.allSettled([
     loadDinosaurGeometry(),
-    loadSandTexture(),
+    loadTerrainTexture(),
   ]);
-  if (modelResult.status === "rejected" || sandResult.status === "rejected") {
+  if (modelResult.status === "rejected" || terrainResult.status === "rejected") {
     if (modelResult.status === "fulfilled") modelResult.value.dispose();
-    if (sandResult.status === "fulfilled") sandResult.value.dispose();
+    if (terrainResult.status === "fulfilled") terrainResult.value.dispose();
     throw modelResult.status === "rejected"
       ? modelResult.reason
-      : (sandResult as PromiseRejectedResult).reason;
+      : (terrainResult as PromiseRejectedResult).reason;
   }
   const geometry = modelResult.value,
-    sand = sandResult.value;
+    terrainTexture = terrainResult.value;
   // HMR can replace the module while its model request is still in flight.
   if (superseded) {
     geometry.dispose();
-    sand.dispose();
+    terrainTexture.dispose();
     return;
   }
   let view: View;
   try {
-    view = new View(canvas, geometry, sand);
+    view = new View(canvas, geometry, terrainTexture);
   } catch (error) {
     geometry.dispose();
-    sand.dispose();
+    terrainTexture.dispose();
     throw error;
   }
   action.innerHTML = initialAction;
@@ -85,6 +90,7 @@ async function boot() {
 
   function show() {
     const phase = game.phase;
+    if (phase !== "running") input.clear();
     app.dataset.phase = phase;
     overlay.hidden = phase === "running";
     pauseButton.disabled = phase !== "running" && phase !== "paused";
@@ -117,7 +123,7 @@ async function boot() {
     }
     element("hint").textContent =
       phase === "running"
-        ? "← → ДВИЖЕНИЕ · ↑ ПРЫЖОК"
+        ? "УДЕРЖИВАЙ СЛЕВА / СПРАВА · СВАЙП ↑"
         : "БЕГИ СВОБОДНО · ПРЫГАЙ ДАЛЬШЕ";
     element("menu-best").textContent = String(best);
     shownPhase = phase;
@@ -137,9 +143,9 @@ async function boot() {
     if (contextLost || orientationBlocked || game.phase === "running") return;
     if (game.phase !== "paused") game.reset((Math.random() * 0xffffffff) >>> 0);
     game.phase = "running";
+    input.clear();
     previous = accumulator = 0;
     show();
-    canvas.focus();
     schedule();
   }
   function pause() {
@@ -149,6 +155,7 @@ async function boot() {
     }
     if (game.phase !== "running") return;
     game.phase = "paused";
+    input.clear();
     previous = accumulator = 0;
     show();
   }
@@ -173,26 +180,22 @@ async function boot() {
       distanceText.textContent = String(meters);
       displayedDistance = meters;
     }
-    view.draw(game);
+    view.draw(game, game.phase === "running" ? accumulator / STEP : 1);
     if (game.phase === "running") schedule();
   }
 
   const input = new Input(
     canvas,
     (direction) => {
-      if (!orientationBlocked) game.move(direction);
+      if (!orientationBlocked || direction === 0) game.move(direction);
     },
     () => {
       if (!orientationBlocked) game.jump();
     },
-    pause,
-    start,
   );
   const options = { signal: abort.signal };
-  // Some mobile browsers suppress a compatibility click just after a swipe.
-  // Handle touch release directly; suppress its duplicate click, not keyboard clicks.
+  // Touch release only; compatibility mouse/keyboard clicks are intentionally ignored.
   function bindButton(button: HTMLButtonElement, handler: () => void) {
-    let lastTouch = -Infinity;
     button.addEventListener(
       "pointerup",
       (event) => {
@@ -203,15 +206,6 @@ async function boot() {
         )
           return;
         event.preventDefault();
-        lastTouch = performance.now();
-        handler();
-      },
-      options,
-    );
-    button.addEventListener(
-      "click",
-      (event) => {
-        if (event.detail !== 0 && performance.now() - lastTouch < 700) return;
         handler();
       },
       options,
@@ -292,7 +286,11 @@ async function boot() {
         snapshot: () => ({
           phase: game.phase,
           x: game.x,
-          targetX: game.targetX,
+          steering: game.steering,
+          terrainSegment: game.terrain.segment,
+          terrainCurrent: game.terrain.current,
+          terrainNext: game.terrain.next,
+          terrainPrevious: game.terrain.previous,
           heading: game.heading,
           movingX: game.movingX,
           y: game.y,
@@ -332,6 +330,8 @@ boot().catch((error: unknown) => {
       : "Нужен браузер с WebGL 2. Попробуй перезагрузить страницу.";
   action.disabled = false;
   action.textContent = "Попробовать снова";
-  action.addEventListener("click", () => location.reload());
+  action.addEventListener("pointerup", event => {
+    if (event.pointerType === "touch") location.reload();
+  });
   console.error(error);
 });

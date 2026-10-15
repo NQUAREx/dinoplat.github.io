@@ -13,7 +13,6 @@ import {
   laneX,
   LANES,
   MAX_PLAYER_X,
-  MOVE_INCREMENT,
   MAX_HEADING,
 } from "../src/simulation.ts";
 
@@ -24,29 +23,20 @@ function emptyGame() {
   return game;
 }
 
-test("free X movement: one input shifts target by one unit, never by a column", () => {
+test("held steering integrates time, release stops at arbitrary fractional X", () => {
   const game = emptyGame();
   assert.equal(LANES, 5);
-  assert.equal(game.x, 0);
-  assert.equal(laneX(0), -laneX(LANES - 1));
   game.move(1);
-  assert.equal(game.targetX, MOVE_INCREMENT);
-  assert.equal(game.x, 0);
-  game.step(STEP);
-  assert.ok(game.x > 0 && game.x < MOVE_INCREMENT);
-  for (let i = 0; i < 30; i++) game.step(STEP);
-  assert.equal(game.x, 1);
-  assert.ok(
-    !Array.from({ length: LANES }, (_, i) => laneX(i)).includes(game.x),
-  );
-  game.move(1);
-  game.move(1);
-  assert.equal(game.targetX, 3);
+  for (let i = 0; i < 7; i++) game.step(STEP);
+  assert.ok(Math.abs(game.x - SIDE_SPEED * STEP * 7) < 1e-10);
+  const released = game.x;
+  game.move(0);
   for (let i = 0; i < 60; i++) game.step(STEP);
-  assert.equal(game.x, 3);
+  assert.equal(game.x, released);
   game.move(-1);
-  for (let i = 0; i < 30; i++) game.step(STEP);
-  assert.equal(game.x, 2);
+  for (let i = 0; i < 3; i++) game.step(STEP);
+  assert.ok(Math.abs(game.x - SIDE_SPEED * STEP * 4) < 1e-10);
+  assert.ok(!Number.isInteger(game.x));
 });
 
 test("free movement is clamped by road bounds, including repeated input at the edge", () => {
@@ -55,13 +45,11 @@ test("free movement is clamped by road bounds, including repeated input at the e
     game.move(1);
     game.step(STEP);
   }
-  assert.equal(game.targetX, MAX_PLAYER_X);
   assert.equal(game.x, MAX_PLAYER_X);
   for (let i = 0; i < 240; i++) {
     game.move(-1);
     game.step(STEP);
   }
-  assert.equal(game.targetX, -MAX_PLAYER_X);
   assert.equal(game.x, -MAX_PLAYER_X);
 });
 
@@ -72,10 +60,12 @@ test("dinosaur turns to +/-45 degrees during lateral motion and forward after st
     for (let i = 0; i < 10; i++) game.step(STEP);
     assert.equal(game.heading, -direction * MAX_HEADING);
     assert.equal(game.movingX, direction);
+    const released = game.x;
+    game.move(0);
     for (let i = 0; i < 40; i++) game.step(STEP);
     assert.equal(game.heading, 0);
     assert.equal(game.movingX, 0);
-    assert.equal(game.x, direction);
+    assert.equal(game.x, released);
   }
 });
 
@@ -91,7 +81,7 @@ test("collision uses actual continuous X, not the future target", () => {
 test("collisions work in every obstacle column, including the fifth", () => {
   for (let lane = 0; lane < LANES; lane++) {
     const game = emptyGame();
-    game.x = game.targetX = laneX(lane);
+    game.x = laneX(lane);
     game.rowZ[0] = 0.9;
     game.masks[0] = 1 << lane;
     game.step(STEP);
@@ -101,7 +91,7 @@ test("collisions work in every obstacle column, including the fifth", () => {
 
 test("free position between two adjacent cubes passes through the real gap", () => {
   const game = emptyGame();
-  game.x = game.targetX = LANE_WIDTH / 2;
+  game.x = LANE_WIDTH / 2;
   game.rowZ[0] = 1.5;
   game.masks[0] = (1 << 2) | (1 << 3);
   for (let i = 0; i < 60; i++) game.step(STEP);
@@ -110,7 +100,7 @@ test("free position between two adjacent cubes passes through the real gap", () 
 
 test("a non-column-aligned body still collides when it actually overlaps a cube", () => {
   const game = emptyGame();
-  game.x = game.targetX = 0.8;
+  game.x = 0.8;
   game.rowZ[0] = 0.9;
   game.masks[0] = 1 << 2;
   game.step(STEP);
@@ -180,7 +170,6 @@ test("pause freezes simulation and restart resets all state without replacing po
   assert.equal(game.y, 0);
   assert.equal(game.velocityY, 0);
   assert.equal(game.x, 0);
-  assert.equal(game.targetX, 0);
   assert.equal(game.heading, 0);
   assert.equal(game.movingX, 0);
   assert.equal(game.phase, "ready");
@@ -219,10 +208,8 @@ test("100 seeds: follow guaranteed route for 5 minutes at maximum speed, no jump
         reaction = 0.3;
       }
       reaction -= STEP;
-      if (reaction <= 0)
-        game.move(
-          Math.sign(Math.round(laneX(game.safeLanes[next])) - game.targetX),
-        );
+      const delta = laneX(game.safeLanes[next]) - game.x;
+      game.move(reaction <= 0 && Math.abs(delta) > SIDE_SPEED * STEP / 2 ? Math.sign(delta) : 0);
       game.step(STEP);
       assert.equal(game.phase, "running", `seed=${seed}, step=${step}`);
     }
@@ -248,7 +235,7 @@ test("fixed-step simulation yields the same outcome at 15, 30, 60 and 120Hz", ()
       }
     }
     outcomes.push(game.distance);
-    assert.equal(game.x, 3);
+    assert.equal(game.x, MAX_PLAYER_X);
     assert.equal(game.heading, 0);
   }
   assert.ok(outcomes.every((value) => Math.abs(value - outcomes[0]) < 1e-9));

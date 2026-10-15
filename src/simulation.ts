@@ -1,3 +1,4 @@
+import { Terrain } from "./terrain";
 // Independent of Three.js and DOM: replace presentation without changing rules.
 export const LANES = 5;
 export const LANE_WIDTH = 2.1;
@@ -8,7 +9,6 @@ export const ROW_GAP = 18;
 export const MAX_SPEED = 24;
 export const STEP = 1 / 120;
 export const SIDE_SPEED = 8;
-export const MOVE_INCREMENT = 1;
 export const CUBE_SIZE = 1.2;
 // Rotation-invariant body collider; decorative tail is excluded.
 export const PLAYER_RADIUS = 0.32;
@@ -19,12 +19,16 @@ export const laneX = (lane: number) => (lane - (LANES - 1) / 2) * LANE_WIDTH;
 export type Phase = "ready" | "running" | "paused" | "over";
 
 export class Simulation {
+  readonly terrain = new Terrain();
   readonly rowZ = new Float64Array(ROW_COUNT);
   readonly masks = new Uint8Array(ROW_COUNT);
   readonly safeLanes = new Uint8Array(ROW_COUNT);
   phase: Phase = "ready";
   x = 0;
-  targetX = 0;
+  previousX = 0;
+  previousY = 0;
+  previousHeading = 0;
+  steering = 0;
   heading = 0;
   movingX = 0;
   y = 0;
@@ -38,10 +42,12 @@ export class Simulation {
   }
 
   reset(seed: number) {
+    this.terrain.reset(seed);
     this.state = seed >>> 0 || 1;
     this.phase = "ready";
     this.safeLane = CENTER_LANE;
-    this.x = this.targetX = this.heading = this.movingX = 0;
+    this.x = this.steering = this.heading = this.movingX = 0;
+    this.previousX = this.previousY = this.previousHeading = 0;
     this.y = this.velocityY = this.distance = 0;
     this.speed = 12;
     for (let i = 0; i < ROW_COUNT; i++) {
@@ -77,14 +83,8 @@ export class Simulation {
   }
 
   move(direction: number) {
-    if (this.phase === "running")
-      this.targetX = Math.max(
-        -MAX_PLAYER_X,
-        Math.min(
-          MAX_PLAYER_X,
-          this.targetX + Math.sign(direction) * MOVE_INCREMENT,
-        ),
-      );
+    // Held axis, not a destination. Release stops at any fractional coordinate.
+    this.steering = this.phase === "running" ? Math.sign(direction) : 0;
   }
   jump() {
     if (this.phase === "running" && this.y === 0) this.velocityY = 8.6;
@@ -94,8 +94,11 @@ export class Simulation {
     if (this.phase !== "running") return;
     const oldX = this.x,
       oldY = this.y;
-    const delta = this.targetX - this.x;
-    this.x += Math.sign(delta) * Math.min(Math.abs(delta), SIDE_SPEED * dt);
+    this.previousX = oldX;
+    this.previousY = oldY;
+    this.previousHeading = this.heading;
+    this.x = Math.max(-MAX_PLAYER_X, Math.min(MAX_PLAYER_X,
+      this.x + this.steering * SIDE_SPEED * dt));
     this.movingX = Math.sign(this.x - oldX);
     const targetHeading = -this.movingX * MAX_HEADING;
     const turn = targetHeading - this.heading;
@@ -108,12 +111,13 @@ export class Simulation {
     this.speed = Math.min(MAX_SPEED, 12 + this.distance * 0.008);
     const travel = this.speed * dt;
     this.distance += travel;
+    this.terrain.advance(this.distance);
     const extent = CUBE_SIZE / 2 + PLAYER_RADIUS;
     for (let i = 0; i < ROW_COUNT; i++) {
       const before = this.rowZ[i],
         after = before - travel;
       this.rowZ[i] = after;
-      // Swept body AABB: actual continuous X/Z/Y, never targetX or a column index.
+      // Swept body AABB: actual continuous X/Z/Y, never a column index.
       if (after <= extent && before >= -extent) {
         const enter = Math.max(0, (before - extent) / travel);
         const leave = Math.min(1, (before + extent) / travel);

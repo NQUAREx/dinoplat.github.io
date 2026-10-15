@@ -9,9 +9,9 @@
     <meta name="theme-color" content="#d6f2ec" />
     <meta
       name="description"
-      content="Свободный забег маленького динозавра по мультяшному песку. Светлый пиксельный 3D-раннер Dino Plat."
+      content="Удерживай экран и веди динозавра по 16 пиксельным мирам. Светлый мобильный 3D-раннер Dino Plat."
     />
-    <title>Dino Plat — Песчаный забег</title>
+    <title>Dino Plat — Бесконечный забег</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23639947' d='M7 1h8v6h-5v3h-2v5H5v-4H3V9H1V5h2v3h4z'/%3E%3Cpath fill='%232f493b' d='M12 2h1v1h-1z'/%3E%3C/svg%3E"
@@ -22,7 +22,6 @@
       <canvas
         id="game"
         aria-label="Свободно движущийся белый динозавр и кубы на песчаной дорожке"
-        tabindex="0"
       ></canvas>
       <header class="topbar">
         <a class="brand" href="./" aria-label="Dino Plat, главная"
@@ -65,7 +64,7 @@
             <path fill="#38543c" d="M24 6h2v2h-2z" />
             <path fill="#ecc77e" d="M2 30h28v2H2z" />
           </svg>
-          <div id="chapter" class="chapter">ПЕСЧАНЫЙ ЗАБЕГ</div>
+          <div id="chapter" class="chapter">МИР ПРИКЛЮЧЕНИЙ</div>
           <h1 id="title">Дино,<br /><em>вперёд!</em></h1>
           <p id="description">
             Беги свободно навстречу приключениям!<br />Обходи кубы и прыгай всё
@@ -77,12 +76,8 @@
           <button id="action" class="pixel-button primary">
             ИГРАТЬ <span aria-hidden="true">→</span>
           </button>
-          <div class="controls">
-            <div><kbd>←</kbd><kbd>→</kbd><span>ДВИЖЕНИЕ</span></div>
-            <div><kbd>↑</kbd><span>ПРЫЖОК</span></div>
-          </div>
           <p class="touch-help">
-            Касайся слева или справа.<br />Свайп вверх — и дино прыгает!
+            Удерживай слева или справа — беги вбок.<br />Отпусти — остановись. Свайп вверх — прыжок!
           </p>
           <p class="record-note">
             Твой рекорд: <span id="menu-best">0</span> м
@@ -113,6 +108,13 @@
         <span class="phone-pixel" aria-hidden="true"></span>
         <h2 id="rotate-title">Поверни телефон</h2>
         <p>Дино бегает только вертикально.<br />Твой забег ждёт тебя!</p>
+      </div>
+    </aside>
+    <aside id="mobile-required" role="status">
+      <div class="rotate-card">
+        <span class="phone-pixel" aria-hidden="true"></span>
+        <h2>Открой на телефоне</h2>
+        <p>Дино слушается пальцев!<br />Нужен сенсорный экран<br />и вертикальное положение.</p>
       </div>
     </aside>
     <noscript>Для игры включите JavaScript в браузере.</noscript>

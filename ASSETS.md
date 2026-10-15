@@ -2,16 +2,16 @@
 
 All assets are served from this static site. No runtime calls to OpenGameArt, Google Fonts or other CDNs.
 
-## Sand road
+## Pixel terrain array
 
-- File: `src/assets/sand.webp` (128×128, 2024 bytes).
-- Source: [2048 Digitally Painted Tileable Desert Sand Texture — OpenGameArt](https://opengameart.org/content/2048-digitally-painted-tileable-desert-sand-texture), author **txturs**.
-- Licence: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
-- Original albedo: https://opengameart.org/sites/default/files/sand_1.jpg.
-- Hand-painted dunes replace the former photographic sand. Reduced to 12 flat colours, with no dithering or photographic grain; a warm material tint gives a strong cartoon/cel-painted appearance. A pixel-atlas alternative was inspected but not included because its grain pattern formed visible dashed grid lines when repeated.
-- Only the colour map is used. No normal / bump / displacement / roughness maps, PBR shader, extra lights or decoder.
-- Prepared using ImageMagick: `magick sand_1.jpg -resize 128x128! -dither None -colors 12 -strip -define webp:lossless=true sand.webp`.
-- Uploaded once, mipmapped, repeated and scrolled using a bounded UV offset. Approximate RGBA GPU memory including mipmaps: 85 KiB. GPU memory depends on browser implementation. `assetsInlineLimit: 0` preserves an independent cacheable texture asset even though it is smaller than 4 KiB.
+- File: `src/assets/terrains.webp`, 512×512, **108 282 bytes**, 16 cells in a 4×4 grid, 128×128 per material.
+- Reference supplied by the user: https://chatgpt.com/s/m_6ad0f47f37dc8191bb6ba760102e41b4 . Original 1536×1024 image is preserved in `art/terrain-reference.png`. Treat this as user-provided reference art, not an asserted CC0 asset; its upstream copyright/licence has not been independently established.
+- `art/terrain-atlas-source.png`: AI-assisted production adaptation of that reference. The sixteen original material identities, row-major order, palette and pixel-art style were retained; ragged patches on black were extended into fully filled square cells. No black background remains in the runtime atlas.
+- `npm run terrain:build` runs `tools/prepare_terrains.mjs`: nearest-neighbour reduction to 512×512, matching opposing edges within an 8px strip, 128-colour quantisation without dithering and lossless WebP compression. Narrow edge matching avoids the obvious symmetry of full-tile mirroring. Original art PNGs are not included in the site build.
+- Runtime: decode once into a `DataArrayTexture`, 16 independent 128×128 sRGB layers, nearest magnification, trilinear mipmaps, anisotropy 1. Approximate RGBA GPU memory including mipmaps: **1.33 MiB** (implementation dependent). One texture object, no per-segment loading, allocations or new draw calls. Browser resource tests verify all 16 layers and stable resource counts across 100 restarts.
+- Each square spans 5.25×5.25 world metres; UV scroll is bounded. The road's small unlit shader takes one texture sample outside transitions, two within a spatial 16m transition, and adds distance fog. No normal / bump / displacement maps, PBR, postprocessing or extra lights.
+- Coverings are independently seeded and change every 500m. All sixteen configurable weights are 1; the current material is excluded from the next draw, so remaining candidates each have probability 1/15. Previous/current/next IDs preserve the boundary when the player crosses it.
+- The former OpenGameArt sand asset was removed; it is not shipped or requested anymore.
 
 ## Pixel font
 
@@ -24,4 +24,4 @@ All assets are served from this static site. No runtime calls to OpenGameArt, Go
 
 ## Original project assets
 
-`src/assets/dinosaur.glb`, `art/dinosaur.blend`, the Python generator and the small pixel dinosaur SVG in `index.html` were authored for this project. The dinosaur GLB has vertex colours and no textures; the only Three.js texture is the sand road. The UI font and SVG do not add WebGL texture objects.
+`src/assets/dinosaur.glb`, `art/dinosaur.blend`, the Python generator and the small pixel dinosaur SVG in `index.html` were authored for this project. The dinosaur GLB has vertex colours and no textures; the only Three.js texture object is the terrain array. The UI font and SVG do not add WebGL texture objects.

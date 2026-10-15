@@ -1,102 +1,54 @@
+/** Touch-only held steering. No click increments or desktop fallback. */
 export class Input {
   private readonly abort = new AbortController();
   private pointer = -1;
   private startX = 0;
   private startY = 0;
-  private started = 0;
+  private swiped = false;
   constructor(
     canvas: HTMLCanvasElement,
-    move: (direction: number) => void,
+    private readonly move: (direction: number) => void,
     jump: () => void,
-    pause: () => void,
-    start: () => void,
   ) {
     const options = { signal: this.abort.signal };
-    window.addEventListener(
-      "keydown",
-      (event) => {
-        if ((event.target as HTMLElement).closest("button,a")) return;
-        if (
-          ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"].includes(
-            event.code,
-          )
-        )
-          event.preventDefault();
-        // Repeated horizontal keydowns continue shifting X; jump/pause never repeat.
-        if (
-          event.repeat &&
-          !["ArrowLeft", "KeyA", "ArrowRight", "KeyD"].includes(event.code)
-        )
-          return;
-        if (event.code === "ArrowLeft" || event.code === "KeyA") move(-1);
-        if (event.code === "ArrowRight" || event.code === "KeyD") move(1);
-        if (
-          event.code === "ArrowUp" ||
-          event.code === "KeyW" ||
-          event.code === "Space"
-        )
-          jump();
-        if (event.code === "Escape" || event.code === "KeyP") pause();
-        if (event.code === "Enter") start();
-      },
-      options,
-    );
-    canvas.addEventListener(
-      "pointerdown",
-      (event) => {
-        if (
-          !event.isPrimary ||
-          (event.pointerType === "mouse" && event.button !== 0)
-        )
-          return;
-        this.pointer = event.pointerId;
-        this.startX = event.clientX;
-        this.startY = event.clientY;
-        this.started = performance.now();
-        canvas.setPointerCapture(event.pointerId);
-      },
-      options,
-    );
-    canvas.addEventListener(
-      "pointerup",
-      (event) => {
-        if (event.pointerId !== this.pointer) return;
-        this.pointer = -1;
-        const dx = event.clientX - this.startX,
-          dy = event.clientY - this.startY;
-        if (Math.abs(dy) > Math.abs(dx) && dy < -28) jump();
-        else if (Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy))
-          move(Math.sign(dx));
-        else if (
-          Math.abs(dx) < 20 &&
-          Math.abs(dy) < 20 &&
-          performance.now() - this.started < 500
-        )
-          move(
-            this.startX <
-              canvas.getBoundingClientRect().left + canvas.clientWidth / 2
-              ? -1
-              : 1,
-          );
-      },
-      options,
-    );
-    canvas.addEventListener(
-      "pointercancel",
-      () => {
-        this.pointer = -1;
-      },
-      options,
-    );
-    canvas.addEventListener(
-      "lostpointercapture",
-      () => {
-        this.pointer = -1;
-      },
-      options,
-    );
+    const steer = (x: number) => {
+      const bounds = canvas.getBoundingClientRect();
+      move(x < bounds.left + bounds.width / 2 ? -1 : 1);
+    };
+    canvas.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "touch" || !event.isPrimary || this.pointer !== -1) return;
+      event.preventDefault();
+      this.pointer = event.pointerId;
+      this.startX = event.clientX;
+      this.startY = event.clientY;
+      this.swiped = false;
+      canvas.setPointerCapture(event.pointerId);
+      steer(event.clientX);
+    }, options);
+    canvas.addEventListener("pointermove", (event) => {
+      if (event.pointerId !== this.pointer) return;
+      event.preventDefault();
+      const dx = event.clientX - this.startX;
+      const dy = event.clientY - this.startY;
+      if (!this.swiped && dy < -28 && -dy > Math.abs(dx)) {
+        this.swiped = true;
+        move(0);
+        jump();
+      } else if (!this.swiped) steer(event.clientX);
+    }, options);
+    for (const name of ["pointerup", "pointercancel", "lostpointercapture"] as const)
+      canvas.addEventListener(name, (event) => {
+        if (event.pointerId === this.pointer) this.clear();
+      }, options);
+    window.addEventListener("blur", () => this.clear(), options);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) this.clear();
+    }, options);
   }
-  dispose() {
-    this.abort.abort();
+  clear() {
+    this.pointer = -1;
+    this.swiped = false;
+    this.move(0);
   }
+  dispose() { this.clear(); this.abort.abort(); }
 }

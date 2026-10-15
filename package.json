@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "tsx --test tests/*.test.ts",
     "model:build": "blender --background --factory-startup --python tools/create_dinosaur.py",
+    "terrain:build": "node tools/prepare_terrains.mjs",
     "test:browser": "node tests/browser.mjs"
   },
   "dependencies": {

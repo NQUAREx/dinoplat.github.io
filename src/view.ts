@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { TERRAIN_LENGTH, TERRAIN_TRANSITION } from "./terrain";
 import {
   CUBE_SIZE,
   LANES,
@@ -18,9 +19,58 @@ export class View {
     color: 0xffffff,
     flatShading: true,
   });
-  private readonly roadMaterial = new THREE.MeshBasicMaterial({
-    // Warm cel-painted dunes; tint uses the existing unlit material, no extra pass.
-    color: new THREE.Color().setRGB(1.35, 1.7, 1.4),
+  private readonly roadMaterial = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3,
+    uniforms: {
+      ground: { value: null },
+      layers: { value: new THREE.Vector3() },
+      progress: { value: 0 },
+      scroll: { value: 0 },
+    },
+    vertexShader: `
+      out vec2 world;
+      out float depth;
+      void main() {
+        vec4 p = modelMatrix * vec4(position, 1.0);
+        world = p.xz;
+        vec4 eye = viewMatrix * p;
+        depth = -eye.z;
+        gl_Position = projectionMatrix * eye;
+      }`,
+    fragmentShader: `
+      precision highp sampler2DArray;
+      uniform sampler2DArray ground;
+      uniform vec3 layers;
+      uniform float progress;
+      uniform float scroll;
+      in vec2 world;
+      in float depth;
+      out vec4 terrainColor;
+      #define gl_FragColor terrainColor
+      void main() {
+        // Square texels in world space, independent of the long road box UVs.
+        vec2 uv = vec2(world.x, -world.y + scroll) / 5.25 + vec2(0.37, 0.0);
+        float s = progress - world.y;
+        float a = layers.y;
+        float b = layers.z;
+        float boundary = s - ${TERRAIN_LENGTH.toFixed(1)};
+        if (s < ${TERRAIN_LENGTH / 2}.) {
+          a = layers.x; b = layers.y; boundary = s;
+        }
+        // Fixed, blocky transition details anchored to the ground, not the screen.
+        vec2 pixel = floor(mod(uv, 2.0) * 64.0);
+        float noise = fract(dot(pixel, vec2(0.06711056, 0.1135789)) * 52.9829189);
+        float blend = smoothstep(-${TERRAIN_TRANSITION / 2}., ${TERRAIN_TRANSITION / 2}., boundary + (noise - 0.5) * 4.0);
+        vec3 colour;
+        if (boundary < -10.0) colour = texture(ground, vec3(uv, a)).rgb;
+        else if (boundary > 10.0) colour = texture(ground, vec3(uv, b)).rgb;
+        else colour = mix(texture(ground, vec3(uv, a)).rgb,
+                          texture(ground, vec3(uv, b)).rgb, blend);
+        // Same inexpensive distance fog as the rest of the scene, in linear space.
+        vec3 fog = vec3(0.672443, 0.887923, 0.846873);
+        gl_FragColor = vec4(mix(colour, fog, smoothstep(32.0, 106.0, depth)), 1.0);
+        #include <colorspace_fragment>
+      }`,
   });
   private readonly markerMaterial = new THREE.MeshBasicMaterial({
     color: 0x9fbd71,
@@ -60,9 +110,9 @@ export class View {
   constructor(
     canvas: HTMLCanvasElement,
     private readonly dinosaur: THREE.BufferGeometry,
-    private readonly sand: THREE.Texture,
+    private readonly terrainTexture: THREE.DataArrayTexture,
   ) {
-    this.roadMaterial.map = sand;
+    this.roadMaterial.uniforms.ground.value = terrainTexture;
     this.player = new THREE.Mesh(dinosaur, this.dinosaurMaterial);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -177,14 +227,18 @@ export class View {
     this.sampleTime = this.sampleFrames = 0;
   }
 
-  draw(game: Simulation) {
-    // The texture scrolls with the world. Modulo avoids unbounded UV offsets.
-    this.sand.offset.y = (game.distance / (126 / 24)) % 1;
-    this.player.position.x = game.x;
-    this.player.rotation.y = game.heading;
+  draw(game: Simulation, alpha = 1) {
+    game.terrain.advance(game.distance);
+    this.roadMaterial.uniforms.layers.value.set(
+      game.terrain.previous, game.terrain.current, game.terrain.next);
+    this.roadMaterial.uniforms.progress.value = game.distance % TERRAIN_LENGTH;
+    // Two tile periods also preserve the transition noise phase at wraparound.
+    this.roadMaterial.uniforms.scroll.value = game.distance % 10.5;
+    this.player.position.x = THREE.MathUtils.lerp(game.previousX, game.x, alpha);
+    this.player.rotation.y = THREE.MathUtils.lerp(game.previousHeading, game.heading, alpha);
     // Rigid-mesh stride: no skeleton, per-vertex uploads or per-frame allocation.
     this.player.position.y =
-      game.y +
+      THREE.MathUtils.lerp(game.previousY, game.y, alpha) +
       (game.y === 0 ? Math.abs(Math.sin(game.distance * 3)) * 0.025 : 0);
     this.player.rotation.z = Math.sin(game.distance * 3) * 0.025;
     let count = 0;
@@ -255,8 +309,9 @@ export class View {
       cameraExtraPitchDegrees: THREE.MathUtils.radToDeg(
         this.cameraPitch - this.basePitch,
       ),
-      sandSize: (this.sand.image as HTMLImageElement).width,
-      sandOffset: this.sand.offset.y,
+      terrainSize: this.terrainTexture.image.width,
+      terrainLayers: this.terrainTexture.image.depth,
+      terrainOffset: this.roadMaterial.uniforms.scroll.value,
       laneEdgeNdc: new THREE.Vector3(ROAD_WIDTH / 2, 0, 0).project(this.camera)
         .x,
     };
@@ -271,7 +326,7 @@ export class View {
     this.dinosaurMaterial.dispose();
     this.white.dispose();
     this.roadMaterial.dispose();
-    this.sand.dispose();
+    this.terrainTexture.dispose();
     this.markerMaterial.dispose();
     this.accentMaterial.dispose();
     this.renderer.dispose();

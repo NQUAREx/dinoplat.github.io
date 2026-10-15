@@ -49,8 +49,7 @@ button:disabled {
 }
 #app {
   position: relative;
-  width: min(100%, 480px, 64vh);
-  width: min(100%, 480px, 64dvh);
+  width: 100%;
   height: 100%;
   overflow: hidden;
   background: #d6f2ec;
@@ -226,32 +225,6 @@ h1 em {
 .primary span {
   font-size: 16px;
 }
-.controls {
-  display: flex;
-  justify-content: center;
-  gap: 17px;
-  margin-top: 23px;
-  font-size: 6px;
-  color: #7d7c61;
-}
-.controls > div {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-kbd {
-  font: inherit;
-  font-size: 10px;
-  line-height: 1.5;
-  color: #647c49;
-  background: #f0edce;
-  border: 2px solid #c5cc9c;
-  padding: 2px 3px;
-  box-shadow: 0 2px #c5cc9c;
-}
-.controls span {
-  margin-left: 2px;
-}
 .touch-help {
   font-size: 7px;
   line-height: 2;
@@ -317,7 +290,7 @@ kbd {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
-#rotate {
+#rotate, #mobile-required {
   display: none;
   position: fixed;
   inset: 0;
@@ -379,9 +352,6 @@ kbd {
     font-size: 7px;
     margin-bottom: 14px;
   }
-  .controls {
-    margin-top: 17px;
-  }
   .touch-help {
     font-size: 6px;
     margin-top: 12px;
@@ -398,6 +368,9 @@ kbd {
     gap: 10px;
   }
 }
+body[data-device="unsupported"] #app,
+body[data-device="unsupported"] #rotate { display: none; }
+body[data-device="unsupported"] #mobile-required { display: grid; }
 @media (orientation: landscape) and (pointer: coarse) {
   #app {
     visibility: hidden;
