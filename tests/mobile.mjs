@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { checkCollectibles } from "./collectibles-browser.mjs";
 import { checkTerrainMotion } from "./terrain-browser.mjs";
+import { checkContinuity } from "./continuity-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -322,6 +323,8 @@ try {
           window.__runner.game.crouch === 0 &&
           window.__runner.game.crouchRemaining === 0,
       );
+      // Isolate resize coalescing from the independent adaptive-resolution timer.
+      await page.evaluate(() => window.__runner.pause());
       const resizes = await page.evaluate(
         () => window.__runner.stats().bufferResizes,
       );
@@ -444,6 +447,7 @@ try {
         errors,
       };
       results[engine].lighting = await checkLighting(context, engine);
+      results[engine].continuity = await checkContinuity(context, url, engine);
       results[engine].terrainMotion = await checkTerrainMotion(
         context,
         url,

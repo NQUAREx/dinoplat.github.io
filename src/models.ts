@@ -53,7 +53,7 @@ export class ModelLibrary {
       return new ModelLibrary(
         Array.from({ length: 8 }, (_, i) => requireGeometry(`run-${i}`)),
         requireGeometry("death"),
-        Array.from({ length: 6 }, (_, i) => requireGeometry(`cactus-${i}`)),
+        Array.from({ length: 7 }, (_, i) => requireGeometry(`cactus-${i}`)),
         requireGeometry("pickup-coin"),
         requireGeometry("pickup-diamond"),
         requireGeometry("pickup-heart"),

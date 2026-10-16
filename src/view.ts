@@ -13,6 +13,7 @@ import { LightingRig } from "./lighting";
 import { RenderPose } from "./render-pose";
 import { CachedShadows } from "./shadows";
 import { PickupMotion } from "./pickup-motion";
+import { DinosaurShadow } from "./dinosaur-shadow";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
@@ -25,10 +26,10 @@ export class View {
   private readonly scene = new THREE.Scene();
   private readonly ground: Ground;
   private readonly dinosaur: AnimatedDinosaur;
+  private readonly dinosaurShadow = new DinosaurShadow();
   private readonly dust: FootDust;
   private readonly cactusMaterial = new THREE.MeshLambertMaterial({
     vertexColors: true,
-    flatShading: true,
   });
   // Palette is the HUD palette, with just a little self-emission for night
   // readability. One opaque vertex-colour material shared by all three types.
@@ -84,7 +85,6 @@ export class View {
       this.lighting.key,
       this.lighting.key.target,
       this.lighting.ambient,
-      this.lighting.moon,
     );
     const time = new URLSearchParams(location.search).get("time");
     if (time !== null && time.trim() !== "" && Number.isFinite(Number(time)))
@@ -109,7 +109,8 @@ export class View {
       [models.heart],
       this.pickupMaterial,
     );
-    this.scene.add(this.ground.mesh, this.dinosaur.mesh, this.dust.mesh);
+    this.scene.add(this.ground.mesh, this.dinosaurShadow.mesh,
+      this.dinosaur.mesh, this.dust.mesh);
     for (const mesh of this.objectRenderers.get(ObjectKind.Cactus)!.meshes) {
       mesh.castShadow = true;
       // Only the terrain needs reception today. Avoid a depth lookup on every
@@ -193,18 +194,16 @@ export class View {
   draw(alpha = 1, dt = 0) {
     const game = this.game;
     this.pose.update(game, alpha);
-    this.lighting.update(game.time);
+    this.lighting.update(game.previousTime + (game.time - game.previousTime) * alpha);
     this.renderer.setClearColor(this.lighting.fogColour);
     (this.scene.fog as THREE.Fog).color.copy(this.lighting.fogColour);
     this.ground.update(game, this.pose);
     this.dinosaur.update(game, alpha);
+    this.dinosaurShadow.update(this.dinosaur, this.lighting,
+      this.ground.surface.heightAt(this.pose.x, this.pose.distance));
     const moving = game.phase === "running" && !game.y && !game.velocityY;
     const activeDt = game.phase === "running" ? dt : 0;
     this.rig.update(this.pose.distance, 0, activeDt, moving);
-    if (this.lighting.moon.visible)
-      this.lighting.moon.position
-        .set(0.58, 0.65, 0.997)
-        .unproject(this.rig.camera);
     this.visibility.update(this.rig.camera);
     this.dust.update(
       game,
@@ -257,16 +256,17 @@ export class View {
         world.kinds[i] === ObjectKind.Cactus &&
         x * x + forward * forward < 60 * 60
       ) {
+        // A map may live for .25s: retain a guard band exceeding max forward
+        // movement (6m) during that interval. Tight per-frame caster culling
+        // makes cached edge shadows pop. Do not submit the whole 60m disk.
         const sx = this.lighting.shadowSlope.x,
           sz = this.lighting.shadowSlope.y;
         const mid = world.baseY[i] + world.height[i] / 2;
         caster = this.visibility.intersects(
-          x - mid * sx,
-          forward + mid * sz,
-          world.halfX[i] + (Math.abs(sx) * world.height[i]) / 2,
-          world.halfZ[i] + (Math.abs(sz) * world.height[i]) / 2,
-          0.02,
-          0,
+          x - mid * sx, forward + mid * sz,
+          world.halfX[i] + Math.abs(sx) * world.height[i] / 2 + 8,
+          world.halfZ[i] + Math.abs(sz) * world.height[i] / 2 + 8,
+          .02, 0,
         );
       }
       if (!visible && !caster) continue;
@@ -342,7 +342,7 @@ export class View {
       sunY: this.lighting.key.position.y,
       sunZ: this.lighting.key.position.z,
       lightSource: this.lighting.source,
-      moonVisible: this.lighting.moon.visible,
+      moonVisible: false,
       shadowUpdates: this.shadows.updates,
       shadowMapSize: this.lighting.key.shadow.mapSize.x,
       terrainTriangles: this.ground.surface.geometry.index!.count / 3,
@@ -351,6 +351,10 @@ export class View {
           ? this.objectRenderers.get(ObjectKind.Cactus)!.visible
           : 0,
       shadowStrength: this.lighting.shadowStrength,
+      dinosaurShadowX: this.dinosaurShadow.mesh.position.x,
+      dinosaurShadowZ: this.dinosaurShadow.mesh.position.z,
+      dinosaurShadowWidth: this.dinosaurShadow.mesh.scale.x,
+      dinosaurShadowOpacity: this.dinosaurShadow.mesh.material.opacity,
       renderX: this.pose.x,
       renderDistance: this.pose.distance,
     };
@@ -361,6 +365,7 @@ export class View {
     this.cactusMaterial.dispose();
     this.pickupMaterial.dispose();
     this.dinosaur.dispose();
+    this.dinosaurShadow.dispose();
     this.dust.dispose();
     this.ground.dispose();
     this.models.dispose();

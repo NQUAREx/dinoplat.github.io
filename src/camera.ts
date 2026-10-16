@@ -30,6 +30,7 @@ export class CameraRig {
   private blendTime = 0.35;
   private shake = 0;
   private shakeTime = 0;
+  private walkingBlend = 0;
   shakeMultiplier = 1;
   constructor(private readonly reducedMotion = false) {
     this.update(0, 0, 0, false);
@@ -71,8 +72,10 @@ export class CameraRig {
     }
     const phase = (distance * Math.PI * 2) / Rules.stepStride;
     const intensity = Math.max(0, Math.min(3, this.shakeMultiplier));
-    const bob =
-      walking && !this.reducedMotion ? Math.sin(phase) * 0.035 * intensity : 0;
+    this.walkingBlend += ((walking ? 1 : 0) - this.walkingBlend) *
+      (1 - Math.exp(-Math.max(0, dt) * 12));
+    const bob = !this.reducedMotion
+      ? Math.sin(phase) * 0.035 * intensity * this.walkingBlend : 0;
     this.shakeTime = Math.max(0, this.shakeTime - dt);
     const shake =
       this.shakeTime > 0 && !this.reducedMotion
@@ -93,6 +96,7 @@ export class CameraRig {
   }
   reset() {
     this.shake = this.shakeTime = 0;
+    this.walkingBlend = 0;
     this.setPose(
       {
         offsetX: 0,

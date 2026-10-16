@@ -2,29 +2,17 @@ import {
   Color,
   DirectionalLight,
   HemisphereLight,
-  IcosahedronGeometry,
-  Mesh,
-  MeshBasicMaterial,
   Vector2,
   Vector3,
 } from "three";
 import { DayCycle } from "./day-cycle";
 
-/** One directional source switches from sun to white moonlight. No hidden sun
- * or second directional/shadow pass is evaluated at night. */
+/** One continuously moving virtual source. Sun/moon is a semantic label only:
+ * never switch light direction, ambient brightness or shadow strength at 6/18. */
 export class LightingRig {
   readonly cycle = new DayCycle();
   readonly key = new DirectionalLight(0xffffff, 1.8);
   readonly ambient = new HemisphereLight(0xffffff, 0xc49754, 1);
-  readonly moon = new Mesh(
-    new IcosahedronGeometry(0.9, 0),
-    new MeshBasicMaterial({
-      color: 0xf5f6e5,
-      fog: false,
-      depthTest: false,
-      depthWrite: false,
-    }),
-  );
   readonly fogColour = new Color();
   readonly shadowSlope = new Vector2();
   source: "sun" | "moon" = "sun";
@@ -59,7 +47,6 @@ export class LightingRig {
     shadow.bias = -0.0003;
     shadow.normalBias = 0.035;
     shadow.autoUpdate = false;
-    this.moon.renderOrder = -1;
     this.update(0);
   }
   setTimeOfDay(hours: number, automatic = false) {
@@ -81,37 +68,34 @@ export class LightingRig {
   update(elapsed: number) {
     const hours = this.cycle.sample(elapsed);
     this.source = hours >= 6 && hours < 18 ? "sun" : "moon";
-    const moon = this.source === "moon";
-    const angle = (((moon ? (hours + 12) % 24 : hours) - 6) * Math.PI) / 12;
-    if (!this.manualPosition || moon)
+    const angle = ((hours - 6) * Math.PI) / 12;
+    const elevation = Math.sin(angle);
+    const day = this.smooth((elevation + 0.15) / 0.5);
+    const twilight = 4 * day * (1 - day);
+    // An artistic orbit stays above the horizon and travels continuously through
+    // dawn/dusk. Avoid grazing-angle kilometre-long shadows and direction flips.
+    if (!this.manualPosition)
       this.position.set(
-        Math.cos(angle) * (moon ? 36 : 40) + (moon ? 12 : 0),
-        Math.max(2, Math.sin(angle) * (moon ? 32 : 40)),
-        -12 + Math.cos(angle) * (moon ? 14 : 18) + (moon ? 10 : 0),
+        Math.cos(angle) * 40,
+        14 + 26 * Math.sqrt(elevation * elevation + 0.01) / Math.sqrt(1.01),
+        -12 + Math.cos(angle) * 18 + 10 * (1 - day),
       );
     this.key.target.position.set(0, 0, -12);
     this.key.position.copy(this.position);
     const dx = this.position.x,
       dy = this.position.y,
       dz = this.position.z + 12;
-    const elevation = dy / Math.max(0.01, Math.hypot(dx, dy, dz));
-    const strength = Math.max(0, Math.min(1, (elevation - 0.025) / 0.2));
-    const day = moon ? 0 : Math.max(0, elevation);
-    const twilight = moon
-      ? Math.max(0, 1 - elevation * 6)
-      : Math.max(0, 1 - elevation * 5);
-    this.key.intensity = (moon ? 0.65 : 1.8) * strength;
-    this.key.color.copy(moon ? this.moonWhite : this.warmSun);
-    if (!moon) this.key.color.lerp(this.whiteSun, day);
-    this.ambient.intensity = moon ? 0.42 : 0.65 + 0.6 * day + twilight * 0.3;
+    this.key.intensity = 0.65 + 1.15 * day;
+    this.key.color.copy(this.moonWhite).lerp(this.whiteSun, day)
+      .lerp(this.warmSun, twilight * 0.55);
+    this.ambient.intensity = 0.42 + 0.7 * day + twilight * 0.12;
     this.ambient.color.copy(this.nightSky).lerp(this.daySky, day);
-    if (!moon) this.ambient.color.lerp(this.warmSun, twilight * 0.5);
+    this.ambient.color.lerp(this.warmSun, twilight * 0.3);
     this.ambient.groundColor.copy(this.nightGround).lerp(this.dayGround, day);
     this.shadowStrength = this.shadowsEnabled
-      ? (moon ? 0.9 : 0.95) * strength
+      ? 0.9 + 0.05 * day
       : 0;
     this.key.shadow.intensity = this.shadowStrength;
-    this.moon.visible = moon && elevation > 0.08;
     const denom = Math.max(dy, Math.hypot(dx, dz) / 3, 0.01);
     this.shadowSlope.set(dx / denom, dz / denom);
     let stop = 0;
@@ -120,14 +104,16 @@ export class LightingRig {
       .copy(this.sky[stop])
       .lerp(
         this.sky[stop + 1],
-        (hours - this.stops[stop]) / (this.stops[stop + 1] - this.stops[stop]),
+        this.smooth((hours - this.stops[stop]) / (this.stops[stop + 1] - this.stops[stop])),
       );
+  }
+  private smooth(value: number) {
+    const t = Math.max(0, Math.min(1, value));
+    return t * t * (3 - 2 * t);
   }
   dispose() {
     // LightShadow disposes its target; the renderer releases its owned depth
     // texture from that event. Do not dispose the same attachment twice.
     this.key.dispose();
-    this.moon.geometry.dispose();
-    this.moon.material.dispose();
   }
 }

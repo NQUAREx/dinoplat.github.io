@@ -51,7 +51,7 @@ test("moving sun reverses shadows and day/night changes fog and visibility witho
   light.update(0);
   assert.ok(light.shadowStrength > 0);
   assert.equal(light.source, "moon");
-  assert.equal(light.moon.visible, true);
+  assert.equal("moon" in light, false);
   assert.notEqual(light.fogColour.getHex(), morning);
   assert.ok(light.ambient.intensity > 0.3);
   light.setTimeOfDay(18);
@@ -134,7 +134,7 @@ test("one interpolated render origin is used at tile and biome boundaries, inclu
   ground.dispose();
 });
 
-test("cached shadow map is rebased continuously, throttled even at minimum quality and invalidated on source/reset", () => {
+test("cached shadow map is rebased continuously, throttled even at minimum quality and invalidated on manual light/reset", () => {
   const game = new Simulation(),
     pose = new RenderPose(),
     light = new LightingRig(),

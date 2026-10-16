@@ -14,7 +14,6 @@ export class CachedShadows {
   private time = -Infinity;
   private seed = 0;
   private revision = -1;
-  private source = "";
   private worldRevision = -1;
   private readonly matrix = new Matrix4();
   private readonly translation = new Matrix4();
@@ -34,7 +33,6 @@ export class CachedShadows {
       game.seed !== this.seed ||
       game.world.revision !== this.worldRevision ||
       light.revision !== this.revision ||
-      light.source !== this.source ||
       Math.abs(pose.x - this.x) > 8 ||
       Math.abs(pose.distance - this.distance) > 8 ||
       game.time < this.time ||
@@ -47,7 +45,6 @@ export class CachedShadows {
       this.seed = game.seed;
       this.worldRevision = game.world.revision;
       this.revision = light.revision;
-      this.source = light.source;
       const camera = shadow.camera;
       camera.position.copy(light.key.position);
       camera.lookAt(light.key.target.position);

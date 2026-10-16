@@ -5,6 +5,7 @@ import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { checkCollectibles } from "./collectibles-browser.mjs";
 import { checkTerrainMotion } from "./terrain-browser.mjs";
+import { checkContinuity } from "./continuity-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -71,6 +72,7 @@ try {
     "chromium-browser",
   );
   report.terrainMotion = await checkTerrainMotion(context, url, "chromium");
+  report.continuity = await checkContinuity(context, url, "chromium-browser");
   const page = await context.newPage();
   await page.addInitScript(() => {
     window.vibrationCalls = [];
@@ -99,7 +101,7 @@ try {
   });
   report.initial = await page.evaluate(() => window.__runner.snapshot());
   assert.equal(report.initial.boundaryCount, 0);
-  assert.equal(report.initial.obstacleVariants, 6);
+  assert.equal(report.initial.obstacleVariants, 7);
   assert.equal(report.initial.loadedPoses, 8);
   assert.equal(report.initial.terrainLayers, 97);
   assert.equal(report.initial.terrainTileMetres, 2.5);
@@ -274,11 +276,11 @@ try {
       g.x = g.previousX = 0;
       g.distance = g.previousDistance = frame / 0.9 + 0.1;
       g.world.active.fill(0);
-      for (let i = 0; i < 6; i++) {
+      for (let i = 0; i < 7; i++) {
         g.world.active[i] = 1;
         g.world.kinds[i] = 0;
         g.world.variants[i] = i;
-        g.world.x[i] = (i - 2.5) * 1.3;
+        g.world.x[i] = (i - 3) * 1.3;
         g.world.z[i] = g.distance + 8;
         g.world.halfX[i] = 0.55;
         g.world.halfZ[i] = 0.55;
@@ -306,7 +308,7 @@ try {
     }
     r.render();
   });
-  // Warm moon geometry before resource comparisons.
+  // Night uses the same virtual light and allocates no moon geometry.
   await page.evaluate(() => {
     const r = window.__runner;
     r.lighting.setTimeOfDay(0);
@@ -592,7 +594,7 @@ try {
   });
   assert.equal(report.performance.failed, undefined);
   assert.equal(report.performance.lives, 3);
-  assert.ok(report.performance.calls <= 19);
+  assert.ok(report.performance.calls <= 21);
   await page.screenshot({ path: "test-results/animated-run.png" });
   report.shadowsAfter170 = await page.evaluate(() => {
     const r = window.__runner,

@@ -113,7 +113,7 @@ test("2D cell pool is bounded, deterministic after reentry, and generates both a
       }
   }
   assert.equal(left && right, true);
-  assert.equal(variants, 63);
+  assert.equal(variants, 127);
   assert.equal(pool.x, arrays[0]);
   assert.equal(pool.z, arrays[1]);
   assert.equal(pool.active, arrays[2]);

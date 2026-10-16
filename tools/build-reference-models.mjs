@@ -13,6 +13,7 @@ import {
 } from "three";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
+import { LowPolyCacti } from "./low-poly-cacti.mjs";
 
 globalThis.FileReader = class {
   readAsArrayBuffer(blob) {
@@ -171,14 +172,6 @@ class ModelBuilder {
   async build() {
     const scene = new Scene(),
       material = new MeshBasicMaterial({ vertexColors: true });
-    const cactusNames = [
-      "cactus",
-      "cactus_tall",
-      "cactus_thin",
-      "fcactus",
-      "fcactus_tall",
-      "fcactus_thin",
-    ];
     const entries = [
       ...Array.from({ length: 8 }, (_, i) => [
         `t-rex/${i}`,
@@ -187,12 +180,6 @@ class ModelBuilder {
         true,
       ]),
       ["t-rex/death", "death", 1.65, true],
-      ...cactusNames.map((name, i) => [
-        `cactus/${name}`,
-        `cactus-${i}`,
-        [1.15, 1.55, 1.05, 1.15, 1.55, 1.05][i],
-        false,
-      ]),
       ["../collectibles/coin", "pickup-coin", 0.75, false],
       ["../collectibles/diamond", "pickup-diamond", 0.7, false],
       ["../collectibles/heart", "pickup-heart", 0.7, false],
@@ -206,15 +193,17 @@ class ModelBuilder {
         mesh = new Mesh(geometry, material);
       mesh.name = name;
       scene.add(mesh);
-      if (name.startsWith("cactus-")) {
-        const b = geometry.boundingBox;
-        colliders.push({
-          halfX: +b.max.x.toFixed(5),
-          halfZ: +b.max.z.toFixed(5),
-          height,
-        });
-      }
       console.log(name, geometry.index.count / 3, "triangles");
+    }
+    const cacti = new LowPolyCacti();
+    for (let i = 0; i < 7; i++) {
+      const geometry = cacti.build(i), mesh = new Mesh(geometry, material);
+      mesh.name = `cactus-${i}`;
+      scene.add(mesh);
+      const b = geometry.boundingBox;
+      colliders.push({ halfX: +b.max.x.toFixed(5), halfZ: +b.max.z.toFixed(5),
+        height: +b.max.y.toFixed(5) });
+      console.log(mesh.name, geometry.index.count / 3, "triangles");
     }
     const glb = await new GLTFExporter().parseAsync(scene, {
       binary: true,
