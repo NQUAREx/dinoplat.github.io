@@ -7,7 +7,7 @@ export async function checkTerrainMotion(context, url, engine) {
   page.on("pageerror", (e) => errors.push(e.message));
   try {
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     const result = await page.evaluate(() => {
       const r = window.__runner,
         g = r.game;

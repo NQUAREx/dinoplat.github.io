@@ -5,7 +5,7 @@ import { ObjectKind, ObjectRegistry, WorldSpawner } from "./world";
 import { Terrain } from "./terrain";
 import { PickupMotion } from "./pickup-motion";
 
-export type Phase = "ready" | "running" | "paused" | "over";
+export type Phase = "ready" | "running" | "dying" | "paused" | "over";
 export const STEP = Rules.step;
 
 /** Pure numerical simulation. World coordinates are Float64; the renderer uses
@@ -43,6 +43,9 @@ export class Simulation {
   feedbackTime = 0;
   previousFeedbackTime = 0;
   hitStopRemaining = 0;
+  deathTime = 0;
+  previousDeathTime = 0;
+  private nextFoot = 0;
   private previousBob = 0;
   private nextStep = 0;
   constructor(seed = 1, registry = ObjectRegistry.defaults()) {
@@ -58,6 +61,8 @@ export class Simulation {
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
     this.previousTime = this.previousBob = 0;
     this.feedbackTime = this.previousFeedbackTime = this.hitStopRemaining = 0;
+    this.deathTime = this.previousDeathTime = 0;
+    this.nextFoot = 0;
     this.pickupMotion.update(0);
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
@@ -102,6 +107,14 @@ export class Simulation {
     }
   }
   step(dt: number) {
+    if (this.phase === "dying") {
+      this.previousDeathTime = this.deathTime;
+      this.deathTime = Math.min(Rules.deathSeconds, this.deathTime + dt);
+      this.previousFeedbackTime = this.feedbackTime;
+      this.feedbackTime += dt;
+      if (this.deathTime >= Rules.deathSeconds - 1e-9) this.phase = "over";
+      return;
+    }
     if (this.phase !== "running") return;
     this.previousFeedbackTime = this.feedbackTime;
     this.feedbackTime += dt;
@@ -116,7 +129,7 @@ export class Simulation {
       this.hitStopRemaining = Math.max(0, this.hitStopRemaining - dt);
       if (this.hitStopRemaining < 1e-9) {
         this.hitStopRemaining = 0;
-        if (!this.health.lives) this.phase = "over";
+        if (!this.health.lives) this.phase = "dying";
       }
       return;
     }
@@ -165,9 +178,12 @@ export class Simulation {
     this.world.update(this.x, this.z);
     this.terrain.advance(this.distance);
     this.collisions();
-    if (this.distance >= this.nextStep) {
-      this.nextStep = this.distance + Rules.stepStride;
-      if (!this.y && !this.velocityY) this.events.emit(GameEvent.Step);
+    if (!this.hitStopRemaining && this.distance >= this.nextStep) {
+      this.nextStep += Rules.stepStride;
+      if (!this.y && !this.velocityY) {
+        this.events.emit(GameEvent.Step, this.nextFoot);
+        this.nextFoot = 1 - this.nextFoot;
+      }
     }
   }
   private collisions() {

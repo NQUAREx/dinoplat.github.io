@@ -34,6 +34,7 @@ class GameApplication {
   private contextLost = false;
   private previous = 0;
   private accumulator = 0;
+  private resumePhase: "running" | "dying" = "running";
   private raf = 0;
   private readonly debug = new URLSearchParams(location.search).has("debug");
 
@@ -59,7 +60,6 @@ class GameApplication {
     this.cosmetics = new CosmeticInventory(this.game.wallet);
     this.ui.initializeShop(
       this.cosmetics,
-      this.game.wallet,
       (id) => {
         const result = this.cosmetics!.choose(id);
         this.ui.shopMessage(
@@ -107,7 +107,13 @@ class GameApplication {
           : (ground as PromiseRejectedResult).reason;
       }
       try {
-        this.view = new View(this.canvas, model.value, ground.value, this.game);
+        this.view = new View(
+          this.canvas,
+          model.value,
+          ground.value,
+          this.game,
+          () => this.schedule(),
+        );
       } catch (error) {
         model.value.dispose();
         ground.value.dispose();
@@ -201,6 +207,11 @@ class GameApplication {
           if (button.id !== "sound") this.sound.menu("ui");
           handler();
           this.ui.update(this.game);
+          // Present the correct scene alongside menu DOM changes on WebKit;
+          // otherwise its compositor can show the old world through Home.
+          if (this.game.phase !== "running" && this.game.phase !== "dying")
+            this.view?.draw();
+          this.schedule();
         },
         options,
       );
@@ -231,14 +242,12 @@ class GameApplication {
       document.getElementById("shop-toggle") as HTMLButtonElement,
       () => this.ui.selectSection("shop"),
     );
+    touchButton(document.getElementById("resume") as HTMLButtonElement, () =>
+      this.start(),
+    );
     touchButton(
-      document.getElementById("leave-run") as HTMLButtonElement,
-      () => {
-        this.pause();
-        this.game.phase = "over";
-        this.ui.show(this.game);
-        this.view?.draw();
-      },
+      document.getElementById("pause-settings") as HTMLButtonElement,
+      () => this.ui.showSettings(true),
     );
     touchButton(
       document.getElementById("fullscreen") as HTMLButtonElement,
@@ -258,6 +267,11 @@ class GameApplication {
       this.settings.sound = !this.settings.sound;
       this.applySettings();
       if (this.settings.sound) this.sound.unlock();
+    });
+    touchButton(document.getElementById("music") as HTMLButtonElement, () => {
+      this.settings.music = !this.settings.music;
+      this.applySettings();
+      this.sound.unlock();
     });
     touchButton(
       document.getElementById("settings-toggle") as HTMLButtonElement,
@@ -299,7 +313,6 @@ class GameApplication {
       () => {
         this.contextLost = false;
         this.view?.restoreContext();
-        if (this.game.phase === "ready") this.game.phase = "paused";
         this.ui.show(this.game);
         this.view?.resize();
         this.schedule();
@@ -325,14 +338,13 @@ class GameApplication {
   }
   private applySettings() {
     this.haptics.enabled = this.settings.vibration;
-    this.sound.enabled = this.settings.sound;
+    this.sound.configure(this.settings.sound, this.settings.music);
     if (!this.haptics.enabled) this.haptics.stop();
-    if (!this.sound.enabled) this.sound.suspend();
     if (this.view) this.view.rig.shakeMultiplier = this.settings.shake;
-    for (const key of ["vibration", "sound"] as const) {
+    for (const key of ["vibration", "sound", "music"] as const) {
       const button = document.getElementById(key)!;
       button.setAttribute("aria-pressed", String(this.settings[key]));
-      button.textContent = `${key === "vibration" ? "ВИБРАЦИЯ" : "ЗВУК"}: ${this.settings[key] ? "ДА" : "НЕТ"}`;
+      button.textContent = `${key === "vibration" ? "ВИБРАЦИЯ" : key === "music" ? "МУЗЫКА" : "ЗВУК"}: ${this.settings[key] ? "ДА" : "НЕТ"}`;
     }
     this.settings.save();
   }
@@ -341,16 +353,18 @@ class GameApplication {
       !this.alive ||
       this.contextLost ||
       this.landscape.matches ||
-      this.game.phase === "running"
+      this.game.phase === "running" ||
+      this.game.phase === "dying"
     )
       return;
     void this.mobile?.enterFullscreen();
     if (this.game.phase !== "paused")
       this.game.reset((Math.random() * 0xffffffff) >>> 0);
-    this.game.phase = "running";
+    this.game.phase =
+      this.game.phase === "paused" ? this.resumePhase : "running";
     this.haptics.stop();
     this.sound.unlock();
-    this.sound.setRunning(true);
+    this.sound.setRunning(this.game.phase === "running");
     this.input?.clear();
     this.previous = this.accumulator = 0;
     this.ui.show(this.game);
@@ -362,7 +376,8 @@ class GameApplication {
     this.haptics.stop();
     this.sound.suspend();
     this.sound.setRunning(false);
-    if (this.game.phase !== "running") return;
+    if (this.game.phase !== "running" && this.game.phase !== "dying") return;
+    this.resumePhase = this.game.phase;
     this.game.phase = "paused";
     this.previous = this.accumulator = 0;
     this.ui.show(this.game);
@@ -393,11 +408,18 @@ class GameApplication {
       return;
     const dt = this.previous ? (now - this.previous) / 1000 : 0;
     this.previous = now;
-    if (dt > 0.5 && this.game.phase === "running") this.pause();
+    if (
+      dt > 0.5 &&
+      (this.game.phase === "running" || this.game.phase === "dying")
+    )
+      this.pause();
     this.input?.update(now);
-    if (this.game.phase === "running") {
+    if (this.game.phase === "running" || this.game.phase === "dying") {
       this.accumulator += Math.min(dt, 0.25);
-      while (this.accumulator >= STEP && this.game.phase === "running") {
+      while (
+        this.accumulator >= STEP &&
+        (this.game.phase === "running" || this.game.phase === "dying")
+      ) {
         this.game.step(STEP);
         this.accumulator -= STEP;
       }
@@ -410,10 +432,16 @@ class GameApplication {
     }
     this.ui.update(this.game);
     this.view.draw(
-      this.game.phase === "running" ? this.accumulator / STEP : 1,
+      this.game.phase === "running" || this.game.phase === "dying"
+        ? this.accumulator / STEP
+        : 1,
       Math.min(dt, 0.25),
     );
-    if (this.game.phase === "running" || this.view.rig.transitioning)
+    if (
+      this.game.phase === "running" ||
+      this.game.phase === "dying" ||
+      this.view.rig.transitioning
+    )
       this.schedule();
   };
   dispose() {

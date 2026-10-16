@@ -72,25 +72,25 @@ test("shop purchase/equip is validated, charged once and survives reload; access
     },
   };
   const shop = new CosmeticInventory(wallet, storage);
-  assert.equal(COSMETICS.filter((i) => i.category === "dino").length, 3);
+  assert.equal(COSMETICS.filter((i) => i.category === "dino").length, 4);
   assert.equal(COSMETICS.filter((i) => i.category === "hat").length, 3);
   assert.equal(COSMETICS.filter((i) => i.category === "boots").length, 3);
   assert.equal(shop.equipped.dino, "dino-green");
   assert.equal(shop.choose("dino-white"), "funds");
-  wallet.add(Currency.Coin, 500);
-  wallet.add(Currency.Diamond, 30);
+  wallet.add(Currency.Coin, 2500);
+  wallet.add(Currency.Diamond, 90);
   let spends = 0,
     pickups = 0;
   events.on(GameEvent.WalletChanged, () => spends++);
   events.on(GameEvent.Pickup, () => pickups++);
   assert.equal(shop.choose("dino-white"), "purchased");
-  assert.equal(wallet.coins, 250);
+  assert.equal(wallet.coins, 1750);
   assert.equal(shop.choose("dino-white"), "equipped");
-  assert.equal(wallet.coins, 250);
+  assert.equal(wallet.coins, 1750);
   assert.equal(shop.choose("hat-safari"), "purchased");
   assert.equal(shop.choose("boots-red"), "purchased");
   assert.equal(shop.choose("dino-pink"), "purchased");
-  assert.equal(wallet.diamonds, 10);
+  assert.equal(wallet.diamonds, 30);
   assert.equal(shop.choose("unknown"), "invalid");
   assert.equal(wallet.spend(Currency.Coin, -1), false);
   const loaded = new CosmeticInventory(wallet, storage);

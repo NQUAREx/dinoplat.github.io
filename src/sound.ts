@@ -6,6 +6,7 @@ type Voice = { gain: GainNode; source?: AudioBufferSourceNode; until: number };
 /** One decoded local sprite, eight bounded SFX channels and one quiet music loop. */
 export class GameSound {
   enabled = true;
+  musicEnabled = true;
   private context?: AudioContext;
   private master?: GainNode;
   private limiter?: DynamicsCompressorNode;
@@ -24,6 +25,7 @@ export class GameSound {
   private lastCue = "";
   private codecOffset = 0;
   private pendingMenu?: Cue;
+  private pendingCritical?: "hit" | "death";
   constructor(events: GameEvents) {
     this.off = [
       events.on(GameEvent.Jump, () => this.play("jump", 0.32, 1)),
@@ -36,11 +38,10 @@ export class GameSound {
           0.94 + (this.sequence % 5) * 0.035,
         );
       }),
-      events.on(GameEvent.Hit, () => this.play("hit", 0.65, 0.9)),
+      events.on(GameEvent.Hit, () => this.play("hit", 1, 0.85)),
       events.on(GameEvent.Death, () => {
-        this.play("death", 0.6, 0.85);
-        this.play("death", 0.45, 0.65, 0.12);
-        this.play("death", 0.35, 0.48, 0.27);
+        this.setRunning(false);
+        this.play("death", 1, 0.65);
       }),
       events.on(GameEvent.Pickup, (currency) => {
         this.play(
@@ -81,7 +82,7 @@ export class GameSound {
     })();
   }
   unlock() {
-    if (!this.enabled || !this.alive) return;
+    if ((!this.enabled && !this.musicEnabled) || !this.alive) return;
     try {
       if (!this.context) {
         this.context = new AudioContext();
@@ -106,7 +107,10 @@ export class GameSound {
       this.master!.gain.setValueAtTime(0.8, this.context.currentTime);
       void this.context
         .resume()
-        .then(() => this.startMusic())
+        .then(() => {
+          this.startMusic();
+          this.flushCritical();
+        })
         .catch(() => {});
       this.preload();
       if (!this.preparing) this.preparing = this.prepare();
@@ -132,6 +136,7 @@ export class GameSound {
           break;
         }
       this.startMusic();
+      this.flushCritical();
       if (this.pendingMenu) {
         const cue = this.pendingMenu;
         this.pendingMenu = undefined;
@@ -149,6 +154,19 @@ export class GameSound {
   private play(cue: Cue, volume: number, rate: number, delay = 0) {
     const context = this.context;
     if (
+      this.enabled &&
+      this.alive &&
+      (cue === "hit" || cue === "death") &&
+      (!this.buffer || context?.state !== "running")
+    ) {
+      this.pendingCritical = cue;
+      if (context && context.state !== "closed")
+        void context
+          .resume()
+          .then(() => this.flushCritical())
+          .catch(() => {});
+    }
+    if (
       !this.enabled ||
       !this.alive ||
       !context ||
@@ -157,8 +175,13 @@ export class GameSound {
     )
       return;
     const now = context.currentTime;
-    let voice = this.voices[0];
-    for (const candidate of this.voices) {
+    // Ordinary steps/pickups cannot steal either reserved collision channel.
+    const critical = cue === "hit" || cue === "death";
+    const first = critical ? (cue === "hit" ? 6 : 7) : 0;
+    const end = critical ? first + 1 : 6;
+    let voice = this.voices[first];
+    for (let i = first; i < end; i++) {
+      const candidate = this.voices[i];
       if (candidate.until <= now) {
         voice = candidate;
         break;
@@ -201,7 +224,7 @@ export class GameSound {
   private startMusic() {
     if (
       !this.running ||
-      !this.enabled ||
+      !this.musicEnabled ||
       !this.alive ||
       this.music ||
       !this.buffer ||
@@ -230,8 +253,38 @@ export class GameSound {
       this.music = undefined;
     }
   }
+  configure(effects: boolean, music: boolean) {
+    this.enabled = effects;
+    this.musicEnabled = music;
+    if (!music) this.stopMusic();
+    if (!effects) this.pendingCritical = undefined;
+    if (!effects)
+      for (const voice of this.voices) {
+        if (voice.source) {
+          voice.source.onended = null;
+          voice.source.stop();
+          voice.source.disconnect();
+          voice.source = undefined;
+        }
+        voice.until = 0;
+      }
+    if (!effects && !music) this.suspend();
+    else this.startMusic();
+  }
+  private flushCritical() {
+    if (
+      !this.pendingCritical ||
+      !this.buffer ||
+      this.context?.state !== "running"
+    )
+      return;
+    const cue = this.pendingCritical;
+    this.pendingCritical = undefined;
+    this.play(cue, 1, cue === "death" ? 0.65 : 0.85);
+  }
   stop() {
     this.pendingMenu = undefined;
+    this.pendingCritical = undefined;
     this.stopMusic();
     for (const voice of this.voices) {
       if (voice.source) {
@@ -256,6 +309,7 @@ export class GameSound {
   stats() {
     return {
       enabled: this.enabled,
+      musicEnabled: this.musicEnabled,
       state: this.context?.state ?? "uninitialized",
       voices: this.voices.length,
       activeVoices: this.voices.filter((v) => v.source).length,

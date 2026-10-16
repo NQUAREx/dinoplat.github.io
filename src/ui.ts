@@ -1,7 +1,6 @@
 import type { Phase, Simulation } from "./simulation";
 import { ShopUI } from "./shop-ui";
 import type { CosmeticCategory, CosmeticInventory } from "./cosmetics";
-import type { Wallet } from "./progression";
 
 /** DOM ownership and dirty counters live outside simulation/rendering. */
 export class GameUI {
@@ -25,8 +24,6 @@ export class GameUI {
   best = 0;
   phase: Phase | "loading" | "error" = "loading";
   private shop?: ShopUI;
-  private inventory?: CosmeticInventory;
-  private cosmeticRevision = -1;
   constructor() {
     try {
       this.best = Math.max(
@@ -50,20 +47,29 @@ export class GameUI {
   }
   initializeShop(
     inventory: CosmeticInventory,
-    wallet: Wallet,
     choose: (id: string) => void,
     remove: (category: CosmeticCategory) => void,
   ) {
-    this.inventory = inventory;
     this.shop = new ShopUI(
       this.element("shop-panel"),
       inventory,
-      wallet,
       choose,
       remove,
     );
   }
   selectSection(section: "home" | "shop" | "settings") {
+    if (this.phase === "paused") {
+      this.showPause(section === "settings");
+      return;
+    }
+    if (this.phase === "running" || this.phase === "dying") return;
+    this.element("pause-panel").hidden = true;
+    if (
+      this.element("settings-panel").parentElement !==
+      this.element("menu-content")
+    )
+      this.element("menu-content").append(this.element("settings-panel"));
+    this.element("menu-shell").hidden = false;
     this.element("menu-panel").hidden = section !== "home";
     this.element("shop-panel").hidden = section !== "shop";
     this.element("settings-panel").hidden = section !== "settings";
@@ -73,6 +79,13 @@ export class GameUI {
         "aria-pressed",
         String(name === section),
       );
+  }
+  private showPause(settings = false) {
+    this.element("menu-shell").hidden = true;
+    this.element("pause-panel").hidden = settings;
+    this.element("overlay").append(this.element("settings-panel"));
+    this.element("settings-panel").hidden = !settings;
+    this.app.dataset.menu = settings ? "pause-settings" : "pause";
   }
   shopMessage(message: string) {
     this.element("shop-message").textContent = message;
@@ -110,27 +123,22 @@ export class GameUI {
       }
     }
     this.shop?.update();
-    if (this.inventory && this.cosmeticRevision !== this.inventory.revision) {
-      this.cosmeticRevision = this.inventory.revision;
-      (this.element("menu-avatar") as HTMLImageElement).src =
-        `${import.meta.env.BASE_URL}shop/${this.inventory.equipped.dino}.webp`;
-    }
+    this.cameraButton.disabled =
+      (game.phase !== "running" && game.phase !== "dying") ||
+      !game.health.lives;
   }
   show(game: Simulation) {
     const phase = game.phase;
     this.phase = phase;
     this.app.dataset.phase = phase;
-    this.overlay.hidden = phase === "running";
+    this.overlay.hidden = phase === "running" || phase === "dying";
     this.showSettings(false);
-    this.element("leave-run").hidden = phase !== "paused";
-    this.pauseButton.disabled = phase !== "running" && phase !== "paused";
-    this.cameraButton.disabled = phase !== "running" && phase !== "paused";
-    this.pauseButton.setAttribute(
-      "aria-label",
-      phase === "paused" ? "Продолжить" : "Пауза",
-    );
+    this.pauseButton.disabled = phase !== "running" && phase !== "dying";
+    this.pauseButton.setAttribute("aria-label", "Пауза");
     this.element("result").hidden = phase !== "over";
     this.action.disabled = false;
+    this.element("pause-title").textContent = "ПАУЗА";
+    (this.element("resume") as HTMLButtonElement).disabled = false;
     if (phase === "over") {
       this.best = Math.max(this.best, Math.floor(game.distance));
       try {
@@ -138,20 +146,20 @@ export class GameUI {
       } catch {
         /* Optional. */
       }
-      this.title.innerHTML = "Новый мир.<br /><em>Новый забег!</em>";
-      this.description.textContent = "Твой дино готов к приключениям.";
-      this.chapter.textContent = "DINO RUN · ГЛАВНАЯ";
+      this.title.textContent = "ГЛАВНОЕ МЕНЮ";
+      this.description.textContent = "";
+      this.chapter.textContent = "";
       this.element("final-distance").textContent = this.format(game.distance);
       this.action.textContent = "НАЧАТЬ ЗАБЕГ →";
       this.element("live").textContent =
         `Конец игры. ${Math.floor(game.distance)} метров.`;
     } else if (phase === "paused") {
-      this.title.innerHTML = "Отдохнём?<br /><em>Дино ждёт!</em>";
-      this.description.textContent = "Приключение продолжится с этого места.";
-      this.chapter.textContent = "DINO RUN · ПАУЗА";
-      this.action.textContent = "ПРОДОЛЖИТЬ →";
+      this.showPause();
     } else if (phase === "ready") {
       this.action.textContent = "ИГРАТЬ →";
+      this.title.textContent = "ГЛАВНОЕ МЕНЮ";
+      this.chapter.textContent = "";
+      this.description.textContent = "";
     }
     this.element("menu-best").textContent = this.format(this.best);
     this.update(game);
@@ -164,18 +172,18 @@ export class GameUI {
     this.phase = "error";
     this.app.dataset.phase = "error";
     this.overlay.hidden = false;
-    this.title.innerHTML = "Ой!<br /><em>Не вышло</em>";
+    this.title.textContent = "ОШИБКА ЗАГРУЗКИ";
     this.description.textContent =
       error instanceof Error ? error.message : "Не удалось запустить игру.";
     this.action.disabled = false;
     this.action.textContent = "ЕЩЁ РАЗ";
   }
   graphicsLost() {
-    this.selectSection("home");
+    this.showPause();
     this.overlay.hidden = false;
     this.action.disabled = true;
-    this.title.textContent = "Графика на паузе";
-    this.description.textContent = "Ждём восстановления изображения…";
+    this.element("pause-title").textContent = "ВОССТАНОВЛЕНИЕ ГРАФИКИ";
+    (this.element("resume") as HTMLButtonElement).disabled = true;
   }
   dispose() {
     this.shop?.dispose();

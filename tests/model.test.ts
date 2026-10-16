@@ -35,6 +35,29 @@ test("all wardrobe swaps reuse one rig and three attachment meshes, including an
     { dinosaur: mesh, animations: gltf.animations } as ModelLibrary,
     game,
   );
+  const contactLeft = new Vector3(),
+    contactRight = new Vector3();
+  game.phase = "running";
+  game.distance = game.previousDistance = 4.444444444;
+  actor.sampleContact(game, 0, contactLeft);
+  actor.sampleContact(game, 1, contactRight);
+  assert.ok(
+    contactLeft.x < 0 && contactRight.x > 0,
+    "dust comes from distinct animated foot transforms",
+  );
+  assert.ok(contactLeft.distanceTo(contactRight) > 0.3);
+  for (const id of ["boots-red", "boots-blue", "boots-gold"]) {
+    const geometry = geometries.get(id)!;
+    geometry.computeBoundingBox();
+    assert.ok(
+      geometry.boundingBox!.min.y <= -0.389,
+      "closed sole extends below the bare foot",
+    );
+    assert.ok(
+      geometry.boundingBox!.min.z <= -0.5 &&
+        geometry.boundingBox!.max.x >= 0.199,
+    );
+  }
   const wardrobe = new DinosaurCosmetics(
     { greenGeometry: mesh.geometry, cosmetics: geometries },
     mesh,
@@ -49,7 +72,7 @@ test("all wardrobe swaps reuse one rig and three attachment meshes, including an
   });
   assert.equal(attachments.length, 3);
   for (let i = 0; i < 1000; i++) {
-    inventory.choose(COSMETICS[i % 9].id);
+    inventory.choose(COSMETICS[i % COSMETICS.length].id);
     wardrobe.apply(inventory);
   }
   const after: string[] = [];
@@ -160,10 +183,10 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
   const json = JSON.parse(
     buffer.toString("utf8", 20, 20 + buffer.readUInt32LE(12)),
   );
-  assert.equal(json.meshes.length, 26);
+  assert.equal(json.meshes.length, 27);
   assert.equal(json.images, undefined);
   assert.equal(json.textures, undefined);
-  assert.equal(json.skins.length, 3);
+  assert.equal(json.skins.length, 4);
   assert.equal(json.skins[0].joints.length, 11);
   for (const skin of json.skins)
     assert.deepEqual(skin.joints, json.skins[0].joints);

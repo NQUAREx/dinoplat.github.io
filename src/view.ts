@@ -18,6 +18,7 @@ import { FloatingFeedback } from "./floating-feedback";
 import { RenderQuality } from "./render-quality";
 import type { CosmeticInventory } from "./cosmetics";
 import { DinosaurCosmetics } from "./dinosaur-cosmetics";
+import { MenuPreview } from "./menu-preview";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
@@ -31,6 +32,9 @@ export class View {
   private readonly ground: Ground;
   private readonly dinosaur: AnimatedDinosaur;
   private readonly cosmetics: DinosaurCosmetics;
+  private readonly preview: MenuPreview;
+  private warmed = false;
+  private deathFirstPerson = false;
   private readonly dinosaurShadow = new DinosaurShadow();
   private readonly dust: FootDust;
   private readonly feedback: FloatingFeedback;
@@ -65,6 +69,7 @@ export class View {
     private readonly models: ModelLibrary,
     texture: THREE.DataArrayTexture,
     private readonly game: Simulation,
+    redraw: () => void = () => {},
   ) {
     const reducedMotion = matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -72,8 +77,9 @@ export class View {
     this.rig = new CameraRig(reducedMotion);
     this.ground = new Ground(texture);
     this.dinosaur = new AnimatedDinosaur(models, game);
+    this.preview = new MenuPreview(models, redraw);
     this.cosmetics = new DinosaurCosmetics(models, this.dinosaur.mesh);
-    this.dust = new FootDust(game, reducedMotion);
+    this.dust = new FootDust(game, reducedMotion, this.dinosaur);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -157,8 +163,16 @@ export class View {
     }
     this.off = [
       game.events.on(GameEvent.Hit, () => this.rig.impulse(0.075, 0.22)),
-      game.events.on(GameEvent.Land, () => this.rig.impulse(0.035, 0.2)),
-      game.events.on(GameEvent.Start, () => this.rig.reset()),
+      game.events.on(GameEvent.Land, () => this.rig.impulse(0.0525, 0.2)),
+      game.events.on(GameEvent.Death, () => {
+        this.deathFirstPerson = this.rig.firstPerson;
+        this.rig.firstPerson = false;
+      }),
+      game.events.on(GameEvent.Start, () => {
+        if (this.deathFirstPerson) this.rig.firstPerson = true;
+        this.deathFirstPerson = false;
+        this.rig.reset();
+      }),
     ];
     this.resize();
   }
@@ -217,9 +231,17 @@ export class View {
   }
   applyCosmetics(inventory: CosmeticInventory) {
     this.cosmetics.apply(inventory);
+    this.dinosaur.groundLift = this.cosmetics.groundLift;
+    this.preview.apply(inventory);
   }
   draw(alpha = 1, dt = 0) {
     const game = this.game;
+    const home =
+      (game.phase === "ready" || game.phase === "over") && this.preview.visible;
+    if (this.warmed && home) {
+      this.preview.draw(this.renderer);
+      return;
+    }
     this.pose.update(game, alpha);
     this.lighting.update(
       game.previousTime + (game.time - game.previousTime) * alpha,
@@ -243,7 +265,11 @@ export class View {
       !game.y &&
       !game.velocityY;
     const activeDt =
-      game.phase === "running" || this.rig.transitioning ? dt : 0;
+      game.phase === "running" ||
+      game.phase === "dying" ||
+      this.rig.transitioning
+        ? dt
+        : 0;
     this.rig.update(
       this.pose.distance,
       0,
@@ -369,6 +395,8 @@ export class View {
     this.renderer.info.render.frame++;
     this.renderer.render(this.scene, this.rig.camera);
     this.shadows.complete(this.lighting);
+    this.warmed = true;
+    if (home) this.preview.draw(this.renderer);
   }
   stats() {
     return {
@@ -385,6 +413,12 @@ export class View {
       cameraBlend: this.rig.firstPersonBlend,
       cameraTransitioning: this.rig.transitioning,
       cosmetics: this.cosmetics.stats(),
+      preview: this.preview.stats(),
+      deathTime: this.game.deathTime,
+      playerRoll: this.dinosaur.mesh.rotation.z,
+      dustOriginX: this.dust.lastOriginX,
+      dustOriginZ: this.dust.lastOriginZ,
+      dustSide: this.dust.lastSide,
       playerVisible: this.dinosaur.mesh.visible,
       width: this.renderer.domElement.width,
       height: this.renderer.domElement.height,
@@ -455,6 +489,7 @@ export class View {
     this.cactusMaterial.dispose();
     this.pickupMaterial.dispose();
     this.dinosaur.dispose();
+    this.preview.dispose();
     this.dinosaurShadow.dispose();
     this.dust.dispose();
     this.feedback.dispose();

@@ -1,6 +1,7 @@
 export class GameSettings {
   vibration = true;
   sound = true;
+  music = true;
   readonly shake = 2.9;
   constructor() {
     try {
@@ -11,6 +12,7 @@ export class GameSettings {
       if (typeof saved.vibration === "boolean")
         this.vibration = saved.vibration;
       if (typeof saved.sound === "boolean") this.sound = saved.sound;
+      if (typeof saved.music === "boolean") this.music = saved.music;
     } catch {
       /* Storage is optional. */
     }
@@ -22,6 +24,7 @@ export class GameSettings {
         JSON.stringify({
           vibration: this.vibration,
           sound: this.sound,
+          music: this.music,
         }),
       );
     } catch {

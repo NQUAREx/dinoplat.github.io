@@ -90,8 +90,8 @@ export class LowPolyCosmetics {
           : id === "boots-blue"
             ? 0x32bbef
             : 0xf6bd40;
-      this.part(new BoxGeometry(0.34, 0.11, 0.55), 0xfff2dc, 0, -0.28, -0.15);
-      this.part(new BoxGeometry(0.3, 0.15, 0.48), colour, 0, -0.19, -0.14);
+      this.part(new BoxGeometry(0.4, 0.16, 0.68), 0xfff2dc, 0, -0.31, -0.17);
+      this.part(new BoxGeometry(0.36, 0.18, 0.6), colour, 0, -0.2, -0.17);
       this.part(
         new CylinderGeometry(0.13, 0.14, id === "boots-gold" ? 0.26 : 0.12, 6),
         colour,
@@ -125,7 +125,13 @@ export class LowPolyCosmetics {
       if (g > r * 1.45 && g > b * 1.2) {
         const light = Math.min(1, 0.48 + g * 0.65);
         tint
-          .set(id === "dino-white" ? 0xeaf6ff : 0xff84bb)
+          .set(
+            id === "dino-white"
+              ? 0xeaf6ff
+              : id === "dino-gold"
+                ? 0xffcc40
+                : 0xff84bb,
+          )
           .multiplyScalar(light);
         colours.setXYZ(i, tint.r, tint.g, tint.b);
       }

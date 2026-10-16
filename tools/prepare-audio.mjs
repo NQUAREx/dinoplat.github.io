@@ -54,6 +54,30 @@ class AudioBuilder {
         out,
       ]);
       const data = await readFile(out);
+      // Original offline emphasis: an audible low impact and descending death
+      // stinger layered into the existing CC0 cue. No runtime synthesis cost.
+      if (name === "hit" || name === "death") {
+        let noise = 1979;
+        for (let i = 0; i < data.length / 2; i++) {
+          const t = i / rate;
+          noise = (Math.imul(noise, 1664525) + 1013904223) >>> 0;
+          const envelope =
+            Math.min(1, t / 0.004) * Math.exp(-t * (name === "hit" ? 14 : 5));
+          const phase =
+            name === "hit"
+              ? 2 * Math.PI * (110 * t - 65 * t * t)
+              : 2 * Math.PI * (420 * t - 210 * t * t);
+          const value =
+            data.readInt16LE(i * 2) / 32768 +
+            envelope *
+              (Math.sin(phase) * 0.48 +
+                (noise / 4294967296 - 0.5) * (name === "hit" ? 0.45 : 0.1));
+          data.writeInt16LE(
+            Math.round(Math.max(-0.96, Math.min(0.96, value)) * 32767),
+            i * 2,
+          );
+        }
+      }
       sprite[name] = {
         offset: samples / rate,
         duration: data.length / 2 / rate,

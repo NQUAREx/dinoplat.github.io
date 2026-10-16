@@ -40,7 +40,6 @@
         <a class="brand" href="./" aria-label="Dino Run, главная"
           >DINO<span>RUN</span><small>3D</small></a
         >
-        <span class="subtitle">МАЛЕНЬКИЙ ДИНО · БОЛЬШОЙ ЗАБЕГ</span>
       </header>
       <section class="hud" aria-label="Результат забега">
         <div class="score-box" aria-label="Монеты" title="Монеты">
@@ -79,7 +78,7 @@
         </div>
       </section>
       <main id="overlay">
-        <div class="menu-shell">
+        <div id="menu-shell" class="menu-shell">
           <nav class="menu-nav" aria-label="Разделы меню">
             <button
               id="home-toggle"
@@ -116,33 +115,24 @@
               </svg>
             </button>
           </nav>
-          <div class="menu-content">
+          <div id="menu-content" class="menu-content">
             <section id="menu-panel" class="panel" aria-labelledby="title">
-              <div id="chapter" class="chapter">DINO RUN · ГЛАВНАЯ</div>
-              <h1 id="title">Большой мир.<br /><em>Твой дино!</em></h1>
+              <div id="chapter" class="chapter"></div>
+              <h1 id="title">ГЛАВНОЕ МЕНЮ</h1>
               <div class="hero-preview">
-                <img
+                <div
                   id="menu-avatar"
-                  src="./shop/dino-green.webp"
-                  alt="Твой динозавр"
-                  width="192"
-                  height="192"
-                /><span class="hero-stamp">БЕЗ ГРАНИЦ</span>
+                  role="img"
+                  aria-label="3D-модель динозавра. Проведите пальцем для вращения."
+                ></div>
               </div>
-              <p id="description">Новый маршрут. Новое приключение.</p>
+              <p id="description"></p>
               <div id="result" hidden>
                 <span id="final-distance">0</span><span>метров за забег</span>
               </div>
               <button id="action" class="pixel-button primary">
                 ИГРАТЬ <span aria-hidden="true">→</span>
               </button>
-              <button id="leave-run" class="pixel-button settings-link" hidden>
-                ЗАВЕРШИТЬ ЗАБЕГ
-              </button>
-              <p class="touch-help">
-                Удерживай слева или справа — поворачивай.<br />Отдельный свайп
-                вверх — прыжок.<br />Свайп вниз — приземлиться или пригнуться.
-              </p>
               <div class="menu-wallet">
                 <div>
                   <img src="/src/assets/icons/coin.png" alt="Монеты" /><span
@@ -182,7 +172,6 @@
               hidden
             >
               <h2 id="shop-title">ГАРДЕРОБ</h2>
-              <p class="shop-intro">Твой стиль. Твои приключения.</p>
               <div id="shop-message" role="status" aria-live="polite"></div>
             </section>
             <section
@@ -206,6 +195,13 @@
               >
                 ЗВУК: ДА
               </button>
+              <button
+                id="music"
+                class="pixel-button setting-toggle"
+                aria-pressed="true"
+              >
+                МУЗЫКА: ДА
+              </button>
               <button id="settings-back" class="pixel-button settings-link">
                 ← НАЗАД
               </button>
@@ -216,6 +212,18 @@
             </section>
           </div>
         </div>
+        <section
+          id="pause-panel"
+          class="panel pause-panel"
+          aria-labelledby="pause-title"
+          hidden
+        >
+          <h2 id="pause-title">ПАУЗА</h2>
+          <button id="resume" class="pixel-button primary">ПРОДОЛЖИТЬ</button>
+          <button id="pause-settings" class="pixel-button settings-link">
+            НАСТРОЙКИ
+          </button>
+        </section>
       </main>
       <footer class="bottom">
         <button
@@ -253,17 +261,14 @@
       <div class="rotate-card">
         <span class="phone-pixel" aria-hidden="true"></span>
         <h2 id="rotate-title">Поверни телефон</h2>
-        <p>Дино бегает только вертикально.<br />Твой забег ждёт тебя!</p>
+        <p>Поддерживается только вертикальная ориентация.</p>
       </div>
     </aside>
     <aside id="mobile-required" role="status">
       <div class="rotate-card">
         <span class="phone-pixel" aria-hidden="true"></span>
         <h2>Открой на телефоне</h2>
-        <p>
-          Дино слушается пальцев!<br />Нужен сенсорный экран<br />и вертикальное
-          положение.
-        </p>
+        <p>Нужен сенсорный экран<br />и вертикальное положение.</p>
       </div>
     </aside>
     <noscript>Для игры включите JavaScript в браузере.</noscript>

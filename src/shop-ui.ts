@@ -3,19 +3,18 @@ import {
   type CosmeticCategory,
   type CosmeticInventory,
 } from "./cosmetics";
-import type { Wallet } from "./progression";
+import coinIcon from "./assets/icons/coin.png";
+import diamondIcon from "./assets/icons/diamond.png";
 
-/** Fixed nine cards; touch rails scroll locally without enabling page gestures. */
+/** Fixed catalogue cards; touch rails scroll locally without enabling page gestures. */
 export class ShopUI {
   private revision = -1;
-  private walletRevision = -1;
   private readonly buttons = new Map<string, HTMLButtonElement>();
   private readonly abort = new AbortController();
   private readonly sections: HTMLElement[] = [];
   constructor(
     root: HTMLElement,
     private readonly inventory: CosmeticInventory,
-    private readonly wallet: Wallet,
     choose: (id: string) => void,
     remove: (category: CosmeticCategory) => void,
   ) {
@@ -140,13 +139,8 @@ export class ShopUI {
       );
   }
   update() {
-    if (
-      this.revision === this.inventory.revision &&
-      this.walletRevision === this.wallet.revision
-    )
-      return;
+    if (this.revision === this.inventory.revision) return;
     this.revision = this.inventory.revision;
-    this.walletRevision = this.wallet.revision;
     for (const item of COSMETICS) {
       const button = this.buttons.get(item.id)!,
         owned = this.inventory.owned.has(item.id),
@@ -157,7 +151,16 @@ export class ShopUI {
         ? "НАДЕТО ✓"
         : owned
           ? "НАДЕТЬ"
-          : `${item.price} ${item.currency === 0 ? "●" : "◆"}`;
+          : String(item.price);
+      if (!owned) {
+        const icon = document.createElement("img");
+        icon.src = item.currency === 0 ? coinIcon : diamondIcon;
+        icon.alt = item.currency === 0 ? "монет" : "алмазов";
+        icon.className = "currency-icon";
+        icon.width = 14;
+        icon.height = 14;
+        button.querySelector(".card-price")!.append(icon);
+      }
       button.setAttribute(
         "aria-label",
         `${item.name}, ${equipped ? "надето" : owned ? "надеть" : `${item.price} ${item.currency === 0 ? "монет" : "алмазов"}`}`,

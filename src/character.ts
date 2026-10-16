@@ -4,6 +4,7 @@ import type { Simulation } from "./simulation";
 import type { ModelLibrary } from "./models";
 import { Palette, Rules } from "./config";
 import type { ObjectVisibility } from "./camera";
+import { DeathMotion } from "./death-motion";
 
 export class AnimatedDinosaur {
   private readonly material = new THREE.MeshLambertMaterial({
@@ -17,9 +18,19 @@ export class AnimatedDinosaur {
   frame = 0;
   state = "idle";
   private landedAt = -Infinity;
+  groundLift = 0;
+  private readonly death = new DeathMotion();
+  private readonly leftFoot: THREE.Bone;
+  private readonly rightFoot: THREE.Bone;
   private readonly off: (() => void)[];
   constructor(models: ModelLibrary, game: Simulation) {
     this.mesh = models.dinosaur;
+    this.leftFoot = this.mesh.skeleton.bones.find(
+      (b) => b.name === "dino-shin-l",
+    )!;
+    this.rightFoot = this.mesh.skeleton.bones.find(
+      (b) => b.name === "dino-shin-r",
+    )!;
     this.mesh.material = this.material;
     // Pitch/dive stays in the dinosaur's local frame while heading is unbounded.
     this.mesh.rotation.order = "YXZ";
@@ -46,8 +57,14 @@ export class AnimatedDinosaur {
       alpha,
     );
     const airborne = game.y > 0 || game.velocityY > 0;
-    this.state =
-      game.hitStopRemaining > 0
+    const dying =
+      game.phase === "dying" ||
+      (game.phase === "paused" &&
+        !game.health.lives &&
+        game.hitStopRemaining === 0);
+    this.state = dying
+      ? "dying"
+      : game.hitStopRemaining > 0
         ? "hit"
         : game.phase === "over"
           ? "dead"
@@ -71,7 +88,7 @@ export class AnimatedDinosaur {
     const airWeight = airborne
       ? Math.min(1, game.y / 0.15 + Math.abs(game.velocityY) / 20)
       : 0;
-    if (animate)
+    if (animate && !dying)
       for (const action of this.actions) {
         const name = action.getClip().name;
         action.time =
@@ -92,10 +109,10 @@ export class AnimatedDinosaur {
                     : 0;
         action.setEffectiveWeight(weight);
       }
-    if (animate) this.mixer.update(0);
+    if (animate && !dying) this.mixer.update(0);
     this.mesh.position.set(
       0,
-      THREE.MathUtils.lerp(game.previousY, game.y, alpha),
+      THREE.MathUtils.lerp(game.previousY, game.y, alpha) + this.groundLift,
       0,
     );
     this.mesh.rotation.set(
@@ -126,6 +143,25 @@ export class AnimatedDinosaur {
       Math.floor((Rules.immunitySeconds - game.health.immunity) * 10) % 2 === 0
         ? 0.5
         : 1;
+    if (dying) {
+      this.death.sample(
+        game.previousDeathTime +
+          (game.deathTime - game.previousDeathTime) * alpha,
+        game.heading,
+        game.y + this.groundLift,
+      );
+      this.mesh.position.set(this.death.x, this.death.y, this.death.z);
+      this.mesh.rotation.set(0, game.heading, this.death.roll);
+      this.mesh.scale.setScalar(1);
+      this.material.opacity = 1;
+    }
+  }
+  sampleContact(game: Simulation, side: number, out: THREE.Vector3) {
+    this.update(game, 1, true);
+    this.mesh.updateWorldMatrix(true, true);
+    out
+      .set(0, this.groundLift ? -0.39 : -0.34, -0.15)
+      .applyMatrix4((side === 0 ? this.leftFoot : this.rightFoot).matrixWorld);
   }
   dispose() {
     for (const off of this.off) off();
@@ -151,17 +187,25 @@ export class FootDust {
   private readonly matrix = new THREE.Matrix4();
   private cursor = 0;
   private state = 1;
+  private readonly foot = new THREE.Vector3();
+  lastSide = 0;
+  lastOriginX = 0;
+  lastOriginZ = 0;
   private readonly off: (() => void)[];
   constructor(
     game: Simulation,
     private readonly reducedMotion: boolean,
+    private readonly dinosaur?: AnimatedDinosaur,
   ) {
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.off = [
-      game.events.on(GameEvent.Step, () => this.emit(game, 42)),
-      game.events.on(GameEvent.Land, () => this.emit(game, 72)),
+      game.events.on(GameEvent.Step, (side) => this.emit(game, 42, side)),
+      game.events.on(GameEvent.Land, () => {
+        this.emit(game, 36, 0);
+        this.emit(game, 36, 1);
+      }),
       game.events.on(GameEvent.Start, () => {
         this.life.fill(0);
         this.cursor = 0;
@@ -169,22 +213,29 @@ export class FootDust {
       }),
     ];
   }
-  private emit(game: Simulation, amount: number) {
+  private emit(game: Simulation, amount: number, side: number) {
     if (this.reducedMotion) return;
+    const sin = Math.sin(game.heading),
+      cos = Math.cos(game.heading),
+      sign = side === 0 ? -1 : 1;
+    if (this.dinosaur) this.dinosaur.sampleContact(game, side, this.foot);
+    else this.foot.set(sign * 0.22 * cos, 0.03, -sign * 0.22 * sin);
+    const originX = game.x + this.foot.x,
+      originZ = game.z - this.foot.z;
+    this.lastSide = side;
+    this.lastOriginX = originX;
+    this.lastOriginZ = originZ;
     for (let n = 0; n < amount; n++) {
       const i = this.cursor++ % this.life.length;
       this.state = (Math.imul(this.state, 1664525) + 1013904223) >>> 0;
       const spread = this.state / 4294967296 - 0.5;
       const variation = ((this.state >>> 16) & 255) / 255;
       this.life[i] = 0.85;
-      const sin = Math.sin(game.heading),
-        cos = Math.cos(game.heading);
-      this.worldX[i] = game.x + spread * cos * 0.5 + sin * 0.3;
-      this.worldZ[i] =
-        game.z + spread * sin * 0.5 - cos * 0.3 + (variation - 0.5) * 0.4;
+      this.worldX[i] = originX + spread * cos * 0.1;
+      this.worldZ[i] = originZ + spread * sin * 0.1 + (variation - 0.5) * 0.1;
       this.lift[i] = 0.35 + variation * 0.9;
-      this.driftX[i] = spread * cos + sin * 0.6;
-      this.driftZ[i] = spread * sin - cos * 0.6;
+      this.driftX[i] = (sign * 0.45 + spread * 0.35) * cos + sin * 0.4;
+      this.driftZ[i] = (sign * 0.45 + spread * 0.35) * sin - cos * 0.4;
     }
   }
   update(

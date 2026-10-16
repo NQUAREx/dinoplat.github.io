@@ -6,7 +6,7 @@ export async function checkShop(context, url, engine) {
   page.on("pageerror", (e) => errors.push(e.message));
   try {
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     await page.evaluate(() => {
       localStorage.removeItem("dinorun-cosmetics-v1");
       localStorage.setItem(
@@ -15,7 +15,7 @@ export async function checkShop(context, url, engine) {
       );
     });
     await page.reload();
-    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     assert.equal(
       await page.evaluate(() => window.__runner.audio().state),
       "uninitialized",
@@ -27,11 +27,11 @@ export async function checkShop(context, url, engine) {
     );
     await page.screenshot({ path: `test-results/${engine}-main-menu.png` });
     await page.tap("#shop-toggle");
-    assert.equal(await page.locator(".shop-card").count(), 9);
+    assert.equal(await page.locator(".shop-card").count(), 10);
     for (const category of ["dino", "hat", "boots"])
       assert.equal(
         await page.locator(`[data-rail="${category}"] .shop-card`).count(),
-        3,
+        category === "dino" ? 4 : 3,
       );
     await page.waitForFunction(() => window.__runner.audio().loaded);
     const choose = async (id) => {
@@ -47,14 +47,14 @@ export async function checkShop(context, url, engine) {
     assert.match(await page.locator("#shop-message").innerText(), /Не хватает/);
     await page.evaluate(() => {
       const w = window.__runner.game.wallet;
-      w.add(0, 500);
-      w.add(1, 60);
+      w.add(0, 2500);
+      w.add(1, 2000);
     });
     await choose("dino-white");
     await choose("dino-white");
     assert.equal(
       await page.evaluate(() => window.__runner.game.wallet.coins),
-      250,
+      1750,
     );
     await choose("hat-safari");
     await choose("boots-red");
@@ -71,12 +71,20 @@ export async function checkShop(context, url, engine) {
       hat: "hat-safari",
       boots: "boots-red",
     });
-    assert.equal(purchased.coins, 40);
-    assert.equal(purchased.diamonds, 40);
+    assert.equal(purchased.coins, 1120);
+    assert.equal(purchased.diamonds, 1940);
     assert.equal(purchased.render.hatVisible, true);
     assert.equal(purchased.render.bootsVisible, true);
     assert.equal(purchased.render.hatParent, "dino-head");
     assert.equal(purchased.render.leftParent, "dino-shin-l");
+    assert.equal(
+      await page.evaluate(() => window.__runner.stats().preview.hatVisible),
+      true,
+    );
+    assert.equal(
+      await page.evaluate(() => window.__runner.stats().preview.bootsVisible),
+      true,
+    );
     assert.equal(purchased.audio.voices, 8);
     assert.ok(purchased.audio.played > 0);
     assert.ok(purchased.audio.decodedBytes < 4000000);
@@ -217,14 +225,14 @@ export async function checkShop(context, url, engine) {
     );
     await page.screenshot({ path: `test-results/${engine}-shop.png` });
     await page.reload();
-    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     assert.deepEqual(
       await page.evaluate(() => ({ ...window.__runner.cosmetics.equipped })),
       purchased.equipped,
     );
     assert.equal(
       await page.evaluate(() => window.__runner.game.wallet.coins),
-      40,
+      1120,
     );
     await page.tap("#action");
     await page.waitForFunction(() => window.__runner.audio().musicPlaying);
@@ -240,21 +248,30 @@ export async function checkShop(context, url, engine) {
     assert.equal(await page.locator("#menu-best").innerText(), "321");
     await page.tap("#action");
     await page.evaluate(() => window.__runner.pause());
-    // Explicit end-run action returns to Home and saves the record.
-    await page.tap("#leave-run");
-    assert.equal(
-      await page.locator("#home-toggle").getAttribute("aria-pressed"),
-      "true",
-    );
-    assert.equal(await page.locator("#menu-panel").isVisible(), true);
+    // Pause is deliberately separate from Home and Shop.
+    assert.equal(await page.locator("#pause-panel").isVisible(), true);
+    assert.equal(await page.locator("#menu-shell").isVisible(), false);
+    assert.equal(await page.locator("#pause-panel button").count(), 2);
     assert.equal(await page.locator("#shop-panel").isVisible(), false);
-    await page.tap("#settings-toggle");
+    await page.tap("#pause-settings");
     await page.tap("#sound");
     assert.equal(
       await page.evaluate(() => window.__runner.audio().musicPlaying),
       false,
     );
-    assert.equal(await page.evaluate(() => window.__runner.audio().gain), 0);
+    assert.equal(
+      await page.evaluate(() => window.__runner.audio().activeVoices),
+      0,
+    );
+    assert.equal(
+      await page.evaluate(() => window.__runner.settings.music),
+      true,
+    );
+    await page.tap("#music");
+    assert.equal(
+      await page.evaluate(() => window.__runner.settings.music),
+      false,
+    );
     await page.tap("#sound");
     assert.deepEqual(errors, []);
     return { purchased, drag, vertical, nativeDrag, burst, errors };

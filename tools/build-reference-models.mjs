@@ -32,7 +32,7 @@ class ModelBuilder {
     const dinosaur = new LowPolyDinosaur().build();
     scene.add(dinosaur.mesh);
     const cosmetics = new LowPolyCosmetics();
-    for (const id of ["dino-white", "dino-pink"])
+    for (const id of ["dino-white", "dino-pink", "dino-gold"])
       scene.add(cosmetics.skin(dinosaur.mesh, id, material));
     for (const id of [
       "hat-cap",

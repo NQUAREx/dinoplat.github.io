@@ -11,6 +11,7 @@ import { checkFeedback } from "./feedback-browser.mjs";
 import { checkTurning, checkRetina } from "./turning-browser.mjs";
 import { checkDinoRun } from "./dino-run-browser.mjs";
 import { checkShop } from "./shop-browser.mjs";
+import { checkPolish } from "./polish-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -32,7 +33,7 @@ async function checkLighting(context, engine) {
   try {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     await page.evaluate(() => {
       const r = window.__runner,
         g = r.game;
@@ -143,7 +144,7 @@ async function checkLighting(context, engine) {
         assert.ok(probe.stats.shadows > 0);
       }
       assert.ok(probe.stats.calls <= 24);
-      assert.equal(probe.stats.textures, 4);
+      assert.equal(probe.stats.textures, 5);
       frames[hour] = probe;
       // Let WebKit present the manually drawn paused frame to its compositor.
       await page.evaluate(
@@ -215,7 +216,7 @@ try {
           errors.push(message.text());
       });
       await page.goto(`${url}/?debug`);
-      await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+      await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
       assert.equal(
         await page.evaluate(() => getComputedStyle(document.body).position),
         "fixed",
@@ -383,13 +384,13 @@ try {
         await page.evaluate(() => window.__runner.game.distance),
         pausedDistance,
       );
-      await page.tap("#action");
+      await page.tap("#resume");
       await page.waitForFunction(
         () => window.__runner.audio().state === "running",
       );
       assert.equal(await page.evaluate(() => window.__runner.game.steering), 0);
       await page.tap("#pause");
-      await page.tap("#settings-toggle");
+      await page.tap("#pause-settings");
       assert.equal(await page.locator("#shake").count(), 0);
       assert.equal(
         await page.evaluate(() => window.__runner.settings.shake),
@@ -500,7 +501,7 @@ try {
         fallback.on("pageerror", (error) => errors.push(error.message));
         await fallback.goto(`${url}/?debug`);
         await fallback.waitForFunction(
-          () => window.__runner?.stats().textures === 4,
+          () => window.__runner?.stats().textures >= 4,
         );
         await fallback.tap("#action");
         await fallback.waitForFunction(
@@ -511,7 +512,7 @@ try {
           mode === "standalone",
         );
         await fallback.tap("#pause");
-        await fallback.tap("#settings-toggle");
+        await fallback.tap("#pause-settings");
         assert.equal(
           await fallback.locator("#install-help").isVisible(),
           mode !== "standalone",
@@ -533,6 +534,7 @@ try {
       }
       assert.deepEqual(errors, []);
       results[engine].shop = await checkShop(context, url, engine);
+      results[engine].polish = await checkPolish(context,url,engine);
       await context.close();
     } finally {
       await browser.close();

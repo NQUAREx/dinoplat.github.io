@@ -267,7 +267,11 @@ test("lives, damage immunity, game over, pause and reset retain bounded pools", 
       assert.equal(game.health.lives, 2 - hit);
     }
   }
-  assert.equal(game.phase, "over");
+  assert.equal(game.phase, "dying");
+  const stoppedDistance=game.distance;
+  for(let i=0;i<150;i++)game.step(STEP);
+  assert.equal(game.phase,"over");
+  assert.equal(game.distance,stoppedDistance);
   game.reset(999);
   assert.equal(game.world.active, pool);
   assert.equal(game.health.lives, 3);

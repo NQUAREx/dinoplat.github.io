@@ -8,6 +8,7 @@ export class DinosaurCosmetics {
   private readonly left: Mesh;
   private readonly right: Mesh;
   private revision = -1;
+  groundLift = 0;
   constructor(
     private readonly models: Pick<ModelLibrary, "greenGeometry" | "cosmetics">,
     private readonly dinosaur: SkinnedMesh,
@@ -38,6 +39,7 @@ export class DinosaurCosmetics {
       boots = this.models.cosmetics.get(inventory.equipped.boots);
     this.hat.visible = !!hat;
     this.left.visible = this.right.visible = !!boots;
+    this.groundLift = boots ? 0.04 : 0;
     if (hat) this.hat.geometry = hat;
     if (boots) this.left.geometry = this.right.geometry = boots;
   }

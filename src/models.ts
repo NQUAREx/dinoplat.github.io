@@ -79,6 +79,7 @@ export class ModelLibrary {
           [
             "dino-white",
             "dino-pink",
+            "dino-gold",
             "hat-cap",
             "hat-safari",
             "hat-crown",

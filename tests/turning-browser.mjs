@@ -10,7 +10,7 @@ export async function checkTurning(context, url, engine) {
   });
   try {
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     const result = await page.evaluate(() => {
       const r = window.__runner,
         g = r.game;
@@ -102,7 +102,7 @@ export async function checkRetina(browser, url, engine) {
   try {
     const page = await context.newPage();
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     const stats = await page.evaluate(() => window.__runner.stats());
     await page.evaluate(() => {
       document.querySelector("#overlay").hidden = true;

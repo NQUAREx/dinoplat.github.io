@@ -57,6 +57,7 @@ try {
     "dino-green",
     "dino-white",
     "dino-pink",
+    "dino-gold",
     "hat-cap",
     "hat-safari",
     "hat-crown",

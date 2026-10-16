@@ -11,6 +11,7 @@ import { checkFeedback } from "./feedback-browser.mjs";
 import { checkTurning } from "./turning-browser.mjs";
 import { checkDinoRun } from "./dino-run-browser.mjs";
 import { checkShop } from "./shop-browser.mjs";
+import { checkPolish } from "./polish-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -50,7 +51,7 @@ async function ready(page) {
       errors.push(message.text());
   });
   await page.goto(`${url}/?debug`);
-  await page.waitForFunction(() => window.__runner?.stats().textures === 4);
+  await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
 }
 try {
   for (let i = 0; i < 50; i++) {
@@ -264,7 +265,7 @@ try {
   // All frames/variant buffers are exercised before a resource-growth comparison.
   await page.tap("#pause");
   const pausedTime = await page.evaluate(() => window.__runner.game.time);
-  await page.tap("#settings-toggle");
+  await page.tap("#pause-settings");
   assert.equal(await page.locator("#settings-panel").isVisible(), true);
   await page.tap("#vibration");
   await page.tap("#sound");
@@ -285,7 +286,7 @@ try {
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("dinoplat-settings")),
   );
-  assert.deepEqual(saved, { vibration: false, sound: false });
+  assert.deepEqual(saved, { vibration: false, sound: false, music: true });
   const restored = await page.context().newPage();
   await ready(restored);
   assert.equal(
@@ -302,7 +303,7 @@ try {
   await page.waitForFunction(() => window.__runner.audio().state === "running");
   assert.equal(await page.evaluate(() => window.__runner.audio().voices), 8);
   await page.tap("#settings-back");
-  assert.equal(await page.locator("#menu-panel").isVisible(), true);
+  assert.equal(await page.locator("#pause-panel").isVisible(), true);
   await page.evaluate(() => {
     const r = window.__runner,
       g = r.game;
@@ -574,8 +575,8 @@ try {
   await page.waitForFunction(() => window.__runner.game.phase === "over");
   assert.equal(await page.locator("#result").isVisible(), true);
   assert.equal(
-    await page.evaluate(() => window.__runner.stats().playerState),
-    "dead",
+    await page.evaluate(() => window.__runner.stats().preview.visible),
+    true,
   );
   await page.screenshot({ path: "test-results/game-over.png" });
   await page.tap("#action");
@@ -601,7 +602,7 @@ try {
     ...window.__runner.stats(),
   }));
   assert.equal(report.memoryBefore.geometries, report.memoryAfter.geometries);
-  assert.equal(report.memoryAfter.textures, 4);
+  assert.equal(report.memoryAfter.textures, 5);
   assert.ok(report.memoryAfter.heap - report.memoryBefore.heap < 2000000);
   report.performance = await page.evaluate(async () => {
     const samples = [];
@@ -698,7 +699,7 @@ try {
   await page.waitForFunction(() => document.querySelector("#action").disabled);
   await page.evaluate(() => window.testLoss.restoreContext());
   await page.waitForFunction(() => !document.querySelector("#action").disabled);
-  await page.tap("#action");
+  await page.tap("#resume");
   await touch("touchStart", 40);
   await page.setViewportSize({ width: 844, height: 390 });
   await page.waitForFunction(() => window.__runner.game.phase === "paused");
@@ -709,7 +710,7 @@ try {
   await page.waitForFunction(
     () => !window.__runner.snapshot().orientationBlocked,
   );
-  await page.tap("#action");
+  await page.tap("#resume");
   assert.equal(await page.evaluate(() => window.__runner.game.steering), 0);
   await page.close();
 
@@ -727,9 +728,9 @@ try {
   const smallHud = await small.locator(".hud").boundingBox();
   assert.ok(smallHud.width > 285);
   await small.tap("#pause");
-  const smallPause = await small.locator("#menu-panel").boundingBox();
+  const smallPause = await small.locator("#pause-panel").boundingBox();
   assert.ok(smallPause.y > 55 && smallPause.y + smallPause.height < 568);
-  await small.tap("#settings-toggle");
+  await small.tap("#pause-settings");
   const smallSettings = await small.locator("#settings-panel").boundingBox();
   assert.ok(
     smallSettings.y > 55 && smallSettings.y + smallSettings.height < 568,
@@ -774,6 +775,7 @@ try {
   assert.deepEqual(errors, []);
   report.errors = errors;
   report.shop = await checkShop(context, url, "chromium");
+  report.polish = await checkPolish(context,url,"chromium");
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(
