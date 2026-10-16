@@ -47,11 +47,26 @@ test("model asset contains eight run poses, death, seven low-poly cacti and thre
     const node = json.nodes.find((n: { name: string }) => n.name === `cactus-${i}`);
     const primitive = json.meshes[node.mesh].primitives[0];
     const positions = json.accessors[primitive.attributes.POSITION];
+    const colours = json.accessors[primitive.attributes.COLOR_0];
+    assert.equal(colours.componentType, 5121, "packed byte colours, not float RGB");
+    assert.equal(colours.normalized, true);
+    const colourView = json.bufferViews[colours.bufferView], palette = new Set<string>();
+    let creamSpines = 0, paleSpots = 0;
+    for (let n = 0; n < colours.count; n++) {
+      const p = binaryStart + (colourView.byteOffset || 0) +
+        (colours.byteOffset || 0) + n * (colourView.byteStride || 3);
+      const r = buffer[p], g = buffer[p+1], b = buffer[p+2];
+      palette.add(`${r},${g},${b}`);
+      if (r > 240 && g > 210 && b > 120) creamSpines++;
+      if (r > 150 && r < 180 && g > 195 && b > 50 && b < 80) paleSpots++;
+    }
+    assert.ok(creamSpines > 0 && paleSpots > 0 && palette.size >= 5,
+      "spines, areoles and varied rib colours on every cactus");
     assert.ok(Math.abs(positions.min[1]) < 1e-6, "feet at ground zero");
     assert.ok(Math.abs(positions.max[0] - colliders[i].halfX) < 1e-5);
     assert.ok(Math.abs(positions.max[2] - colliders[i].halfZ) < 1e-5);
     assert.ok(Math.abs(positions.max[1] - colliders[i].height) < 1e-5);
-    assert.ok(json.accessors[primitive.indices].count / 3 <= 360);
+    assert.ok(json.accessors[primitive.indices].count / 3 <= 700);
     const normals = json.accessors[primitive.attributes.NORMAL];
     const view = json.bufferViews[normals.bufferView];
     let faceted = 0;

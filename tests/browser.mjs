@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { checkCollectibles } from "./collectibles-browser.mjs";
 import { checkTerrainMotion } from "./terrain-browser.mjs";
 import { checkContinuity } from "./continuity-browser.mjs";
+import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -73,6 +74,7 @@ try {
   );
   report.terrainMotion = await checkTerrainMotion(context, url, "chromium");
   report.continuity = await checkContinuity(context, url, "chromium-browser");
+  report.instanceMotion = await checkInstanceMotion(context, url, "chromium-browser");
   const page = await context.newPage();
   await page.addInitScript(() => {
     window.vibrationCalls = [];

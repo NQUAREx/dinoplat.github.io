@@ -293,6 +293,13 @@ export class View {
       this.lighting,
       this.quality,
     );
+    // r186 updates visible objects before incrementing its frame ID, then
+    // shadow casters afterwards. A cached shadow capture therefore leaves the
+    // object's upload stamp equal to the NEXT frame's visibility-pass stamp:
+    // instance matrices are skipped for one frame (stale positions/counts).
+    // Start a fresh upload epoch before visibility traversal. This touches only
+    // renderer bookkeeping, not shadow cadence/maps or simulation time.
+    this.renderer.info.render.frame++;
     this.renderer.render(this.scene, this.rig.camera);
     this.shadows.complete(this.lighting);
   }

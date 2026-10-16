@@ -1,13 +1,14 @@
 // Original editable model source. Built offline; no procedural modelling in RAF.
 import {
-  BufferGeometry, Color, CylinderGeometry, IcosahedronGeometry, LatheGeometry,
-  Float32BufferAttribute, Vector2, Vector3, Quaternion,
+  BufferGeometry, CircleGeometry, ConeGeometry, Color, CylinderGeometry,
+  IcosahedronGeometry, LatheGeometry, SphereGeometry,
+  Float32BufferAttribute, Uint8BufferAttribute, Vector2, Vector3, Quaternion,
 } from "three";
 import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 
 export class LowPolyCacti {
   parts = [];
-  add(geometry, colour, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) {
+  add(geometry, colour, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, striped = false) {
     if (geometry.index) {
       const source = geometry;
       geometry = source.toNonIndexed();
@@ -15,34 +16,58 @@ export class LowPolyCacti {
     }
     // Lathe pole quads contain zero-area triangles. Remove them offline, along
     // with their zero normals, before indexing/exporting the final asset.
-    const positions = geometry.attributes.position, clean = [];
+    const positions = geometry.attributes.position, sourceNormals = geometry.attributes.normal;
+    const clean = [], normals = [], colours = [], c = new Color(colour);
     const a = new Vector3(), b = new Vector3(), edge = new Vector3();
     for (let i = 0; i < positions.count; i += 3) {
       a.fromBufferAttribute(positions, i);
       b.fromBufferAttribute(positions, i + 1).sub(a);
       edge.fromBufferAttribute(positions, i + 2).sub(a);
       if (b.cross(edge).lengthSq() < 1e-14) continue;
-      for (let n = i; n < i + 3; n++)
+      for (let n = i; n < i + 3; n++) {
         clean.push(positions.getX(n), positions.getY(n), positions.getZ(n));
+        normals.push(sourceNormals.getX(n), sourceNormals.getY(n), sourceNormals.getZ(n));
+        const angle = Math.atan2(positions.getX(n), positions.getZ(n));
+        const tint = striped ? .9 + .1 * Math.cos(angle * 4) : 1;
+        colours.push(Math.round(c.r * tint * 255), Math.round(c.g * tint * 255), Math.round(c.b * tint * 255));
+      }
     }
     geometry.dispose();
     geometry = new BufferGeometry();
     geometry.setAttribute("position", new Float32BufferAttribute(clean, 3));
-    geometry.deleteAttribute("uv");
+    geometry.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+    geometry.setAttribute("color", new Uint8BufferAttribute(colours, 3, true));
     geometry.scale(sx, sy, sz);
     geometry.translate(x, y, z);
-    geometry.computeVertexNormals(); // Bake faceted normals, no fragment derivatives.
-    const c = new Color(colour), values = [];
-    for (let i = 0; i < geometry.attributes.position.count; i++)
-      values.push(c.r, c.g, c.b);
-    geometry.setAttribute("color", new Float32BufferAttribute(values, 3));
     this.parts.push(geometry);
   }
   stem(x, y, height, radius, colour = 0x62ce3c, z = 0) {
     // Broad bevels and six-sided facets, not stacked cubes/voxel surfaces.
     const points = [[0, 0], [radius * .86, 0], [radius, height * .1],
       [radius * .96, height * .78], [radius * .7, height * .94], [0, height]];
-    this.add(new LatheGeometry(points.map(p => new Vector2(...p)), 8), colour, x, y, z);
+    this.add(new LatheGeometry(points.map(p => new Vector2(...p)), 8), colour, x, y, z, 1, 1, 1, true);
+    const rows = height > 1.3 ? 3 : 2;
+    for (let row = 0; row < rows; row++) {
+      const t = .2 + row * .46 / (rows - 1);
+      const r = radius * (1 - .04 * (t - .1) / .68) * Math.cos(Math.PI / 8);
+      for (let side = 0; side < 4; side++) {
+        const theta = (side * 2 + row % 2 + .5) * Math.PI / 4;
+        const normal = new Vector3(Math.sin(theta), 0, Math.cos(theta));
+        this.spine(new Vector3(x + normal.x * r, y + t * height, z + normal.z * r), normal);
+      }
+    }
+  }
+  spine(point, normal) {
+    // A raised five-sided areole + a tiny solid triangular spine, merged into
+    // the same mesh/material. No decal planes fighting with the green surface.
+    const spot = new CircleGeometry(.045, 5);
+    spot.applyQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), normal));
+    const base = point.clone().addScaledVector(normal, .006);
+    this.add(spot, 0xd2e889, base.x, base.y, base.z);
+    const thorn = new ConeGeometry(.022, .1, 3, 1);
+    thorn.applyQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), normal));
+    const centre = base.addScaledVector(normal, .05);
+    this.add(thorn, 0xfff2c3, centre.x, centre.y, centre.z);
   }
   arm(x, y, tip, radius, colour = 0x43b83a) {
     const start = new Vector3(0, y, 0), end = new Vector3(x, y + .12, 0);
@@ -92,9 +117,14 @@ export class LowPolyCacti {
         break;
       case 5: // Prickly pear, broad faceted pads.
         this.stem(0, 0, .95, .26, 0x3eb951);
-        for (const [x, y, sx, sy] of [[0, 1.12, .46, .65], [-.44, 1.55, .36, .48], [.42, 1.7, .34, .5]])
-          this.add(new IcosahedronGeometry(1, 0), x < 0 ? 0x7bdc52 : 0x4ac652,
+        for (const [x, y, sx, sy] of [[0, 1.12, .46, .65], [-.44, 1.55, .36, .48], [.42, 1.7, .34, .5]]) {
+          this.add(new SphereGeometry(1, 8, 4), x < 0 ? 0x7bdc52 : 0x4ac652,
             x, y, 0, sx, sy, .23);
+          for (const axis of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) {
+            const n = new Vector3(...axis);
+            this.spine(new Vector3(x + n.x * sx, y, n.z * .23), n);
+          }
+        }
         this.flower(.42, 2.1);
         break;
       case 6: // Candelabra with three upright branches.

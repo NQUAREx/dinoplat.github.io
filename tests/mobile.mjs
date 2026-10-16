@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { checkCollectibles } from "./collectibles-browser.mjs";
 import { checkTerrainMotion } from "./terrain-browser.mjs";
 import { checkContinuity } from "./continuity-browser.mjs";
+import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -448,6 +449,7 @@ try {
       };
       results[engine].lighting = await checkLighting(context, engine);
       results[engine].continuity = await checkContinuity(context, url, engine);
+      results[engine].instanceMotion = await checkInstanceMotion(context, url, engine);
       results[engine].terrainMotion = await checkTerrainMotion(
         context,
         url,

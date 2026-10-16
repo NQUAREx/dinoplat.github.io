@@ -112,12 +112,12 @@ export async function checkContinuity(context, url, engine) {
     assert.equal(result.gallery.obstacleVariants, 7);
     assert.equal(result.gallery.visibleObstacles, 7);
     assert.equal(result.gallery.moonVisible, false);
-    // Subpixel Float32/raster-edge differences are not object movement. Check
-    // world projection independently and reject broad silhouette/colour changes.
+    // CPU projection alone previously hid stale GPU matrices after a shadow
+    // capture. Require near-identical pixels too; GPU readback has its own test.
     for (let axis = 0; axis < 3; axis++) assert.ok(Math.abs(
       result.cactusRebase.projections[0][axis] - result.cactusRebase.projections[1][axis]) < 1e-12);
-    assert.ok(result.cactusRebase.green > 1000 && result.cactusRebase.mean < 1 &&
-      result.cactusRebase.silhouetteFraction < .01,
+    assert.ok(result.cactusRebase.green > 1000 && result.cactusRebase.mean < .02 &&
+      result.cactusRebase.silhouetteFraction < .0005,
       `${engine}: cactus rebase changed pixels: ${JSON.stringify(result.cactusRebase)}`);
     for (const pose of result.poses) assert.ok(pose.darker > 20,
       `${engine}: missing dinosaur contact shadow ${pose.height}/${pose.duck}`);
