@@ -1,5 +1,14 @@
 # Проверка прототипа — 16 октября 2026
 
+## Current fix: developer touch, lit dust and joined dinosaur
+
+- DEV summaries now explicitly handle touch/keyboard activation; panel scrolling excludes summaries so pointer capture cannot swallow section taps. Chromium/WebKit checks open and close every group. Separate +1000coin/+1000diamond buttons update the standard wallet; reload checks verify cookie persistence.
+- Removed the entire bonus implementation, multipliers/shield, registry entry, event subscription, test actions and Help entry. Enabled pickups are only coins, diamonds and healing hearts. Existing numeric object/event IDs remain stable.
+- Dust now uses scene-lit Lambert shading, without additional geometry, draw calls, textures or shadows. Pooled256×8-triangle budget unchanged.
+- Fourteen body bridges connect neck/head, tail sections, arms/hands and legs/feet, with identical seam positions/weights and blended middle rings. Triangle budget remains1182; rig11 bones/five clips and attachments/colliders retained. GLB1069064bytes. Numeric regression checks topology and seams across125 clip samples and25 crossfades.
+- All80 unit tests and production build pass. Focused Chromium/WebKit mobile checks pass with no page/shader errors, including DEV sections/grants, author input, inventory attachments, run/pause/help and pickup fade. No physical-phone FPS measurements.
+- Isolated test-only GPU readback using the actual FootDust material and LightingRig measures a sample RGB199/116/25 at09:00 versus35/24/8 at00:00; GL error0. This confirms light response, not device FPS. All110 shop thumbnails rebuilt offline.
+
 ## Current fix: native author input and naming
 
 - Native author-code focus/selection is exempt from global selection clearing and touch-default cancellation. A focus-scoped `data-editing` flag prevents the landscape warning from hiding the form when the soft keyboard shortens a portrait viewport. Gameplay remains portrait-only. Input text uses16px to avoid Safari's small-input autozoom.

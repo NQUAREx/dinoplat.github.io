@@ -121,6 +121,9 @@ test("denser step/landing dust stays inside one fixed 256-particle instanced poo
   dust.update(game, 0, view);
   assert.equal(dust.mesh.count, 256);
   assert.equal(dust.mesh.geometry.attributes.position.count / 3, 8);
+  assert.equal(dust.mesh.material.type, "MeshLambertMaterial");
+  assert.equal(dust.mesh.castShadow, false);
+  assert.equal(dust.mesh.receiveShadow, false);
   dust.update(game, 1, view);
   assert.equal(dust.mesh.count, 0);
   dust.dispose();

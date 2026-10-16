@@ -4,7 +4,7 @@ import { Simulation, STEP } from "../src/simulation.ts";
 import { Rules } from "../src/config.ts";
 import { ObjectRegistry, ObjectKind, WorldSpawner } from "../src/world.ts";
 import { GameEvent, GameEvents } from "../src/events.ts";
-import { BonusSystem, Currency, Wallet } from "../src/progression.ts";
+import { Currency, Wallet } from "../src/progression.ts";
 
 function emptyGame(distance = 0, x = 0) {
   const registry = new ObjectRegistry();
@@ -321,30 +321,22 @@ test("hit gives exactly two seconds of immunity and temporary start speed, then 
   game.step(STEP);
   assert.equal(game.health.lives, 1);
 });
-test("wallet/bonuses/registry remain extensible; only requested pickups are enabled", () => {
+test("wallet/registry remain extensible; only requested pickups are enabled", () => {
   const events = new GameEvents(),
-    wallet = new Wallet(events),
-    bonuses = new BonusSystem(events);
+    wallet = new Wallet(events);
   wallet.add(Currency.Coin, 4);
   wallet.add(Currency.Diamond, 2);
   assert.equal(wallet.coins, 4);
   assert.equal(wallet.diamonds, 2);
   assert.throws(() => wallet.add(Currency.Coin, -1));
-  bonuses.register({ id: 1, duration: 1, shield: true, speedFactor: 1.2 });
-  assert.equal(bonuses.activate(1), true);
-  assert.equal(bonuses.shield, true);
-  bonuses.step(2);
-  assert.equal(bonuses.shield, false);
-  assert.equal(bonuses.speedFactor, 1);
   const registry = ObjectRegistry.defaults();
-  for (const kind of [ObjectKind.Bonus, ObjectKind.Enemy])
-    assert.equal(registry.get(kind)?.weight, 0);
+  assert.equal(registry.get(ObjectKind.Enemy)?.weight, 0);
   assert.equal(registry.get(ObjectKind.Coin)?.weight, 250);
   assert.equal(registry.get(ObjectKind.Diamond)?.weight, 10);
   assert.equal(registry.get(ObjectKind.Heart)?.weight, 1);
   assert.equal(registry.get(ObjectKind.Cactus)?.destruction, undefined);
 });
-test("registered pickups/bonuses flow through the same pool and speed stays within route budget", () => {
+test("registered pickups flow through the same pool and speed stays within route budget", () => {
   const game = emptyGame(2000);
   game.world.registry.register({
     kind: ObjectKind.Coin,
@@ -360,28 +352,11 @@ test("registered pickups/bonuses flow through the same pool and speed stays with
   assert.equal(game.world.active[0], 0);
   game.step(STEP);
   assert.equal(game.wallet.coins, 3);
-  game.bonuses.register({
-    id: 7,
-    duration: 2,
-    speedFactor: 2,
-    jumpFactor: 1.2,
-    shield: true,
-  });
-  game.world.registry.register({
-    kind: ObjectKind.Bonus,
-    weight: 0,
-    blocking: false,
-    colliders: [{ halfX: 0.25, halfZ: 0.25, height: 0.6 }],
-    bonusId: 7,
-  });
-  obstacle(game, game.x, 0.3, 0.6);
-  game.world.kinds[0] = ObjectKind.Bonus;
-  game.step(STEP);
-  assert.equal(game.bonuses.shield, true);
+  game.distance = 1_000_000;
   game.step(STEP);
   assert.equal(game.speed, Rules.maxSpeed);
   game.jump();
-  assert.ok(Math.abs(game.velocityY - Rules.jumpSpeed * 1.2) < 1e-9);
+  assert.equal(game.velocityY, Rules.jumpSpeed);
 });
 
 test("floating item collider has a real vertical range for future pickups/enemies", () => {

@@ -1,6 +1,6 @@
 import { Rules } from "./config";
 import { GameEvent, GameEvents } from "./events";
-import { BonusSystem, Currency, Health, Wallet } from "./progression";
+import { Currency, Health, Wallet } from "./progression";
 import { ObjectKind, ObjectRegistry, WorldSpawner } from "./world";
 import { Terrain } from "./terrain";
 import { PickupMotion } from "./pickup-motion";
@@ -17,7 +17,6 @@ export class Simulation {
   readonly wallet = new Wallet(this.events);
   readonly health = new Health(this.events);
   readonly pickupMotion = new PickupMotion();
-  readonly bonuses = new BonusSystem(this.events);
   readonly world: WorldSpawner;
   phase: Phase = "ready";
   seed = 1;
@@ -73,7 +72,6 @@ export class Simulation {
     this.world.update(0, 0);
     this.terrain.reset(this.seed);
     this.health.reset();
-    this.bonuses.reset();
     this.events.emit(GameEvent.Start);
   }
   move(direction: number) {
@@ -85,7 +83,7 @@ export class Simulation {
   jump() {
     if (this.phase !== "running" || this.hitStopRemaining || this.y !== 0)
       return;
-    this.velocityY = Rules.jumpSpeed * this.bonuses.jumpFactor;
+    this.velocityY = Rules.jumpSpeed;
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
     this.events.emit(GameEvent.Jump);
@@ -138,7 +136,6 @@ export class Simulation {
     this.time += dt;
     this.pickupMotion.update(this.time);
     this.health.step(dt);
-    this.bonuses.step(dt);
     const ducking = this.crouchRemaining > 0;
     this.crouchRemaining = Math.max(0, this.crouchRemaining - dt);
     this.crouch +=
@@ -163,14 +160,12 @@ export class Simulation {
         this.events.emit(GameEvent.Land);
       }
     }
-    // Future speed bonuses must stay inside the generator's proven timing budget.
     this.speed =
       this.health.immunity > 0
         ? Rules.startSpeed
         : Math.min(
             Rules.maxSpeed,
-            (Rules.startSpeed + this.distance * Tuning.generation.speedGrowth) *
-              this.bonuses.speedFactor,
+            Rules.startSpeed + this.distance * Tuning.generation.speedGrowth,
           );
     this.distance += this.speed * dt;
     const midHeading = (this.heading + this.previousHeading) * 0.5;
@@ -202,8 +197,7 @@ export class Simulation {
       const definition = pool.registry.get(pool.kinds[i]);
       if (
         !definition ||
-        (definition.blocking &&
-          (this.health.immunity > 0 || this.bonuses.shield))
+        (definition.blocking && this.health.immunity > 0)
       )
         continue;
       const blocking = definition.blocking;
@@ -255,7 +249,7 @@ export class Simulation {
       )
         continue;
       if (definition.blocking) {
-        if (!this.bonuses.shield && this.health.damage()) {
+        if (this.health.damage()) {
           this.speed = Rules.startSpeed;
           // Hold the swept contact pose, not a later penetrated/end-of-step pose.
           this.x = this.previousX + dx * enter;
@@ -282,11 +276,7 @@ export class Simulation {
           const before = this.health.lives;
           this.health.heal(definition.healing);
           amount = this.health.lives - before;
-        } else if (
-          definition.kind === ObjectKind.Bonus &&
-          definition.bonusId !== undefined
-        )
-          this.bonuses.activate(definition.bonusId);
+        }
         this.events.emit(GameEvent.CollectedVisual, i);
         pool.consume(i);
         this.events.emit(GameEvent.Collected, definition.kind, amount);

@@ -175,7 +175,7 @@ export class AnimatedDinosaur {
 /** Low-poly puffs, one instanced draw and a fixed particle pool. */
 export class FootDust {
   private readonly geometry = new THREE.OctahedronGeometry(0.65, 0);
-  private readonly material = new THREE.MeshBasicMaterial({
+  private readonly material = new THREE.MeshLambertMaterial({
     color: Palette.dust,
   });
   readonly mesh = new THREE.InstancedMesh(this.geometry, this.material, 256);

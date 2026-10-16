@@ -273,6 +273,18 @@ export class DeveloperPanel {
         group = document.createElement("details");
         const heading = document.createElement("summary");
         heading.textContent = field.group;
+        // Page-level touch guards suppress the native summary click. Handle
+        // touch explicitly; keyboard activation remains accessible via click.
+        heading.addEventListener("pointerup", (event) => {
+          if (event.pointerType !== "touch" || !event.isPrimary) return;
+          event.preventDefault();
+          (group as HTMLDetailsElement).open = !(group as HTMLDetailsElement).open;
+        }, { signal: this.abort.signal });
+        heading.addEventListener("click", (event) => {
+          event.preventDefault();
+          if (event.detail === 0)
+            (group as HTMLDetailsElement).open = !(group as HTMLDetailsElement).open;
+        }, { signal: this.abort.signal });
         group.append(heading);
         groups.set(field.group, group);
         root.append(group);

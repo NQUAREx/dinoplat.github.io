@@ -6,8 +6,7 @@ export enum ObjectKind {
   Cactus,
   Coin,
   Diamond,
-  Bonus,
-  Enemy,
+  Enemy = 4,
   Heart,
 }
 export interface ColliderDefinition {
@@ -27,7 +26,6 @@ export interface ObjectDefinition {
   readonly blocking: boolean;
   readonly colliders: readonly ColliderDefinition[];
   readonly reward?: number;
-  readonly bonusId?: number;
   readonly healing?: number;
   readonly spawnGroup?: "pickup";
   readonly animation?: "spin-bob";
@@ -141,12 +139,6 @@ export class ObjectRegistry {
       healing: 1,
       spawnGroup: "pickup",
       animation: "spin-bob",
-    });
-    registry.register({
-      kind: ObjectKind.Bonus,
-      weight: 0,
-      blocking: false,
-      colliders: pickup,
     });
     registry.register({
       kind: ObjectKind.Enemy,

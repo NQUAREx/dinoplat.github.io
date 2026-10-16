@@ -20,11 +20,8 @@ export async function checkExpansion(browser, url, engine) {
     await page.goto(`${url}/?debug&time=9`);
     await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
     assert.equal(await page.locator("#help-panel").isVisible(), true);
-    assert.equal(await page.locator("[data-help]").count(), 12);
-    assert.match(
-      await page.locator('[data-help="bonuses"]').innerText(),
-      /пока не выпадают/,
-    );
+    assert.equal(await page.locator("[data-help]").count(), 11);
+    assert.equal(await page.locator('[data-help="bonuses"]').count(), 0);
     await page.tap("#help-back");
     const d0 = await page.evaluate(
         () => window.__runner.stats().preview.distance,
@@ -85,6 +82,18 @@ export async function checkExpansion(browser, url, engine) {
     await page.waitForFunction(() => window.__runner?.developer.device.enabled);
     assert.equal(await page.locator("#help-panel").isVisible(), false);
     await page.tap("#developer-toggle");
+    const sections = page.locator("#developer-fields summary");
+    for (let i = 0; i < await sections.count(); i++) {
+      const heading = sections.nth(i);
+      await heading.scrollIntoViewIfNeeded();
+      await heading.tap();
+      assert.equal(await heading.evaluate(e => e.parentElement.open), true);
+      await heading.tap();
+      assert.equal(await heading.evaluate(e => e.parentElement.open), false);
+    }
+    await page.tap("#developer-coins");
+    await page.tap("#developer-diamonds");
+    assert.deepEqual(await page.evaluate(() => [window.__runner.game.wallet.coins, window.__runner.game.wallet.diamonds]), [1000, 1000]);
     assert.ok((await page.locator("[data-parameter]").count()) >= 85);
     const tuned = await page.evaluate(() => {
       const r = window.__runner;
@@ -101,6 +110,7 @@ export async function checkExpansion(browser, url, engine) {
     assert.equal(tuned.weight, 333);
     await page.reload();
     await page.waitForFunction(() => window.__runner?.developer.device.enabled);
+    assert.deepEqual(await page.evaluate(() => [window.__runner.game.wallet.coins, window.__runner.game.wallet.diamonds]), [1000, 1000]);
     assert.equal(
       await page.evaluate(() => window.__runner.tuning.camera.height),
       8.5,
@@ -161,11 +171,7 @@ export async function checkExpansion(browser, url, engine) {
       await page.evaluate(() => window.__runner.game.phase),
       "running",
     );
-    await page.tap("#developer-shield");
-    assert.equal(
-      await page.evaluate(() => window.__runner.game.bonuses.shield),
-      true,
-    );
+    assert.equal(await page.evaluate(() => "bonuses" in window.__runner.game), false);
     await page.tap("#developer-close");
     await page.evaluate(() => window.__runner.pause());
     await page.tap("#pause-help");

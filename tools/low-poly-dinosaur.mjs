@@ -4,6 +4,7 @@ import {
   Bone,
   Color,
   BufferAttribute,
+  BufferGeometry,
   ConeGeometry,
   CylinderGeometry,
   Euler,
@@ -302,7 +303,10 @@ export class LowPolyDinosaur {
         y,
         z,
       );
-    this.roundSurfaces(197);
+    // Spend 224 triangles on fourteen real joint bridges instead of extra
+    // rounding fans, keeping the original 1182-triangle budget.
+    this.roundSurfaces(85);
+    this.connectJoints();
     const merged = mergeGeometries(this.parts);
     for (const part of this.parts) part.dispose();
     merged.deleteAttribute("normal");
@@ -328,7 +332,81 @@ export class LowPolyDinosaur {
     );
     return { mesh, clips };
   }
-  /** Split 197 visible body facets into curved fans: 788 + 197*2 =1182.
+  /** Cut matching surface patches and sew them with three skinned spans.
+   * End rings copy the source positions AND weights exactly, so rotation or
+   * clip blending cannot separate a seam. Middle rings blend both bones. */
+  connectJoints() {
+    const byBone = this.bones.map((_, joint) =>
+      this.parts.filter((p) => p.attributes.skinIndex.getX(0) === joint),
+    );
+    const body = byBone[2][0], neck = byBone[2][2];
+    const joints = [
+      [body, neck, [0, 1.25, -0.12]],
+      [neck, byBone[3][0], [0, 1.4, -0.2]],
+      [body, byBone[4][0], [0, 0.77, 0.36]],
+      [byBone[4][0], byBone[4][1], [0, 0.78, 0.86]],
+    ];
+    for (const [side, thigh, shin, arm] of [[-1, 5, 6, 9], [1, 7, 8, 10]]) {
+      joints.push(
+        [body, byBone[thigh][0], [side * 0.21, 0.7, 0.07]],
+        [byBone[thigh][0], byBone[shin][0], [side * 0.22, 0.36, 0.04]],
+        [byBone[shin][0], byBone[shin][1], [side * 0.22, 0.15, 0.02]],
+        [body, byBone[arm][0], [side * 0.28, 1.03, -0.17]],
+        [byBone[arm][0], byBone[arm][1], [side * 0.34, 0.85, -0.27]],
+      );
+    }
+    const patch = (geometry, target) => {
+      const p = geometry.attributes.position, index = geometry.index;
+      let best = 0, distance = Infinity;
+      for (let f = 0; f < index.count; f += 3) {
+        const ids = [index.getX(f), index.getX(f + 1), index.getX(f + 2)];
+        const centre = [0, 1, 2].map((k) =>
+          ids.reduce((sum, id) => sum + p.array[id * 3 + k], 0) / 3);
+        const d = centre.reduce((sum, value, k) => sum + (value - target[k]) ** 2, 0);
+        if (d < distance) { distance = d; best = f; }
+      }
+      const ids = [0, 1, 2].map((k) => index.getX(best + k));
+      const points = ids.map((id) => [p.getX(id), p.getY(id), p.getZ(id)]);
+      geometry.setIndex(Array.from(index.array).filter((_, i) => i < best || i >= best + 3));
+      return { points, joint: geometry.attributes.skinIndex.getX(ids[0]),
+        colour: ids.map((id) => Array.from(geometry.attributes.color.array.slice(id * 3, id * 3 + 3))) };
+    };
+    for (const [a, b, target] of joints) {
+      const start = patch(a, target), end = patch(b, target);
+      // Opposite winding closes both cut boundaries without a twisted tube.
+      let order, shortest = Infinity;
+      for (let shift = 0; shift < 3; shift++) {
+        const candidate = [0, 1, 2].map((i) => (shift - i + 3) % 3);
+        const distance = candidate.reduce((sum, j, i) => sum + start.points[i].reduce(
+          (d, v, k) => d + (v - end.points[j][k]) ** 2, 0), 0);
+        if (distance < shortest) { shortest = distance; order = candidate; }
+      }
+      const positions = [], colours = [], indices = [], weights = [], faces = [];
+      for (let ring = 0; ring < 4; ring++) {
+        const t = ring / 3;
+        for (let i = 0; i < 3; i++) {
+          const j = order[i];
+          positions.push(...start.points[i].map((v, k) => v * (1 - t) + end.points[j][k] * t));
+          colours.push(...start.colour[i].map((v, k) => Math.round(v * (1 - t) + end.colour[j][k] * t)));
+          indices.push(start.joint, end.joint, 0, 0);
+          weights.push(255 - ring * 85, ring * 85, 0, 0);
+          if (ring < 3) {
+            const v = ring * 3 + i, next = ring * 3 + (i + 1) % 3;
+            faces.push(next, v, v + 3, next, v + 3, next + 3);
+          }
+        }
+      }
+      const bridge = new BufferGeometry();
+      bridge.setAttribute("position", new BufferAttribute(new Float32Array(positions), 3));
+      bridge.setAttribute("color", new Uint8BufferAttribute(colours, 3, true));
+      bridge.setAttribute("skinIndex", new Uint16BufferAttribute(indices, 4));
+      bridge.setAttribute("skinWeight", new Uint8BufferAttribute(weights, 4, true));
+      bridge.setIndex(faces);
+      bridge.computeVertexNormals();
+      this.parts.push(bridge);
+    }
+  }
+  /** Split selected visible body facets into curved three-triangle fans.
    * A half-strength superellipsoid projection rounds real surfaces, not padding. */
   roundSurfaces(budget) {
     const ranked = [];

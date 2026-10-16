@@ -17,6 +17,7 @@ import { HelpUI } from "./help";
 import { panelScroll } from "./panel-scroll";
 import { DeveloperPanel } from "./developer";
 import { Tuning } from "./tuning";
+import { Currency } from "./progression";
 
 class GameApplication {
   readonly game = new Simulation(1979);
@@ -144,12 +145,6 @@ class GameApplication {
           if (!this.landscape.matches) this.game.down();
         },
       );
-      for (const bonus of [
-        { id: 301, duration: 30, shield: true },
-        { id: 302, duration: 15, speedFactor: 1.5 },
-        { id: 303, duration: 15, jumpFactor: 1.25 },
-      ])
-        this.game.bonuses.register(bonus);
       this.developer = new DeveloperPanel(
         this.game,
         this.view,
@@ -316,15 +311,16 @@ class GameApplication {
             ? this.start()
             : undefined,
     );
-    for (const [name, id] of [
-      ["shield", 301],
-      ["speed", 302],
-      ["jump", 303],
+    for (const [name, currency] of [
+      ["coins", Currency.Coin],
+      ["diamonds", Currency.Diamond],
     ] as const)
       touchButton(
         document.getElementById(`developer-${name}`) as HTMLButtonElement,
         () => {
-          this.game.bonuses.activate(id);
+          if (!this.developer?.device.enabled) return;
+          this.game.wallet.add(currency, 1000);
+          this.currency?.flush();
         },
       );
     touchButton(

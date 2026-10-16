@@ -8,7 +8,7 @@ export function panelScroll(root: HTMLElement, signal: AbortSignal) {
     (event) => {
       if (
         event.pointerType !== "touch" ||
-        (event.target as Element).closest("button,input,a")
+        (event.target as Element).closest("button,input,a,summary")
       )
         return;
       pointer = event.pointerId;
