@@ -22,6 +22,8 @@ export class Simulation {
   seed = 1;
   x = 0;
   previousX = 0;
+  z = 0;
+  previousZ = 0;
   y = 0;
   previousY = 0;
   heading = 0;
@@ -51,6 +53,7 @@ export class Simulation {
     this.seed = seed >>> 0 || 1;
     this.phase = "ready";
     this.x = this.previousX = this.y = this.previousY = 0;
+    this.z = this.previousZ = 0;
     this.heading = this.previousHeading = this.movingX = this.steering = 0;
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
     this.previousTime = this.previousBob = 0;
@@ -103,6 +106,7 @@ export class Simulation {
     this.previousFeedbackTime = this.feedbackTime;
     this.feedbackTime += dt;
     this.previousX = this.x;
+    this.previousZ = this.z;
     this.previousY = this.y;
     this.previousCrouch = this.crouch;
     this.previousHeading = this.heading;
@@ -129,11 +133,9 @@ export class Simulation {
         Math.abs((ducking ? 1 : 0) - this.crouch),
         Rules.duckBlendSpeed * dt,
       );
-    this.x += this.steering * Rules.sideSpeed * dt; // Deliberately no lateral bounds.
-    this.movingX = this.steering;
-    const turn = (-this.movingX * Math.PI) / 4 - this.heading;
-    this.heading +=
-      Math.sign(turn) * Math.min(Math.abs(turn), Math.PI * 5 * dt);
+    // Unwrapped heading: releasing input preserves the new running direction.
+    this.heading -= this.steering * Rules.turnSpeed * dt;
+    this.movingX = -Math.sin(this.heading);
     const airborne = this.y > 0 || this.velocityY > 0 || this.diving;
     if (airborne) {
       this.y = Math.max(
@@ -157,7 +159,10 @@ export class Simulation {
               this.bonuses.speedFactor,
           );
     this.distance += this.speed * dt;
-    this.world.update(this.x, this.distance);
+    const midHeading = (this.heading + this.previousHeading) * 0.5;
+    this.x -= Math.sin(midHeading) * this.speed * dt;
+    this.z += Math.cos(midHeading) * this.speed * dt;
+    this.world.update(this.x, this.z);
     this.terrain.advance(this.distance);
     this.collisions();
     if (this.distance >= this.nextStep) {
@@ -168,14 +173,14 @@ export class Simulation {
   private collisions() {
     const pool = this.world,
       dx = this.x - this.previousX,
-      dz = this.distance - this.previousDistance;
+      dz = this.z - this.previousZ;
     for (let i = 0; i < pool.active.length; i++) {
       if (!pool.active[i]) continue;
       const extentX = pool.halfX[i] + Rules.playerRadius,
         extentZ = pool.halfZ[i] + Rules.playerRadius;
       if (
-        pool.z[i] < this.previousDistance - extentZ ||
-        pool.z[i] > this.distance + extentZ
+        pool.z[i] < Math.min(this.previousZ, this.z) - extentZ ||
+        pool.z[i] > Math.max(this.previousZ, this.z) + extentZ
       )
         continue;
       const definition = pool.registry.get(pool.kinds[i]);
@@ -185,14 +190,16 @@ export class Simulation {
           (this.health.immunity > 0 || this.bonuses.shield))
       )
         continue;
-      let enter = Math.max(
-        0,
-        (pool.z[i] - extentZ - this.previousDistance) / dz,
-      );
-      let leave = Math.min(
-        1,
-        (pool.z[i] + extentZ - this.previousDistance) / dz,
-      );
+      let enter = 0,
+        leave = 1;
+      if (Math.abs(dz) < 1e-9) {
+        if (Math.abs(this.previousZ - pool.z[i]) >= extentZ) continue;
+      } else {
+        const a = (pool.z[i] - extentZ - this.previousZ) / dz;
+        const b = (pool.z[i] + extentZ - this.previousZ) / dz;
+        enter = Math.max(enter, Math.min(a, b));
+        leave = Math.min(leave, Math.max(a, b));
+      }
       if (Math.abs(dx) < 1e-9) {
         if (Math.abs(this.previousX - pool.x[i]) >= extentX) continue;
       } else {
@@ -229,9 +236,13 @@ export class Simulation {
           this.speed = Rules.startSpeed;
           // Hold the swept contact pose, not a later penetrated/end-of-step pose.
           this.x = this.previousX + dx * enter;
-          this.distance = this.previousDistance + dz * enter;
+          this.z = this.previousZ + dz * enter;
+          this.distance =
+            this.previousDistance +
+            (this.distance - this.previousDistance) * enter;
           this.y = this.previousY + (this.y - this.previousY) * enter;
           this.previousX = this.x;
+          this.previousZ = this.z;
           this.previousDistance = this.distance;
           this.previousY = this.y;
           this.hitStopRemaining = Rules.hitStopSeconds;

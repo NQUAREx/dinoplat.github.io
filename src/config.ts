@@ -1,7 +1,7 @@
 /** Shared numeric rules, no rendering or browser dependencies. Forward is world Z. */
 export class Rules {
   static readonly step = 1 / 120;
-  static readonly sideSpeed = 8;
+  static readonly turnSpeed = 1.35;
   static readonly maxSpeed = 24;
   static readonly startSpeed = 12;
   static readonly immunitySeconds = 2;
@@ -13,8 +13,8 @@ export class Rules {
   static readonly slotsPerChunk =
     Rules.candidatesPerChunk + Rules.pickupsPerChunk;
   static readonly firstRow = 28;
-  static readonly rowSlots = 9;
-  static readonly maxColumns = 13;
+  static readonly rowSlots = 15;
+  static readonly maxColumns = 15;
   static readonly poolSize =
     Rules.rowSlots * Rules.maxColumns * Rules.slotsPerChunk;
   static readonly playerRadius = 0.32;

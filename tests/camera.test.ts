@@ -31,8 +31,9 @@ test("shake slider spans zero to three times original amplitude without altering
   rig.shakeMultiplier = 3;
   rig.update(1.1, 0, 0.016, true);
   assert.ok(
-    Math.abs(rig.camera.position.y - 8.5 - (normal.camera.position.y - 8.5) * 3) <
-      1e-10,
+    Math.abs(
+      rig.camera.position.y - 8.5 - (normal.camera.position.y - 8.5) * 3,
+    ) < 1e-10,
   );
   assert.equal(rig.camera.fov, 50);
   assert.equal(rig.camera.position.z, 12);
@@ -42,9 +43,13 @@ test("walking bob fades rather than snapping on jump, landing or pause", () => {
   for (let i = 0; i < 60; i++) rig.update(1.1, 0, 1 / 60, true);
   const walking = rig.camera.position.y;
   rig.update(1.1, 0, 0, false);
-  assert.equal(rig.camera.position.y, walking, "pause cannot reset bob instantly");
+  assert.equal(
+    rig.camera.position.y,
+    walking,
+    "pause cannot reset bob instantly",
+  );
   rig.update(1.1, 0, 1 / 120, false);
-  assert.ok(Math.abs(rig.camera.position.y - walking) < .006);
+  assert.ok(Math.abs(rig.camera.position.y - walking) < 0.009);
 });
 test("cacti remain until their full volume exits; pool retirement never removes a visible cell", () => {
   const rig = new CameraRig(),

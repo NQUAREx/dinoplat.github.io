@@ -30,7 +30,7 @@ export async function checkTerrainMotion(context, url, engine) {
         for (const sign of [-1, 1]) {
           const delta = sign * 0.002;
           g.x = g.previousX = baseX + delta;
-          g.distance = g.previousDistance = baseD + delta;
+          g.z = g.previousZ = g.distance = g.previousDistance = baseD + delta;
           g.world.update(g.x, g.distance);
           g.world.active.fill(0);
           r.camera.setPose(
@@ -77,7 +77,7 @@ export async function checkTerrainMotion(context, url, engine) {
         `${engine}: terrain changed across rebase ${JSON.stringify(s)}`,
       );
     assert.equal(result.error, 0);
-    assert.equal(result.stats.terrainTriangles, 1152);
+    assert.equal(result.stats.terrainTriangles, 1568);
     assert.deepEqual(errors, []);
     return result;
   } finally {

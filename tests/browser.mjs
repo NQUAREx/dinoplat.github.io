@@ -8,6 +8,7 @@ import { checkTerrainMotion } from "./terrain-browser.mjs";
 import { checkContinuity } from "./continuity-browser.mjs";
 import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 import { checkFeedback } from "./feedback-browser.mjs";
+import { checkTurning } from "./turning-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -31,7 +32,7 @@ const browser = await chromium.launch({
 });
 const phone = {
   viewport: { width: 390, height: 844 },
-  deviceScaleFactor: 2,
+  deviceScaleFactor: 1,
   isMobile: true,
   hasTouch: true,
 };
@@ -69,6 +70,7 @@ try {
   await desktop.close();
   const context = await browser.newContext(phone);
   report.feedback = await checkFeedback(context, url);
+  report.turning = await checkTurning(context, url, "chromium");
   report.collectibles = await checkCollectibles(
     context,
     url,
@@ -76,7 +78,11 @@ try {
   );
   report.terrainMotion = await checkTerrainMotion(context, url, "chromium");
   report.continuity = await checkContinuity(context, url, "chromium-browser");
-  report.instanceMotion = await checkInstanceMotion(context, url, "chromium-browser");
+  report.instanceMotion = await checkInstanceMotion(
+    context,
+    url,
+    "chromium-browser",
+  );
   const page = await context.newPage();
   await page.addInitScript(() => {
     window.vibrationCalls = [];
@@ -142,13 +148,17 @@ try {
   // Separate jump gesture: start + move queued together, no hold commits first.
   const beforeJumpX = await page.evaluate(() => window.__runner.game.x);
   await Promise.all([touch("touchStart"), touch("touchMove", 330, 500)]);
-  await page.waitForFunction(() => window.__runner.game.y > 0.3);
+  await page.waitForFunction(() => {
+    const r = window.__runner;
+    if (r.game.y > 0.3 && /jump/.test(r.stats().playerState)) {
+      window.observedJumpState = r.stats().playerState;
+      return true;
+    }
+    return false;
+  });
   assert.equal(await page.evaluate(() => window.__runner.game.x), beforeJumpX);
   assert.equal(await page.evaluate(() => window.__runner.game.steering), 0);
-  assert.match(
-    await page.evaluate(() => window.__runner.stats().playerState),
-    /jump/,
-  );
+  assert.match(await page.evaluate(() => window.observedJumpState), /jump/);
   await touch("touchEnd");
   // Start the independent down-swipe fixture at a known airborne height. The
   // preceding real up-swipe was already checked; do not race its brief apex
@@ -204,21 +214,30 @@ try {
   await touch("touchStart");
   await page.waitForFunction(() => window.__runner.game.x > 6);
   await touch("touchEnd");
-  const stopped = await page.evaluate(() => window.__runner.game.x);
+  const stopped = await page.evaluate(() => window.__runner.game.heading);
   await page.waitForTimeout(180);
-  assert.equal(await page.evaluate(() => window.__runner.game.x), stopped);
-  assert.ok(stopped > 4.93, "old lateral boundary removed");
+  assert.equal(
+    await page.evaluate(() => window.__runner.game.heading),
+    stopped,
+  );
+  assert.ok(
+    stopped < -0.2,
+    "holding now changes running direction, not a lane",
+  );
   await touch("touchStart", 40);
   await page.waitForFunction(() => window.__runner.game.steering === -1);
   await touch("touchMove", 330);
   await page.waitForFunction(() => window.__runner.game.steering === 1);
   await touch("touchCancel");
   assert.equal(await page.evaluate(() => window.__runner.game.steering), 0);
-  const released = await page.evaluate(() => window.__runner.game.x);
+  const released = await page.evaluate(() => window.__runner.game.heading);
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("Space");
   await page.mouse.click(30, 600);
-  assert.equal(await page.evaluate(() => window.__runner.game.x), released);
+  assert.equal(
+    await page.evaluate(() => window.__runner.game.heading),
+    released,
+  );
   await page.screenshot({ path: "test-results/mobile-game.png" });
   report.hud = { width: hud.width, pauseLeft: pause.x, pauseTop: pause.y };
   report.holdBeyondOldBoundary = stopped;
@@ -276,9 +295,12 @@ try {
   await page.evaluate(() => {
     const r = window.__runner,
       g = r.game;
+    g.heading = g.previousHeading = 0;
+    r.camera.reset();
+    r.camera.update(0, 0, 1, false, 0);
     for (let frame = 0; frame < 8; frame++) {
       g.x = g.previousX = 0;
-      g.distance = g.previousDistance = frame / 0.9 + 0.1;
+      g.z = g.previousZ = g.distance = g.previousDistance = frame / 0.9 + 0.1;
       g.world.active.fill(0);
       for (let i = 0; i < 7; i++) {
         g.world.active[i] = 1;
@@ -293,6 +315,8 @@ try {
       }
       r.render();
     }
+    for (let i = 0; i < 7; i++) g.world.z[i] = g.z + 42;
+    r.render();
     g.phase = "over";
     r.render();
     g.phase = "paused";
@@ -350,20 +374,20 @@ try {
   await page.evaluate(() => {
     const g = window.__runner.game;
     g.x = g.previousX = 1000000.25;
-    g.distance = g.previousDistance = 1000500;
+    g.z = g.previousZ = g.distance = g.previousDistance = 1000500;
     g.world.update(g.x, g.distance);
     g.terrain.advance(g.distance);
     window.__runner.render();
   });
   report.rebased = await page.evaluate(() => window.__runner.snapshot());
-  assert.ok(report.rebased.maximumRelativeX < 40);
+  assert.ok(report.rebased.maximumRelativeX < 112);
   assert.ok(Math.abs(report.rebased.cameraX) < 0.2);
   await page.screenshot({ path: "test-results/infinite-world.png" });
   // Painted connectors at both sides of the common stone strip.
   for (const distance of [481, 491, 496, 501, 506, 511, 521]) {
     await page.evaluate((distance) => {
       const g = window.__runner.game;
-      g.distance = g.previousDistance = distance;
+      g.z = g.previousZ = g.distance = g.previousDistance = distance;
       g.x = g.previousX = 0;
       g.terrain.reset(1979);
       g.terrain.advance(distance);
@@ -488,7 +512,7 @@ try {
       g = r.game;
     g.phase = "over";
     r.start();
-    g.distance = g.previousDistance = 2000;
+    g.z = g.previousZ = g.distance = g.previousDistance = 2000;
     g.world.update(g.x, g.distance);
     g.world.active.fill(0);
     g.world.active[0] = 1;
@@ -576,8 +600,16 @@ try {
       function tick(now) {
         const g = window.__runner.game;
         if (g.phase !== "running") return resolve({ failed: g.phase });
-        const delta = g.world.safeCenter(g.distance - g.speed * 0.3) - g.x;
-        g.move(Math.abs(delta) > 0.12 ? Math.sign(delta) : 0);
+        const delayed = g.z - g.speed * 0.3;
+        const slope =
+          (g.world.safeCenter(delayed + 0.1) -
+            g.world.safeCenter(delayed - 0.1)) /
+          0.2;
+        const desired = -Math.atan(
+          slope + (g.world.safeCenter(delayed) - g.x) * 0.2,
+        );
+        const error = desired - g.heading;
+        g.move(Math.abs(error) > 0.006 ? -Math.sign(error) : 0);
         samples.push(now - previous);
         previous = now;
         if (now - began < 7000) requestAnimationFrame(tick);
@@ -598,14 +630,14 @@ try {
   });
   assert.equal(report.performance.failed, undefined);
   assert.equal(report.performance.lives, 3);
-  assert.ok(report.performance.calls <= 21);
+  assert.ok(report.performance.calls <= 35);
   await page.screenshot({ path: "test-results/animated-run.png" });
   report.shadowsAfter170 = await page.evaluate(() => {
     const r = window.__runner,
       g = r.game;
     g.phase = "paused";
     g.x = g.previousX = 0;
-    g.distance = g.previousDistance = 220;
+    g.z = g.previousZ = g.distance = g.previousDistance = 220;
     g.world.update(0, 220);
     g.terrain.advance(220);
     r.lighting.shadowsEnabled = true;

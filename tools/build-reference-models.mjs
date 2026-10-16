@@ -198,6 +198,11 @@ class ModelBuilder {
         height: +b.max.y.toFixed(5),
       });
       console.log(mesh.name, geometry.index.count / 3, "triangles");
+      const low = cacti.build(i, true),
+        lowMesh = new Mesh(low, material);
+      lowMesh.name = `cactus-lod-${i}`;
+      scene.add(lowMesh);
+      console.log(lowMesh.name, low.index.count / 3, "triangles");
     }
     const glb = await new GLTFExporter().parseAsync(scene, {
       binary: true,

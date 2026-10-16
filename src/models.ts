@@ -15,6 +15,7 @@ export class ModelLibrary {
     readonly dinosaur: SkinnedMesh,
     readonly animations: AnimationClip[],
     readonly cacti: BufferGeometry[],
+    readonly cactusLods: BufferGeometry[],
     readonly coin: BufferGeometry,
     readonly diamond: BufferGeometry,
     readonly heart: BufferGeometry,
@@ -65,6 +66,7 @@ export class ModelLibrary {
         dinosaur,
         gltf.animations,
         Array.from({ length: 7 }, (_, i) => requireGeometry(`cactus-${i}`)),
+        Array.from({ length: 7 }, (_, i) => requireGeometry(`cactus-lod-${i}`)),
         requireGeometry("pickup-coin"),
         requireGeometry("pickup-diamond"),
         requireGeometry("pickup-heart"),
@@ -83,6 +85,7 @@ export class ModelLibrary {
     this.dinosaur.geometry.dispose();
     this.dinosaur.skeleton.dispose();
     for (const geometry of this.cacti) geometry.dispose();
+    for (const geometry of this.cactusLods) geometry.dispose();
     this.coin.dispose();
     this.diamond.dispose();
     this.heart.dispose();

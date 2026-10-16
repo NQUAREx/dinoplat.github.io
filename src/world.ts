@@ -159,7 +159,7 @@ export class WorldSpawner {
   readonly halfZ = new Float32Array(Rules.poolSize);
   readonly height = new Float32Array(Rules.poolSize);
   readonly baseY = new Float32Array(Rules.poolSize);
-  radius = 3;
+  radius = (Rules.maxColumns - 1) / 2;
   generated = 0;
   revision = 0;
   private seed = 1;
@@ -176,9 +176,11 @@ export class WorldSpawner {
     this.revision++;
   }
   setVisibleHalfWidth(width: number) {
+    // Every heading must be resident before a turn reveals it. Numeric slots
+    // only: full-volume camera culling happens before instance submission.
     const radius = Math.min(
       (Rules.maxColumns - 1) / 2,
-      Math.max(2, Math.ceil(width / Rules.chunkSize) + 1),
+      Math.max(7, Math.ceil(width / Rules.chunkSize) + 1),
     );
     if (radius !== this.radius) {
       this.radius = radius;
@@ -219,13 +221,12 @@ export class WorldSpawner {
     for (let i = 0; i < Rules.poolSize; i++)
       if (
         Math.abs(this.columns[i] - cx) > this.radius ||
-        this.rows[i] < cz - 1 ||
-        this.rows[i] > cz + Rules.rowSlots - 2
+        Math.abs(this.rows[i] - cz) > this.radius
       ) {
         this.active[i] = 0;
         this.columns[i] = this.rows[i] = Infinity;
       }
-    for (let row = Math.max(0, cz - 1); row <= cz + Rules.rowSlots - 2; row++)
+    for (let row = cz - this.radius; row <= cz + this.radius; row++)
       for (
         let column = cx - this.radius;
         column <= cx + this.radius;
@@ -259,9 +260,10 @@ export class WorldSpawner {
       (row + this.random(column, row, candidate, 0x741d)) * Rules.chunkSize;
     // Denser than old rows; fewer candidates per second as natural speed grows.
     // World-distance-based acceptance stays deterministic through slowdown/reentry.
-    const speed = Math.min(Rules.maxSpeed, Rules.startSpeed + z * 0.008);
+    const radius = Math.hypot(x, z);
+    const speed = Math.min(Rules.maxSpeed, Rules.startSpeed + radius * 0.008);
     if (
-      z < (pickup ? 12 : Rules.firstRow) ||
+      radius < (pickup ? 12 : Rules.firstRow) ||
       this.random(column, row, candidate, 0x17f3) >
         0.96 - (speed - Rules.startSpeed) * 0.012
     )

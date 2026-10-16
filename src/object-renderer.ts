@@ -9,12 +9,30 @@ export class InstancedObjectType {
   private readonly uploadRanges: { start: number; count: number }[];
   private readonly matrix = new THREE.Matrix4();
   private lastAngle = NaN;
+  private readonly details: THREE.InstancedBufferAttribute[];
+  private readonly detailRanges: { start: number; count: number }[];
+  private readonly variantCount: number;
   constructor(
     readonly kind: ObjectKind,
     geometries: readonly THREE.BufferGeometry[],
     material: THREE.Material,
     scene: THREE.Scene,
+    lodGeometries?: readonly THREE.BufferGeometry[],
   ) {
+    this.variantCount = geometries.length;
+    if (lodGeometries) geometries = [...geometries, ...lodGeometries];
+    this.details = lodGeometries
+      ? geometries.map((geometry) => {
+          const detail = new THREE.InstancedBufferAttribute(
+            new Float32Array(Rules.poolSize),
+            1,
+          );
+          detail.setUsage(THREE.DynamicDrawUsage);
+          geometry.setAttribute("instanceDetail", detail);
+          return detail;
+        })
+      : [];
+    this.detailRanges = this.details.map(() => ({ start: 0, count: 0 }));
     this.counts = new Uint16Array(geometries.length);
     this.uploadRanges = geometries.map(() => ({ start: 0, count: 0 }));
     this.meshes = geometries.map((geometry) => {
@@ -30,6 +48,23 @@ export class InstancedObjectType {
     this.counts.fill(0);
   }
   place(variant: number, x: number, z: number, angle: number, y = 0) {
+    if (this.meshes.length > this.variantCount) {
+      const d2 = x * x + z * z;
+      const high =
+        d2 <= 22 * 22 ? 1 : d2 >= 30 * 30 ? 0 : (30 - Math.sqrt(d2)) / 8;
+      if (high > 0) this.write(variant, x, z, angle, y, high);
+      if (high < 1)
+        this.write(variant + this.variantCount, x, z, angle, y, -1 - high);
+    } else this.write(variant, x, z, angle, y, 1);
+  }
+  private write(
+    variant: number,
+    x: number,
+    z: number,
+    angle: number,
+    y: number,
+    detail: number,
+  ) {
     const mesh = this.meshes[variant];
     if (!mesh) return;
     // Shared pickup phase: compute its rotation once per bank/frame, not once
@@ -39,7 +74,9 @@ export class InstancedObjectType {
       this.lastAngle = angle;
     }
     this.matrix.setPosition(x, y, z);
-    mesh.setMatrixAt(this.counts[variant]++, this.matrix);
+    const index = this.counts[variant]++;
+    mesh.setMatrixAt(index, this.matrix);
+    this.details[variant]?.setX(index, detail);
   }
   finish() {
     for (let i = 0; i < this.meshes.length; i++) {
@@ -55,12 +92,28 @@ export class InstancedObjectType {
       mesh.instanceMatrix.updateRanges[0] = range;
       mesh.instanceMatrix.updateRanges.length = 1;
       mesh.instanceMatrix.needsUpdate = true;
+      const detail = this.details[i];
+      if (detail) {
+        const detailRange = this.detailRanges[i];
+        detailRange.count = count;
+        detail.updateRanges[0] = detailRange;
+        detail.updateRanges.length = 1;
+        detail.needsUpdate = true;
+      }
     }
   }
   get visible() {
     let total = 0;
     for (const count of this.counts) total += count;
     return total;
+  }
+  get nearCount() {
+    let count = 0;
+    for (let i = 0; i < this.variantCount; i++) count += this.counts[i];
+    return count;
+  }
+  get farCount() {
+    return this.visible - this.nearCount;
   }
   dispose() {
     for (const mesh of this.meshes) {

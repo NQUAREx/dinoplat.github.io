@@ -15,6 +15,7 @@ import { CachedShadows } from "./shadows";
 import { PickupMotion } from "./pickup-motion";
 import { DinosaurShadow } from "./dinosaur-shadow";
 import { FloatingFeedback } from "./floating-feedback";
+import { RenderQuality } from "./render-quality";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
@@ -45,10 +46,7 @@ export class View {
   private readonly objectRenderers = new ObjectRendererRegistry();
   private readonly visibility = new ObjectVisibility();
   private readonly off: (() => void)[];
-  private quality = 1;
-  private sampleTime = 0;
-  private sampleFrames = 0;
-  private cooldown = 0;
+  private readonly resolution = new RenderQuality();
   private nearestRenderedForward = Infinity;
   private maximumRelativeX = 0;
   private visibleCacti = 0;
@@ -74,11 +72,33 @@ export class View {
     this.dust = new FootDust(game, reducedMotion);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: false,
+      antialias: true,
       alpha: false,
-      powerPreference: "low-power",
+      powerPreference: "default",
     });
     this.renderer.setClearColor(Palette.sky);
+    texture.anisotropy = Math.min(
+      2,
+      this.renderer.capabilities.getMaxAnisotropy(),
+    );
+    this.cactusMaterial.onBeforeCompile = (shader) => {
+      shader.vertexShader =
+        "attribute float instanceDetail; varying float vDetail;\n" +
+        shader.vertexShader.replace(
+          "#include <begin_vertex>",
+          "#include <begin_vertex>\nvDetail = instanceDetail;",
+        );
+      shader.fragmentShader =
+        "varying float vDetail;\n" +
+        shader.fragmentShader.replace(
+          "#include <clipping_planes_fragment>",
+          `#include <clipping_planes_fragment>
+        ivec2 p = ivec2(gl_FragCoord.xy) & ivec2(3);
+        int b = ((p.x & 1) * 2 + (p.y & 1)) * 4 + (p.x & 2) + ((p.y & 2) >> 1);
+        float threshold = (float(b) + .5) / 16.;
+        if (vDetail >= 0. ? threshold >= vDetail : threshold < -vDetail - 1.) discard;`,
+        );
+    };
     this.feedback = new FloatingFeedback(
       game.events,
       canvas.parentElement!,
@@ -102,6 +122,7 @@ export class View {
       ObjectKind.Cactus,
       models.cacti,
       this.cactusMaterial,
+      models.cactusLods,
     );
     this.registerObjectType(
       ObjectKind.Coin,
@@ -132,7 +153,7 @@ export class View {
     }
     this.off = [
       game.events.on(GameEvent.Hit, () => this.rig.impulse(0.075, 0.22)),
-      game.events.on(GameEvent.Land, () => this.rig.impulse(0.015, 0.1)),
+      game.events.on(GameEvent.Land, () => this.rig.impulse(0.035, 0.2)),
       game.events.on(GameEvent.Start, () => this.rig.reset()),
     ];
     this.resize();
@@ -144,21 +165,23 @@ export class View {
     kind: ObjectKind,
     geometries: readonly THREE.BufferGeometry[],
     material: THREE.Material,
+    lodGeometries?: readonly THREE.BufferGeometry[],
   ) {
     this.objectRenderers.register(
-      new InstancedObjectType(kind, geometries, material, this.scene),
+      new InstancedObjectType(
+        kind,
+        geometries,
+        material,
+        this.scene,
+        lodGeometries,
+      ),
     );
   }
   resize() {
     const canvas = this.renderer.domElement,
       width = Math.max(1, canvas.clientWidth),
       height = Math.max(1, canvas.clientHeight);
-    const ratio =
-      Math.min(
-        devicePixelRatio || 1,
-        1.25,
-        Math.sqrt(900000 / (width * height)),
-      ) * this.quality;
+    const ratio = this.resolution.ratio(width, height, devicePixelRatio || 1);
     if (
       width === this.viewportWidth &&
       height === this.viewportHeight &&
@@ -183,26 +206,10 @@ export class View {
     );
     this.worldFov = this.rig.camera.fov;
     this.worldCameraX = this.rig.camera.position.x;
-    this.game.world.update(this.game.x, this.game.distance);
+    this.game.world.update(this.game.x, this.game.z);
   }
   adapt(dt: number) {
-    if (dt <= 0 || dt > 0.25) return;
-    this.sampleTime += dt;
-    this.sampleFrames++;
-    this.cooldown += dt;
-    if (this.sampleTime < 2) return;
-    const mean = this.sampleTime / this.sampleFrames;
-    if (this.cooldown >= 4) {
-      const before = this.quality;
-      if (mean > 0.023) this.quality = Math.max(0.5, this.quality - 0.15);
-      else if (mean < 0.018 && this.cooldown > 10)
-        this.quality = Math.min(1, this.quality + 0.05);
-      if (before !== this.quality) {
-        this.resize();
-        this.cooldown = 0;
-      }
-    }
-    this.sampleTime = this.sampleFrames = 0;
+    if (this.resolution.sample(dt)) this.resize();
   }
   draw(alpha = 1, dt = 0) {
     const game = this.game;
@@ -217,7 +224,7 @@ export class View {
     this.dinosaurShadow.update(
       this.dinosaur,
       this.lighting,
-      this.ground.surface.heightAt(this.pose.x, this.pose.distance),
+      this.ground.surface.heightAt(this.pose.x, this.pose.z),
     );
     const moving =
       game.phase === "running" &&
@@ -225,7 +232,8 @@ export class View {
       !game.y &&
       !game.velocityY;
     const activeDt = game.phase === "running" ? dt : 0;
-    this.rig.update(this.pose.distance, 0, activeDt, moving);
+    this.rig.update(this.pose.distance, 0, activeDt, moving, this.pose.heading);
+    this.lighting.followView(this.rig.heading);
     this.feedbackAnchor
       .set(0, this.dinosaur.mesh.position.y + 1.95 - game.crouch * 0.55, 0)
       .project(this.rig.camera);
@@ -241,7 +249,7 @@ export class View {
       game.hitStopRemaining ? 0 : activeDt,
       this.visibility,
       this.pose.x,
-      this.pose.distance,
+      this.pose.z,
     );
     if (
       Math.abs(this.worldFov - this.rig.camera.fov) > 0.05 ||
@@ -253,7 +261,7 @@ export class View {
           Math.abs(camera.position.x) +
           1,
       );
-      game.world.update(game.x, game.distance);
+      game.world.update(game.x, game.z);
       this.worldFov = camera.fov;
       this.worldCameraX = camera.position.x;
     }
@@ -270,7 +278,7 @@ export class View {
       const renderer = this.objectRenderers.get(world.kinds[i]);
       if (!renderer) continue;
       const x = world.x[i] - this.pose.x,
-        forward = world.z[i] - this.pose.distance;
+        forward = world.z[i] - this.pose.z;
       const animated =
         world.registry.get(world.kinds[i])?.animation === "spin-bob";
       const y = world.baseY[i] + (animated ? this.pickupMotion.bob : 0);
@@ -324,7 +332,7 @@ export class View {
       game,
       this.pose,
       this.lighting,
-      this.quality,
+      this.resolution.quality,
     );
     // r186 updates visible objects before incrementing its frame ID, then
     // shadow casters afterwards. A cached shadow capture therefore leaves the
@@ -342,7 +350,11 @@ export class View {
       triangles: this.renderer.info.render.triangles,
       geometries: this.renderer.info.memory.geometries,
       textures: this.renderer.info.memory.textures,
-      quality: this.quality,
+      quality: this.resolution.quality,
+      meanFrameMs: this.resolution.meanFrameSeconds * 1000,
+      pixelRatio: this.pixelRatio,
+      antialias: this.renderer.getContext().getContextAttributes()?.antialias,
+      cameraHeading: this.rig.heading,
       width: this.renderer.domElement.width,
       height: this.renderer.domElement.height,
       bufferResizes: this.bufferResizes,
@@ -369,6 +381,10 @@ export class View {
       pickupAngle: this.pickupMotion.angle,
       pickupBob: this.pickupMotion.bob,
       visibleObstacles: this.visibleCacti,
+      cactusNearInstances: this.objectRenderers.get(ObjectKind.Cactus)!
+        .nearCount,
+      cactusFarInstances: this.objectRenderers.get(ObjectKind.Cactus)!.farCount,
+      cactusLodTriangles: this.models.cactusLods.map((g) => g.index!.count / 3),
       visibleObjects: this.objectRenderers.visible,
       nearestRenderedForward: this.nearestRenderedForward,
       maximumRelativeX: this.maximumRelativeX,
@@ -399,6 +415,7 @@ export class View {
       dinosaurShadowOpacity: this.dinosaurShadow.mesh.material.opacity,
       renderX: this.pose.x,
       renderDistance: this.pose.distance,
+      renderZ: this.pose.z,
     };
   }
   dispose() {

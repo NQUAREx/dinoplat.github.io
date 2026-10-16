@@ -32,6 +32,8 @@ export class CameraRig {
   private shakeTime = 0;
   private shakeAge = 0;
   private walkingBlend = 0;
+  heading = 0;
+  readonly followDelay = 0.28;
   shakeMultiplier = 1;
   constructor(private readonly reducedMotion = false) {
     this.update(0, 0, 0, false);
@@ -58,7 +60,16 @@ export class CameraRig {
     this.shakeTime = Math.max(0, seconds);
     this.shakeAge = 0;
   }
-  update(distance: number, localPlayerX: number, dt: number, walking: boolean) {
+  update(
+    distance: number,
+    localPlayerX: number,
+    dt: number,
+    walking: boolean,
+    heading = 0,
+  ) {
+    this.heading +=
+      (heading - this.heading) *
+      (1 - Math.exp(-Math.max(0, dt) / this.followDelay));
     const blend = 1 - Math.exp((-dt * 4) / this.blendTime);
     const p = this.current,
       t = this.target;
@@ -78,7 +89,7 @@ export class CameraRig {
       ((walking ? 1 : 0) - this.walkingBlend) *
       (1 - Math.exp(-Math.max(0, dt) * 12));
     const bob = !this.reducedMotion
-      ? Math.sin(phase) * 0.035 * intensity * this.walkingBlend
+      ? Math.sin(phase) * 0.035 * intensity * 1.5 * this.walkingBlend
       : 0;
     this.shakeTime = Math.max(0, this.shakeTime - dt);
     this.shakeAge += dt;
@@ -89,12 +100,19 @@ export class CameraRig {
           Math.sin(this.shakeAge * 55) *
           Math.min(1, this.shakeTime * 8)
         : 0;
+    const sin = Math.sin(this.heading),
+      cos = Math.cos(this.heading);
+    const x = p.offsetX + localPlayerX * 0.75;
     this.camera.position.set(
-      p.offsetX + localPlayerX * 0.75 + bob * 0.25 + shake,
+      (x + bob * 0.25 + shake) * cos + p.distance * sin,
       p.height + bob,
-      p.distance,
+      p.distance * cos - (x + bob * 0.25 + shake) * sin,
     );
-    this.look.set(p.offsetX + localPlayerX * 0.75, p.targetY, p.targetZ);
+    this.look.set(
+      x * cos + p.targetZ * sin,
+      p.targetY,
+      p.targetZ * cos - x * sin,
+    );
     this.camera.lookAt(this.look);
     this.camera.rotateZ(bob * 0.025);
     this.camera.updateMatrixWorld();
@@ -103,6 +121,7 @@ export class CameraRig {
     this.shake = this.shakeTime = 0;
     this.shakeAge = 0;
     this.walkingBlend = 0;
+    this.heading = 0;
     this.setPose(
       {
         offsetX: 0,

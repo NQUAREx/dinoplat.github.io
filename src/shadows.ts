@@ -34,13 +34,13 @@ export class CachedShadows {
       game.world.revision !== this.worldRevision ||
       light.revision !== this.revision ||
       Math.abs(pose.x - this.x) > 8 ||
-      Math.abs(pose.distance - this.distance) > 8 ||
+      Math.abs(pose.z - this.distance) > 8 ||
       game.time < this.time ||
       game.time - this.time >= (quality <= 0.55 ? 0.25 : 0.125);
     shadow.needsUpdate = this.refresh;
     if (this.refresh) {
       this.x = pose.x;
-      this.distance = pose.distance;
+      this.distance = pose.z;
       this.time = game.time;
       this.seed = game.seed;
       this.worldRevision = game.world.revision;
@@ -51,9 +51,10 @@ export class CachedShadows {
       camera.updateMatrixWorld();
       this.right.setFromMatrixColumn(camera.matrixWorld, 0);
       this.up.setFromMatrixColumn(camera.matrixWorld, 1);
-      const worldZ = -pose.distance - 12;
-      const rx = pose.x * this.right.x + worldZ * this.right.z;
-      const uy = pose.x * this.up.x + worldZ * this.up.z;
+      const worldZ = -pose.z + light.key.target.position.z;
+      const worldX = pose.x + light.key.target.position.x;
+      const rx = worldX * this.right.x + worldZ * this.right.z;
+      const uy = worldX * this.up.x + worldZ * this.up.z;
       const tx = (camera.right - camera.left) / shadow.mapSize.x,
         ty = (camera.top - camera.bottom) / shadow.mapSize.y;
       this.shift
@@ -64,7 +65,7 @@ export class CachedShadows {
       this.translation.makeTranslation(
         pose.x - this.x,
         0,
-        this.distance - pose.distance,
+        this.distance - pose.z,
       );
       shadow.matrix.copy(this.matrix).multiply(this.translation);
     }

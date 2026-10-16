@@ -23,6 +23,8 @@ export class LowPolyCacti {
   parts = [];
   variant = 0;
   spineSerial = 0;
+  lowDetail = false;
+  transforms = [];
   add(
     geometry,
     colour,
@@ -93,7 +95,7 @@ export class LowPolyCacti {
     this.add(
       new LatheGeometry(
         points.map((p) => new Vector2(...p)),
-        8,
+        this.lowDetail ? 6 : 8,
       ),
       colour,
       x,
@@ -120,9 +122,10 @@ export class LowPolyCacti {
     }
   }
   spine(point, normal) {
+    if (this.lowDetail) return;
     // A raised five-sided areole + a tiny solid triangular spine, merged into
     // the same mesh/material. No decal planes fighting with the green surface.
-    const spot = new CircleGeometry(0.045, 5);
+    const spot = new CircleGeometry(0.073, 5);
     spot.applyQuaternion(
       new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), normal),
     );
@@ -131,17 +134,17 @@ export class LowPolyCacti {
     const style = (this.spineSerial++ + this.variant) % 3;
     const thorn =
       style === 2
-        ? new IcosahedronGeometry(0.065, 0)
+        ? new IcosahedronGeometry(0.105, 0)
         : new ConeGeometry(
-            style === 1 ? 0.04 : 0.022,
-            style === 1 ? 0.065 : 0.1,
+            style === 1 ? 0.065 : 0.038,
+            style === 1 ? 0.11 : 0.17,
             style === 1 ? 5 : 3,
             1,
           );
     thorn.applyQuaternion(
       new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), normal),
     );
-    const centre = base.addScaledVector(normal, 0.05);
+    const centre = base.addScaledVector(normal, 0.075);
     this.add(
       thorn,
       [0xfff2c3, 0xffdf50, 0xb7e958][style],
@@ -166,6 +169,7 @@ export class LowPolyCacti {
     this.stem(x, y, tip - y, radius, colour);
   }
   flower(x, y, z = 0) {
+    if (this.lowDetail) return;
     for (let i = 0; i < 5; i++) {
       const angle = (i * Math.PI * 2) / 5;
       this.add(
@@ -181,7 +185,8 @@ export class LowPolyCacti {
     }
     this.add(new IcosahedronGeometry(0.1, 0), 0xffd34d, x, y + 0.06, z);
   }
-  build(index) {
+  build(index, lowDetail = false) {
+    this.lowDetail = lowDetail;
     this.parts = [];
     this.variant = index;
     this.spineSerial = 0;
@@ -262,20 +267,23 @@ export class LowPolyCacti {
     for (const part of this.parts) part.dispose();
     merged.computeBoundingBox();
     const b = merged.boundingBox;
-    merged.translate(
-      -(b.min.x + b.max.x) / 2,
-      -b.min.y,
-      -(b.min.z + b.max.z) / 2,
-    );
-    merged.scale(
-      (2 * bounds[0]) / (b.max.x - b.min.x),
-      bounds[2] / (b.max.y - b.min.y),
-      (2 * bounds[1]) / (b.max.z - b.min.z),
-    );
+    if (!lowDetail)
+      this.transforms[index] = [
+        -(b.min.x + b.max.x) / 2,
+        -b.min.y,
+        -(b.min.z + b.max.z) / 2,
+        (2 * bounds[0]) / (b.max.x - b.min.x),
+        bounds[2] / (b.max.y - b.min.y),
+        (2 * bounds[1]) / (b.max.z - b.min.z),
+      ];
+    const transform = this.transforms[index];
+    if (!transform) throw new Error("Build detailed variant before LOD");
+    merged.translate(...transform.slice(0, 3));
+    merged.scale(...transform.slice(3));
     this.parts = [merged];
-    for (let i = 0; i < index + 2; i++) {
+    for (let i = 0; !lowDetail && i < index + 2; i++) {
       const angle = i * 2.399963 + index * 0.71;
-      const size = 0.025 + ((i * 7 + index * 3) % 11) * 0.003;
+      const size = 0.045 + ((i * 7 + index * 3) % 11) * 0.004;
       // Corner-biased scatter stays outside the barrel's rounded foot while
       // remaining inside its original rectangular culling envelope.
       const x =

@@ -89,7 +89,7 @@ a:focus-visible {
   height: 100%;
   touch-action: none;
   outline: none;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 .topbar {
   position: absolute;

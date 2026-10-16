@@ -1,12 +1,8 @@
-import {
-  MeshLambertMaterial,
-  Vector2,
-  Vector3,
-  type DataArrayTexture,
-} from "three";
+import { MeshLambertMaterial, Vector2, type DataArrayTexture } from "three";
 import { GridMath } from "./config";
 import { TerrainLayout, TERRAIN_LENGTH } from "./terrain";
 import { TerrainSurface } from "./terrain-surface";
+import { TerrainField } from "./terrain-field";
 import type { Simulation } from "./simulation";
 import type { RenderPose } from "./render-pose";
 
@@ -22,11 +18,10 @@ export class Ground {
   constructor(private readonly texture: DataArrayTexture) {
     this.uniforms = {
       terrainAtlas: { value: texture },
-      terrainTypes: { value: new Vector3() },
       terrainOrigin: { value: new Vector2() },
       terrainTiles: { value: new Vector2() },
-      terrainProgress: { value: 0 },
-      terrainHasPrevious: { value: 0 },
+      terrainBiomeOffset: { value: new Vector2() },
+      terrainBiomeCell: { value: new Vector2() },
       terrainSeed: { value: 1 },
     };
     this.material.onBeforeCompile = (shader) => {
@@ -40,8 +35,8 @@ export class Ground {
       shader.fragmentShader =
         `
         uniform highp sampler2DArray terrainAtlas;
-        uniform vec3 terrainTypes; uniform vec2 terrainOrigin, terrainTiles;
-        uniform float terrainProgress, terrainHasPrevious; uniform uint terrainSeed;
+        uniform vec2 terrainOrigin, terrainTiles, terrainBiomeOffset, terrainBiomeCell;
+        uniform uint terrainSeed;
         varying vec2 vTerrainLocal;
         uint tileHash(ivec2 p) {
           // Wrap BOTH the local sum and CPU anchor: otherwise variants change
@@ -51,6 +46,14 @@ export class Ground {
           h = (h ^ (h >> 16u)) * 2146121005u;
           return h ^ (h >> 15u);
         }
+        float biome(ivec2 cell) {
+          // Match GridMath.hash exactly, using bounded low integer bits.
+          uint h = uint(cell.x) * 521288629u ^ uint(cell.y) * 1597334677u ^ terrainSeed;
+          h = (h ^ (h >> 16u)) * 2146121005u;
+          h = (h ^ (h >> 15u)) * 2221713035u;
+          h = h ^ (h >> 16u);
+          return float((h & 7u) * 2u + (uint(cell.x + cell.y) & 1u));
+        }
       ` + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <map_fragment>",
@@ -58,13 +61,20 @@ export class Ground {
         vec2 uv = (vec2(vTerrainLocal.x, -vTerrainLocal.y) + terrainOrigin) / ${TerrainLayout.worldTileSize.toFixed(1)};
         vec2 gradX = dFdx(uv), gradY = dFdy(uv);
         float variant = float(tileHash(ivec2(floor(uv) + terrainTiles)) & 3u);
-        float s = terrainProgress - vTerrainLocal.y;
-        float before = terrainTypes.y, after = terrainTypes.z, boundary = s - ${TERRAIN_LENGTH.toFixed(1)};
-        if (s < 250.0) { before = terrainTypes.x; after = terrainTypes.y; boundary = s; }
+        vec2 regionUv = (vec2(vTerrainLocal.x, -vTerrainLocal.y) + terrainBiomeOffset) / ${TERRAIN_LENGTH.toFixed(1)};
+        ivec2 cell = ivec2(floor(regionUv)) + ivec2(terrainBiomeCell);
+        vec2 nearest = (fract(regionUv) - step(vec2(.5), fract(regionUv))) * ${TERRAIN_LENGTH.toFixed(1)};
+        bool acrossX = abs(nearest.x) < abs(nearest.y);
+        float boundary = acrossX ? nearest.x : nearest.y;
         float layer; vec2 sampleUv = uv;
-        if (terrainHasPrevious < 0.5 && s < 250.0) layer = terrainTypes.y * 4.0 + variant;
-        else if (boundary < -2.5) layer = before * 4.0 + variant;
-        else if (boundary < -1.25) {
+        if (abs(nearest.x) <= 1.25 && abs(nearest.y) <= 1.25) layer = ${TerrainLayout.stoneLayer.toFixed(1)};
+        else if (abs(boundary) > 2.5) layer = biome(cell) * 4.0 + variant;
+        else {
+          ivec2 axis = acrossX ? ivec2(1,0) : ivec2(0,1);
+          ivec2 lower = cell - (boundary >= 0. ? axis : ivec2(0));
+          float before = biome(lower), after = biome(lower + axis);
+          if (acrossX) { sampleUv = vec2(-uv.y,uv.x); gradX = vec2(-gradX.y,gradX.x); gradY = vec2(-gradY.y,gradY.x); }
+          if (boundary < -1.25) {
           layer = ${TerrainLayout.transitionLayer.toFixed(1)} + before;
           sampleUv.y = clamp((boundary + 2.5) / 1.25, 0.00390625, 0.99609375);
           gradX.y *= 2.0; gradY.y *= 2.0;
@@ -75,12 +85,13 @@ export class Ground {
           layer = ${TerrainLayout.exitTransitionLayer.toFixed(1)} + after;
           sampleUv.y = clamp((boundary - 1.25) / 1.25, 0.00390625, 0.99609375);
           gradX.y *= 2.0; gradY.y *= 2.0;
-        } else layer = after * 4.0 + variant;
+          }
+        }
         diffuseColor.rgb *= textureGrad(terrainAtlas, vec3(sampleUv, layer), gradX, gradY).rgb;
       `,
       );
     };
-    this.material.customProgramCacheKey = () => "lit-terrain-array-v3";
+    this.material.customProgramCacheKey = () => "lit-terrain-world-field-v4";
   }
   update(game: Simulation, pose: RenderPose) {
     this.surface.update(pose);
@@ -88,11 +99,6 @@ export class Ground {
       size = TerrainLayout.worldTileSize;
     const x = this.surface.anchorX,
       distance = this.surface.anchorDistance;
-    u.terrainTypes.value.set(
-      game.terrain.previous,
-      game.terrain.current,
-      game.terrain.next,
-    );
     u.terrainOrigin.value.set(
       GridMath.mod(x, size),
       GridMath.mod(distance, size),
@@ -101,8 +107,14 @@ export class Ground {
       GridMath.mod(Math.floor(x / size), 65536),
       GridMath.mod(Math.floor(distance / size), 65536),
     );
-    u.terrainProgress.value = distance - game.terrain.segment * TERRAIN_LENGTH;
-    u.terrainHasPrevious.value = game.terrain.segment > 0 ? 1 : 0;
+    u.terrainBiomeOffset.value.set(
+      GridMath.mod(x + TerrainField.originX, TERRAIN_LENGTH),
+      GridMath.mod(distance + TerrainField.originZ, TERRAIN_LENGTH),
+    );
+    u.terrainBiomeCell.value.set(
+      Math.floor((x + TerrainField.originX) / TERRAIN_LENGTH),
+      Math.floor((distance + TerrainField.originZ) / TERRAIN_LENGTH),
+    );
     u.terrainSeed.value = game.seed >>> 0;
   }
   dispose() {

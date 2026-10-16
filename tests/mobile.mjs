@@ -8,6 +8,7 @@ import { checkTerrainMotion } from "./terrain-browser.mjs";
 import { checkContinuity } from "./continuity-browser.mjs";
 import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 import { checkFeedback } from "./feedback-browser.mjs";
+import { checkTurning, checkRetina } from "./turning-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -35,7 +36,7 @@ async function checkLighting(context, engine) {
         g = r.game;
       g.phase = "paused";
       g.x = g.previousX = 0;
-      g.distance = g.previousDistance = 200;
+      g.z = g.previousZ = g.distance = g.previousDistance = 200;
       g.health.immunity = 0;
       g.y = g.previousY = 0;
       g.velocityY = 0;
@@ -139,7 +140,7 @@ async function checkLighting(context, engine) {
         );
         assert.ok(probe.stats.shadows > 0);
       }
-      assert.ok(probe.stats.calls <= 15);
+      assert.ok(probe.stats.calls <= 24);
       assert.equal(probe.stats.textures, 4);
       frames[hour] = probe;
       // Let WebKit present the manually drawn paused frame to its compositor.
@@ -312,14 +313,19 @@ try {
       assert.ok(dive.velocity <= -22);
       await page.waitForFunction(() => window.__runner.game.y === 0);
       await page.evaluate(() => window.__runner.game.down());
-      await page.waitForFunction(() => window.__runner.game.crouch > 0.9);
-      assert.equal(
-        await page.evaluate(() => window.__runner.stats().playerState),
-        "duck",
-      );
-      assert.ok(
-        await page.evaluate(() => window.__runner.game.bodyHeight < 0.8),
-      );
+      await page.waitForFunction(() => {
+        const r = window.__runner;
+        if (r.game.crouch > 0.9 && r.stats().playerState === "duck") {
+          window.duckProbe = {
+            state: r.stats().playerState,
+            height: r.game.bodyHeight,
+          };
+          return true;
+        }
+        return false;
+      });
+      assert.equal(await page.evaluate(() => window.duckProbe.state), "duck");
+      assert.ok(await page.evaluate(() => window.duckProbe.height < 0.8));
       await page.waitForFunction(
         () =>
           window.__runner.game.crouch === 0 &&
@@ -450,8 +456,14 @@ try {
       };
       results[engine].lighting = await checkLighting(context, engine);
       results[engine].continuity = await checkContinuity(context, url, engine);
-      results[engine].instanceMotion = await checkInstanceMotion(context, url, engine);
+      results[engine].instanceMotion = await checkInstanceMotion(
+        context,
+        url,
+        engine,
+      );
       results[engine].feedback = await checkFeedback(context, url);
+      results[engine].turning = await checkTurning(context, url, engine);
+      results[engine].retina = await checkRetina(browser, url, engine);
       results[engine].terrainMotion = await checkTerrainMotion(
         context,
         url,

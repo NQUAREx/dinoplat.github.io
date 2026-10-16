@@ -6,6 +6,9 @@ import {
   ConeGeometry,
   CylinderGeometry,
   Euler,
+  ExtrudeGeometry,
+  IcosahedronGeometry,
+  Shape,
   MeshBasicMaterial,
   Quaternion,
   QuaternionKeyframeTrack,
@@ -45,6 +48,11 @@ export class LowPolyDinosaur {
     rotationX = 0,
   ) {
     geometry.deleteAttribute("uv");
+    if (!geometry.index) {
+      const source = geometry;
+      geometry = mergeVertices(source);
+      source.dispose();
+    }
     geometry.scale(sx, sy, sz);
     geometry.rotateX(rotationX);
     geometry.translate(x, y, z);
@@ -70,17 +78,31 @@ export class LowPolyDinosaur {
     this.parts.push(geometry);
   }
   ball(colour, joint, x, y, z, sx, sy, sz, segments = 8, rings = 4) {
-    this.part(
-      new SphereGeometry(1, segments, rings),
-      colour,
-      joint,
-      x,
-      y,
-      z,
-      sx,
-      sy,
-      sz,
-    );
+    const outline = new Shape();
+    for (const [i, p] of [
+      [-0.7, -1],
+      [0.7, -1],
+      [1, -0.7],
+      [1, 0.7],
+      [0.7, 1],
+      [-0.7, 1],
+      [-1, 0.7],
+      [-1, -0.7],
+    ].entries())
+      i ? outline.lineTo(...p) : outline.moveTo(...p);
+    outline.closePath();
+    const source =
+      colour === 0xfff9e8 || colour === 0x24374d || colour === 0xffffff
+        ? new SphereGeometry(1, Math.min(6, segments), Math.min(4, rings))
+        : new ExtrudeGeometry(outline, {
+            depth: 2,
+            steps: 1,
+            bevelEnabled: false,
+            curveSegments: 1,
+          }).translate(0, 0, -1);
+    const geometry = source.index ? source : mergeVertices(source);
+    if (geometry !== source) source.dispose();
+    this.part(geometry, colour, joint, x, y, z, sx, sy, sz);
   }
   build() {
     this.bone("root", -1, 0, 0, 0);
@@ -94,20 +116,61 @@ export class LowPolyDinosaur {
     const shinR = this.bone("shin-r", right, 0, -0.32, 0);
     const armL = this.bone("arm-l", torso, -0.3, 0.02, -0.2);
     const armR = this.bone("arm-r", torso, 0.3, 0.02, -0.2);
-    this.ball(0x58c95a, torso, 0, 0.91, 0.08, 0.32, 0.43, 0.37, 10, 5);
-    this.ball(0xcce78a, torso, 0, 0.91, -0.23, 0.24, 0.31, 0.095);
-    this.ball(0x64d561, head, 0, 1.4, -0.38, 0.38, 0.29, 0.4, 10, 6);
-    this.ball(0x6cdb67, head, 0, 1.27, -0.69, 0.33, 0.18, 0.34);
-    this.ball(0xc5e68b, head, 0, 1.16, -0.7, 0.29, 0.095, 0.3);
-    this.ball(0x287344, head, 0, 1.205, -1.005, 0.16, 0.013, 0.012, 6, 3);
+    this.part(
+      new IcosahedronGeometry(1, 0),
+      0x28bb7c,
+      torso,
+      0,
+      0.96,
+      0.08,
+      0.34,
+      0.51,
+      0.33,
+    );
+    this.part(
+      new IcosahedronGeometry(1, 0),
+      0xffe8bc,
+      torso,
+      0,
+      0.91,
+      -0.205,
+      0.23,
+      0.36,
+      0.07,
+    );
+    this.part(
+      new CylinderGeometry(0.18, 0.21, 0.38, 6),
+      0x36c48a,
+      torso,
+      0,
+      1.25,
+      -0.12,
+    );
+    this.ball(0x3dcc8c, head, 0, 1.49, -0.35, 0.3, 0.26, 0.3);
+    this.ball(0x43d594, head, 0, 1.37, -0.62, 0.28, 0.16, 0.27);
+    this.ball(0xffe8bc, head, 0, 1.23, -0.65, 0.27, 0.085, 0.22);
+    this.ball(0x24374c, head, 0, 1.3, -0.898, 0.2, 0.04, 0.012);
+    for (const x of [-0.13, 0, 0.13])
+      this.part(
+        new ConeGeometry(0.025, 0.065, 3),
+        0xfff9e8,
+        head,
+        x,
+        1.31,
+        -0.918,
+        1,
+        1,
+        1,
+        Math.PI,
+      );
     for (const side of [-1, 1]) {
-      this.ball(0xfff9e8, head, side * 0.315, 1.47, -0.56, 0.08, 0.105, 0.1);
+      this.ball(0xfff9e8, head, side * 0.28, 1.59, -0.43, 0.1, 0.13, 0.11);
       this.ball(
         0x24374d,
         head,
-        side * 0.375,
-        1.48,
-        -0.59,
+        side * 0.365,
+        1.6,
+        -0.46,
         0.034,
         0.065,
         0.055,
@@ -117,9 +180,9 @@ export class LowPolyDinosaur {
       this.ball(
         0xffffff,
         head,
-        side * 0.398,
-        1.505,
-        -0.61,
+        side * 0.39,
+        1.625,
+        -0.48,
         0.012,
         0.023,
         0.02,
@@ -130,8 +193,8 @@ export class LowPolyDinosaur {
         0x367c48,
         head,
         side * 0.135,
-        1.33,
-        -0.99,
+        1.44,
+        -0.9,
         0.025,
         0.018,
         0.015,
@@ -140,16 +203,16 @@ export class LowPolyDinosaur {
       );
       const thigh = side < 0 ? left : right,
         shin = side < 0 ? shinL : shinR;
-      this.ball(0x42ac50, thigh, side * 0.22, 0.52, 0.07, 0.17, 0.23, 0.19);
+      this.ball(0x159968, thigh, side * 0.22, 0.52, 0.07, 0.17, 0.23, 0.19);
       this.part(
         new CylinderGeometry(0.085, 0.105, 0.26, 6),
-        0x57c659,
+        0x28b17b,
         shin,
         side * 0.22,
         0.25,
         0.04,
       );
-      this.ball(0x72d765, shin, side * 0.22, 0.1, -0.1, 0.15, 0.1, 0.24, 8, 3);
+      this.ball(0x36bf88, shin, side * 0.22, 0.1, -0.1, 0.15, 0.1, 0.24, 8, 3);
       for (const toe of [-1, 1])
         this.part(
           new ConeGeometry(0.035, 0.11, 4),
@@ -164,7 +227,7 @@ export class LowPolyDinosaur {
           -Math.PI / 2,
         );
       this.ball(
-        0x48b957,
+        0x26ad78,
         side < 0 ? armL : armR,
         side * 0.34,
         0.97,
@@ -176,7 +239,7 @@ export class LowPolyDinosaur {
         3,
       );
       this.ball(
-        0x8bdd72,
+        0x4ac890,
         side < 0 ? armL : armR,
         side * 0.34,
         0.84,
@@ -190,7 +253,7 @@ export class LowPolyDinosaur {
     }
     this.part(
       new CylinderGeometry(0.1, 0.19, 0.48, 6),
-      0x43b655,
+      0x169c69,
       tail,
       0,
       0.76,
@@ -202,7 +265,7 @@ export class LowPolyDinosaur {
     );
     this.part(
       new ConeGeometry(0.105, 0.5, 6),
-      0x65ce5c,
+      0x38c087,
       tail,
       0,
       0.79,
@@ -221,7 +284,7 @@ export class LowPolyDinosaur {
     ])
       this.part(
         new ConeGeometry(radius, radius * 1.65, 3),
-        0xffb75b,
+        0xff704c,
         z < 0.4 ? torso : tail,
         0,
         y,

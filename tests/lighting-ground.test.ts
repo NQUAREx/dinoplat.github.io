@@ -80,6 +80,8 @@ test("one interpolated render origin is used at tile and biome boundaries, inclu
   game.previousX = -5.1;
   game.distance = 500.1;
   game.previousDistance = 499.9;
+  game.z = 500.1;
+  game.previousZ = 499.9;
   game.terrain.advance(game.distance);
   pose.update(game, 0.25);
   ground.update(game, pose);
@@ -87,9 +89,10 @@ test("one interpolated render origin is used at tile and biome boundaries, inclu
   assert.ok(Math.abs(pose.distance - 499.95) < 1e-9);
   assert.ok(
     Math.abs(
-      uniforms.terrainProgress.value -
-        (ground.surface.anchorDistance - pose.distance) +
-        0.05,
+      uniforms.terrainBiomeCell.value.y * 500 +
+        uniforms.terrainBiomeOffset.value.y -
+        ground.surface.anchorDistance -
+        91.25,
     ) < 1e-9,
   );
   for (const base of [-1000000, 0, 1000000]) {
@@ -98,7 +101,7 @@ test("one interpolated render origin is used at tile and biome boundaries, inclu
     let previous: number[] | undefined;
     for (let i = 0; i <= 100; i++) {
       pose.x = base - 0.1 + i * 0.002;
-      pose.distance = Math.abs(base) + 499.9 + i * 0.002;
+      pose.z = pose.distance = Math.abs(base) + 499.9 + i * 0.002;
       ground.update(game, pose);
       const u =
         (pointX - ground.surface.anchorX + uniforms.terrainOrigin.value.x) /
@@ -124,7 +127,7 @@ test("one interpolated render origin is used at tile and biome boundaries, inclu
   }
   assert.equal(ground.material.isMeshLambertMaterial, true);
   assert.equal(ground.mesh.receiveShadow, true);
-  assert.equal(ground.surface.geometry.index!.count / 3, 1152);
+  assert.equal(ground.surface.geometry.index!.count / 3, 1568);
   ground.surface.setHeightProvider(
     (x, z) => Math.sin(x / 20) * 0.1 + Math.sin(z / 20) * 0.1,
   );
@@ -150,7 +153,7 @@ test("cached shadow map is rebased continuously, throttled even at minimum quali
   const point = new Vector3(3, 0.02, -8).applyMatrix4(light.key.shadow.matrix);
   game.time = 0.02;
   pose.x = 0.1;
-  pose.distance = 0.24;
+  pose.z = pose.distance = 0.24;
   light.update(game.time);
   assert.equal(cache.prepare(game, pose, light, 0.5), false);
   const moved = new Vector3(3 - pose.x, 0.02, pose.distance - 8).applyMatrix4(
@@ -159,7 +162,7 @@ test("cached shadow map is rebased continuously, throttled even at minimum quali
   assert.ok(point.distanceTo(moved) < 1e-10);
   for (let i = 3; i <= 100; i++) {
     game.time = i / 100;
-    pose.distance = game.time * 12;
+    pose.z = pose.distance = game.time * 12;
     light.update(game.time);
     if (cache.prepare(game, pose, light, 0.5)) {
       light.key.updateMatrixWorld();

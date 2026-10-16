@@ -14,7 +14,7 @@ function pickup(game: Simulation, kind: ObjectKind, x = game.x, y = 0.5) {
   w.active[0] = 1;
   w.kinds[0] = kind;
   w.x[0] = x;
-  w.z[0] = game.distance + 0.2;
+  w.z[0] = game.z + 0.2;
   w.baseY[0] = y;
   w.halfX[0] = w.halfZ[0] = 0.46;
   w.height[0] = 0.75;
@@ -178,7 +178,7 @@ test("random pickup field is bounded, spans both axes, preserves original cactus
   assert.ok(counts[ObjectKind.Diamond] > counts[ObjectKind.Heart] * 4);
   assert.ok(counts[ObjectKind.Heart] > 0);
   assert.equal(pool.active, buffer);
-  assert.equal(buffer.length, 1170);
+  assert.equal(buffer.length, Rules.poolSize);
 });
 
 test("authored pickup voxel sources are actual solid volumes with cubic cells and small palettes", async () => {

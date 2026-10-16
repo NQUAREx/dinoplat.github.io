@@ -22,7 +22,7 @@ export async function checkCollectibles(context, url, engine) {
         g = r.game,
         w = g.world;
       g.x = g.previousX = 0;
-      g.distance = g.previousDistance = 200;
+      g.z = g.previousZ = g.distance = g.previousDistance = 200;
       w.update(0, 200);
       w.active.fill(0);
       g.time = g.previousTime = 0;
@@ -103,7 +103,7 @@ export async function checkCollectibles(context, url, engine) {
         w.active[i] = 1;
         w.kinds[i] = [1, 2, 5][i];
         w.x[i] = 0;
-        w.z[i] = g.distance + 0.15;
+        w.z[i] = g.z + 0.15;
         w.baseY[i] = 0.5;
         w.height[i] = 0.75;
         w.halfX[i] = w.halfZ[i] = 0.46;

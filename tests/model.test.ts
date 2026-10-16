@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { AnimationMixer, SkinnedMesh, Vector3 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { AnimatedDinosaur } from "../src/character.ts";
+import { Simulation } from "../src/simulation.ts";
+import type { ModelLibrary } from "../src/models.ts";
 
 test("exported low-poly rig animates limbs and lowers the head when ducking", async () => {
   const bytes = await readFile(
@@ -37,6 +40,23 @@ test("exported low-poly rig animates limbs and lowers the head when ducking", as
   assert.ok(head.getWorldPosition(new Vector3()).y < standing - 0.3);
   mixer.stopAllAction();
   mixer.uncacheRoot(mesh);
+  const game = new Simulation(123);
+  game.phase = "running";
+  game.y = game.previousY = 2;
+  game.diving = true;
+  game.velocityY = -22;
+  game.heading = game.previousHeading = Math.PI / 2;
+  const actor = new AnimatedDinosaur(
+    { dinosaur: mesh, animations: gltf.animations } as ModelLibrary,
+    game,
+  );
+  actor.update(game, 1);
+  const forward = new Vector3(0, 0, -1).applyQuaternion(mesh.quaternion);
+  assert.ok(
+    Math.abs(forward.z) < 1e-8 && Math.abs(forward.y) > 0.1 && forward.x < -0.9,
+    "jump/dive pitch follows local facing after a 90-degree turn",
+  );
+  actor.dispose();
   mesh.skeleton.dispose();
   gltf.scene.traverse((object) => {
     if ("geometry" in object) (object as SkinnedMesh).geometry.dispose();
@@ -51,7 +71,7 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
   const json = JSON.parse(
     buffer.toString("utf8", 20, 20 + buffer.readUInt32LE(12)),
   );
-  assert.equal(json.meshes.length, 11);
+  assert.equal(json.meshes.length, 18);
   assert.equal(json.images, undefined);
   assert.equal(json.textures, undefined);
   assert.equal(json.skins.length, 1);
@@ -65,6 +85,15 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
   assert.ok(names.includes("dinosaur"));
   assert.ok(!names.includes("run-0"));
   for (let i = 0; i < 7; i++) assert.ok(names.includes(`cactus-${i}`));
+  for (let i = 0; i < 7; i++) {
+    const lod = json.nodes.find(
+      (n: { name: string }) => n.name === `cactus-lod-${i}`,
+    );
+    assert.ok(lod);
+    const primitive = json.meshes[lod.mesh].primitives[0];
+    assert.ok(json.accessors[primitive.indices].count / 3 <= 192);
+    assert.ok(json.accessors[primitive.attributes.POSITION].min[1] > -1e-6);
+  }
   for (const name of ["pickup-coin", "pickup-diamond", "pickup-heart"])
     assert.ok(names.includes(name));
   for (const mesh of json.meshes) {

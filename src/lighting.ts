@@ -120,6 +120,16 @@ export class LightingRig {
     const t = Math.max(0, Math.min(1, value));
     return t * t * (3 - 2 * t);
   }
+  /** Move the one shadow-map focus ahead of the delayed camera without rotating
+   * the celestial light direction with the player. update() resets both first. */
+  followView(heading: number) {
+    const x = -12 * Math.sin(heading),
+      z = 12 - 12 * Math.cos(heading);
+    this.key.position.x += x;
+    this.key.position.z += z;
+    this.key.target.position.x += x;
+    this.key.target.position.z += z;
+  }
   dispose() {
     // LightShadow disposes its target; the renderer releases its owned depth
     // texture from that event. Do not dispose the same attachment twice.

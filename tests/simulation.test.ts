@@ -16,7 +16,7 @@ function emptyGame(distance = 0, x = 0) {
   });
   const game = new Simulation(123, registry);
   game.phase = "running";
-  game.distance = game.previousDistance = distance;
+  game.z = game.previousZ = game.distance = game.previousDistance = distance;
   game.x = game.previousX = x;
   game.world.update(x, distance);
   return game;
@@ -26,37 +26,38 @@ function obstacle(game: Simulation, x: number, forward: number, height = 1.5) {
   w.active[0] = 1;
   w.kinds[0] = ObjectKind.Cactus;
   w.x[0] = x;
-  w.z[0] = game.distance + forward;
+  w.z[0] = game.z + forward;
   w.halfX[0] = 0.45;
   w.halfZ[0] = 0.4;
   w.height[0] = height;
 }
 
-test("unbounded X: held movement crosses thousands of old road widths, release stops exactly", () => {
+test("continuous turns cover every heading; release preserves direction and running never stops", () => {
   const game = emptyGame();
   game.move(1);
-  for (let i = 0; i < 20000; i++) game.step(STEP);
-  assert.ok(game.x > 1000);
-  const released = game.x;
+  for (let i = 0; i < 560; i++) game.step(STEP);
+  assert.ok(game.heading < -Math.PI * 2);
+  assert.ok(game.distance > 50);
+  const released = game.heading,
+    x = game.x,
+    z = game.z;
   game.move(0);
   for (let i = 0; i < 20; i++) game.step(STEP);
-  assert.equal(game.x, released);
-  game.move(-1);
-  for (let i = 0; i < 40000; i++) game.step(STEP);
-  assert.ok(game.x < -1000);
+  assert.equal(game.heading, released);
+  assert.ok(Math.hypot(game.x - x, game.z - z) > 1);
 });
-test("fractional coordinates and +/-45 degree headings have no quantization", () => {
+test("path distance counts actual travel independently of world position in all directions", () => {
   const game = emptyGame();
-  game.move(1);
-  for (let i = 0; i < 10; i++) game.step(STEP);
-  assert.ok(Math.abs(game.x - 2 / 3) < 1e-10);
-  assert.equal(game.heading, -Math.PI / 4);
-  game.move(0);
-  for (let i = 0; i < 20; i++) game.step(STEP);
-  assert.equal(game.heading, 0);
-  game.move(-1);
-  for (let i = 0; i < 10; i++) game.step(STEP);
-  assert.equal(game.heading, Math.PI / 4);
+  let travelled = 0;
+  for (let i = 0; i < 1500; i++) {
+    const x = game.x,
+      z = game.z;
+    game.move(i < 800 ? 1 : -1);
+    game.step(STEP);
+    travelled += Math.hypot(game.x - x, game.z - z);
+  }
+  assert.ok(Math.abs(game.distance - travelled) < 1e-9);
+  assert.ok(game.distance > Math.hypot(game.x, game.z) * 2);
 });
 test("2D cell pool is bounded, deterministic after reentry, and generates both axes", () => {
   const pool = new WorldSpawner();
@@ -142,12 +143,20 @@ test("100 seeds: safe route survives 5 minutes at max speed with 300ms reaction 
     game.events.on(GameEvent.Hit, () => hits++);
     game.phase = "running";
     game.distance = 2000;
-    game.x = game.previousX = game.world.safeCenter(game.distance);
+    game.z = game.previousZ = 2000;
+    game.x = game.previousX = game.world.safeCenter(game.z);
     for (let n = 0; n < 300 / STEP; n++) {
-      const delta =
-        game.world.safeCenter(game.distance - 0.3 * Rules.maxSpeed) - game.x;
+      const delayedZ = game.z - 0.3 * Rules.maxSpeed;
+      const slope =
+        (game.world.safeCenter(delayedZ + 0.1) -
+          game.world.safeCenter(delayedZ - 0.1)) /
+        0.2;
+      const desired = -Math.atan(
+        slope + (game.world.safeCenter(delayedZ) - game.x) * 0.2,
+      );
+      const error = desired - game.heading;
       game.move(
-        Math.abs(delta) > (Rules.sideSpeed * STEP) / 2 ? Math.sign(delta) : 0,
+        Math.abs(error) > Rules.turnSpeed * STEP * 0.5 ? -Math.sign(error) : 0,
       );
       game.step(STEP);
       assert.equal(game.health.lives, 3, `seed ${seed}, step ${n}`);
@@ -169,8 +178,8 @@ test("swept cactus collision works at arbitrary positive and negative world coor
 });
 test("swept lateral collision does not tunnel through a cactus", () => {
   const game = emptyGame(0, -2);
-  obstacle(game, 0, 2);
-  game.move(1);
+  game.heading = game.previousHeading = -Math.PI / 2;
+  obstacle(game, 0, 0);
   game.step(0.5);
   assert.equal(game.health.lives, 2);
 });
@@ -404,7 +413,7 @@ test("fixed steps preserve motion at 15/30/60/120Hz", () => {
       }
     }
     results.push(game.distance);
-    assert.ok(Math.abs(game.x - 16) < 1e-10);
+    assert.ok(game.heading < -2.6 && game.x > 15);
   }
   assert.ok(results.every((value) => Math.abs(value - results[0]) < 1e-10));
 });

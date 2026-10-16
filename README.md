@@ -1,157 +1,85 @@
-# DinoPlat3d
+# Dino Plat 3D
 
-Мобильный бесконечный 3D-раннер на **Three.js 0.186.1 + TypeScript + Vite**, со свободным движением в обе стороны. Зелёный воксельный дино, семь оригинальных low-poly кактусов, пиксельная земля без границ и насыщенная мультяшная палитра. Это отдельный проект: действующая игра в `NQUAREx/dinoplat.github.io` не изменяется.
+[Play on a portrait phone](https://nquarex.github.io/DinoPlat3d/)
 
-**Играть на телефоне:** https://nquarex.github.io/DinoPlat3d/
+A lightweight, touch-only endless 3D runner built with Three.js 0.186.1, TypeScript and Vite. Static files only: **no game server, Node.js runtime, accounts or CDN are required on GitHub Pages**. The separate original DinoPlat repository/game is untouched.
 
-## iPhone, Android и полный экран
+## Controls
 
-- **Android:** нажми «Играть» — игра запросит полный экран, если браузер его разрешает. Повторный вход: Пауза → Настройки → На весь экран. Для запуска сразу без панелей добавь игру на главный экран через меню браузера (название пункта может быть «Установить приложение» или «Добавить на главный экран»).
-- **iPhone/iPad:** открой игру в Safari → **Поделиться → На экран «Домой»** → запускай с новой иконки. Если предлагается «Открывать как веб-приложение», оставь включённым. Так игра открывается без адресной строки Safari. Обычная вкладка iPhone не разрешает принудительный fullscreen; код сайта не может обойти это ограничение. Системные индикаторы/жесты остаются под управлением iOS.
-- Подготовлены web manifest, портретный standalone/fullscreen-режим, Apple meta и локальные иконки. Все пути работают в подпапке GitHub Pages. Сервер и внешние CDN не нужны; offline-кеш/Service Worker не добавлялись, для загрузки нужен интернет.
-- Отключены выделение текста, контекстные меню удержания, перетаскивание изображений, прокрутка/overscroll, pinch/double-tap zoom и подсветка касаний. Нативный ползунок настроек, кнопки и ссылки сохранены.
-- Размер игры учитывает панели мобильного браузера, `visualViewport`, безопасные области и вырезы экрана. Повторные resize без изменения размеров не пересоздают WebGL-буфер; размер и DPR обновляются одним вызовом. В фоне/паузе звук приостанавливается; возврат со страницы требует явного продолжения, без залипшего пальца.
-- Требуется современный браузер с WebGL 2: ориентир iOS/Safari 16+ и актуальный Chrome/совместимые браузеры Android. Наличие API проверяется по возможностям, отказ fullscreen/звука/вибрации не блокирует игру.
+- Hold the left/right half to turn continuously in that direction. Release to keep running along the new heading. Full 360° movement, no lanes/boundaries; speed never stops during normal play.
+- Camera follows turns with a short 0.28s delay. Distance counts travelled path length, including sideways/backward travel, not a world coordinate.
+- Release a hold and make a separate upward swipe to jump. Downward swipe dives in the air or ducks for 0.85s on the ground. Vertical gestures never start steering.
+- A stationary hold classifies after 40ms, horizontal intent after 3px; a moving pending swipe is not converted to steering by a timer. A committed hold cannot later turn into a jump—use a separate gesture.
+- Bottom-left Pause opens settings for sound, vibration, camera shake and fullscreen. Portrait touch browsers only; keyboard/mouse and landscape gameplay are intentionally unsupported.
+- Damage displays a small 2D -1 heart notice and freezes the contact pose for one second, including fatal hits; then two seconds of immunity/blinking and temporary start speed. Pickups display +1 icons; a full-health heart displays MAX. Pause freezes timers and restart clears feedback.
+- Coins/diamonds survive new runs via a validated, year-long, project-scoped cookie. Hearts restore one up to three. Browser privacy/deletion can clear storage; this is a client-side prototype economy, not secure server money.
 
-Разработчику: `npm run app-icons:build` воспроизводит PNG-иконки из SVG через установленный Playwright Chromium. Для двухдвижковых проверок: `npx playwright install --with-deps chromium webkit`, затем `npm run build && npm run test:mobile`. Физические телефоны в облачном окружении недоступны; профиль iPhone/Android в тестах не заменяет аппаратное тестирование.
+## iPhone / Android rendering
 
-## Управление и интерфейс
+- Fixed the old whole-canvas `image-rendering:pixelated` enlargement and aggressive resolution reduction that treated a healthy 30Hz Safari cadence as overload.
+- Rendering now requests native antialiasing, uses normal canvas compositing, caps DPR at 2 and physical pixels at 1.3M, and does not reduce ordinary phone buffers below one CSS pixel per pixel. Icons/fonts and terrain magnification retain pixel-art filtering. Terrain mipmaps and at most 2× anisotropy reduce distant shimmer.
+- Sustained frame intervals above40ms can reduce resolution with6s hysteresis; recovery requires12s healthy cadence. Stable30Hz does not progressively lower quality. This trades some extra fill cost for clarity; it is not proof of higher FPS on every device.
+- The owner's screenshot shows a yellow battery/Low Power Mode. [WebKit documents a 30fps requestAnimationFrame throttle in Low Power Mode](https://bugs.webkit.org/show_bug.cgi?id=168837). Turn it off when comparing smoothness. Web code cannot override OS refresh/power/thermal limits, and cloud tests cannot guarantee Brawl Stars/native-game performance.
+- Android/compatible browsers request fullscreen on Play/Resume user activation and fall back safely on denial. Normal iPhone Safari tabs cannot be forced fullscreen: Share → Add to Home Screen, then launch the installed icon. The local manifest/icons support standalone/fullscreen display; offline play is not implemented.
+- Native touch selection/callout, scrolling, overscroll, dragging, tap flash and zoom gestures are disabled; settings sliders and attribution links remain usable. Landscape, background, fullscreen exit and context loss pause rather than silently continuing.
 
-- Удерживай левую или правую половину экрана для непрерывного движения. X не ограничена. Перенос удерживаемого пальца через середину меняет направление; отпускание останавливает движение вбок.
-- Для прыжка отпусти палец и сделай **отдельный свайп вверх**. Неподвижное удержание распознаётся за 40 мс вместо 140; движение вбок — уже после 3 пикселей. Движущийся вверх палец не превращается в удержание по таймеру; подтверждённое удержание не превращается в прыжок. Мгновенно отличить неподвижное касание от будущего свайпа невозможно.
-- **Свайп вниз:** в воздухе — быстрое падение без телепортации, на земле — пригибание на 0,85с. Уменьшаются модель и реальная высота тела/коллайдера (1,3→0,65м). Прыжок отменяет пригибание. Поддержка препятствий над головой подготовлена через baseY, но сами такие препятствия пока не спавнятся.
-- Пауза — иконка слева внизу. Во время забега нет логотипа, слоганов и подсказок. Сверху на всю ширину — монеты, алмазы, жизни, метры и рекорд с иконками исходного DinoPlat.
-- Жизни — три заполненных/пустых сердца. После попадания дино 2 секунды мигает с прозрачностью 50%/100%, не получает повторный урон и бежит со стартовой скоростью 12 м/с. Затем возвращается скорость, соответствующая дистанции. Рекорд сохраняется локально.
-- **Пауза → Настройки:** вибрация, синтезированные звуки прыжка/приземления/попадания и ползунок тряски 0–300% прежней силы. Значения сохраняются между запусками. Web Audio включается только после касания; звук и вибрация необязательны, reduced motion отключает тряску.
-- Только сенсорное управление и портретный режим. Клавиатура/мышь не поддерживаются. При повороте, уходе со вкладки или потере фокуса игра встаёт на паузу; для продолжения нужно нажать кнопку.
+## Art and procedural world
 
-## Бесконечный мир без бесконечного расхода памяти
+- Original angular cartoon dinosaur inspired by the owner's watch/keyring references: long chamfered muzzle, large eyes/teeth, tapered turquoise body and tail, cream belly and coral plates. 788 triangles /11 bones /five cached blended run, jump, duck, hit, death clips; appearance is independent of the stable body collider.
+- Seven detailed cactus variants with enlarged spines/rounded bumps and2–8 enlarged scattered stones:750/774/468/930/886/810/936 triangles. Seven simplified copies omit detail:192/192/48/192/168/192/192 triangles. No additional textures or separate detail objects.
+- Distance-based **LOD**: detailed within22m, low beyond30m, complementary opaque4×4 dither fade between. Both tiers are preloaded with identical core normalization/positions. No network requests, per-obstacle LOD nodes or geometry generation during play.
+- One cached local `src/assets/game-models.glb`:18 meshes /589812 bytes, no texture maps or external decoders. Editable original generators: `tools/low-poly-dinosaur.mjs`, `tools/low-poly-cacti.mjs`. Only coin/diamond/heart meshes remain voxel models matching HUD icons. Imported GPL VOX art is archival only, not runtime dinosaur/cactus geometry.
+- World positions are continuous Float64 X/Z with a bounded symmetric15×15 chunk ring:2250 numeric slots, not2250 rendered objects. Actual instances are full-volume camera culled, with a small shadow-caster guard. Deterministic candidates in a numerical neighbourhood allow turns/revisits without near-camera spawning or an ever-growing scene.
+- Cacti use yaw-aware swept collision and hard-core spacing. Separate pickup RNG preserves cactus distribution; coin:diamond:heart weights250:10:1. Safe continuous corridors remain reserved and tested with a delayed heading-steering pilot at maximum speed.
+- Ground is a world-anchored lit224m low-poly mesh (1568 triangles), 2.5m pixel tiles and original painted material↔stone transitions. Seeded500×500m regions extend in both axes and remain fixed on revisits; terrain cannot use the odometer as Z anymore. Every adjacent region differs, all16 types equally likely. Existing odometer milestone metadata is independent.
+- One shared 97-layer128² terrain array (~8.1MiB RGBA/mips), no overlapping floor planes. Origin rebases preserve UV/tile identity, including negative and huge coordinates, and do not re-upload flat geometry.
+- 128 pooled8-triangle dust puffs, one draw,18 per step/30 on landing. Heading-relative world-anchored trails; stronger running bob (+50% versus the previous build) and landing impulse respect shake settings/reduced motion.
+- One360s day/night cycle, smooth fog/ambient and opposite-side virtual moonlight; no visible moon or second sun/map. Cached256² shadows stay enabled at low quality; their focus follows the delayed view without rotating celestial direction. Dinosaur uses a separate small jump/duck-aware contact shadow.
 
-Мир — фиксированное кольцевое окно из максимум **1170 числовых слотов** (чанки 16×16м, по шесть кандидатов препятствий и четыре кандидата предметов). Чанки служат только хранению: координаты каждого объекта случайные и непрерывные по обеим осям, без рядов/сетки. Расстановка, модель и поворот вычисляются из seed; прореживание не даёт кустам срастаться в плотные кучи. Густота кактусов не изменилась с добавлением предметов; на большой скорости немного уменьшается. Вне ограниченного окна нет объектов/симуляции; GPU получает пересекающие frustum полные AABB и ограниченный запас кактусов для теней. Частично видимые объекты не исчезают у нижнего края.
+## Local development
 
-Мировые числа — Float64. Перед отрисовкой из них вычитается положение игрока, поэтому аватар, камера, частицы и меш земли находятся около локального нуля даже после миллиона метров. Пул и количество геометрий не растут. Краёв земли, ограждений и разделителей нет.
-
-Проходимость сохраняют невидимые плавные маршруты с ограниченным наклоном <=0.081, начинающиеся у X=0 и повторяющиеся через 32м. Генератор резервирует всю ширину реального кактуса с yaw, радиус дино и запас реакции. Это не полосы движения и не линии на земле. На скорости 24 м/с проверяется прохождение с задержкой реакции 300 мс без потери жизней. Swept-коллизии используют реальные X/Z и высоту прыжка.
-
-## Модели, анимация, камера
-
-Визуальный референс: https://hushenghao.github.io/dino3d/ . Оригинальные VOX-модели принадлежат Abraham Tugalov (2020), лицензия GPLv3. Владелец DinoPlat3d согласовал GPLv3; исходники моделей, уведомления и лицензия сохранены. Заимствованы модели, **не игровая логика или старые библиотеки**.
-
-- `art/reference-models/`: восемь кадров бега, поза столкновения; старые VOX-кактусы сохранены только как архив GPL-исходников, не используются сборщиком/игрой.
-- `tools/build-reference-models.mjs`: собственный VOX-конвертер, удаляющий внутренние грани и объединяющий одноцветные поверхности/вершины.
-- `tools/low-poly-cacti.mjs`: семь собственных невоксельных кактусов в стиле приложенного окружения: округлые стебли с мягкими нормалями, вертикальные полоски, светлые крапинки, объёмные короткие колючки и цветы. 468–936 треугольников на вариант; размеры и коллайдеры сохранены. Все детали объединены в один индексированный меш на вариант, цвета Uint8, без новых текстур/материалов/draw calls.
-- `src/assets/game-models.glb`: 11 meshes / 534420 bytes, no texture maps or external decoders. Original low-poly dinosaur: 990 triangles, 11 bones, five blended run/jump/duck/hit/death clips. Only collectibles remain voxel models. Editable source: `tools/low-poly-dinosaur.mjs`.
-- Running follows distance; root height follows physics. Dust uses one instanced draw and 96 pooled low-poly puffs. Cacti include cream/yellow pointed spines, green bumps and 2–8 scattered stones per variant, without extra draw calls.
-- Pickups/damage show pooled 2D icon notices above the dinosaur; full-health hearts show MAX. Every damaging contact freezes the world at impact for one second, including fatal hits, then resumes the existing two-second immunity/recovery. Pause freezes both world/feedback clocks. Shake is 50% stronger (settings/reduced motion preserved). Moonlight emerges opposite sunset through a smooth dimmed handoff; no moon mesh.
-- Кактусы и коллайдеры увеличены вдвое по всем осям. Высота прыжка согласована с новым масштабом.
-- Исправлено реальное отставание GPU-матриц после захвата теней в Three r186: перед обходом видимости начинается новая upload-эпоха. Это не сглаживание поверх ошибки: тест читает GPU-буферы перед отрисовкой и сравнивает X/Z, yaw и основание с миром. Настройки/частота/вид теней не менялись.
-- `CameraRig` имеет `setPose` и `impulse` для будущих событий. Положение/FOV 50° не изменены; дальность 96 м, туман 36–84 м (+50%). Покачивание в такт шагам и реакция на попадание/приземление регулируются в паузе. Учитывается reduced motion.
-
-```sh
-npm run model:build
-npm run terrain:build
-npm run icons:build
-```
-
-Это команды подготовки ассетов, не часть запуска игры. Для текстур/иконок нужен ImageMagick, для моделей — только Node.js. Blender и Python в текущем пайплайне не нужны. Старый авторский GLB/Blender-генератор удалены как неиспользуемые; их история остаётся в Git.
-
-## Земля и переходы
-
-16 покрытий меняются каждые **500 м**. У каждого свой вес в `TERRAIN_WEIGHTS`, сейчас все веса равны 1; текущее покрытие исключено из следующего выбора. Генератор материалов независим от кактусов.
-
-Тайл занимает **2.5×2.5 м**, ещё вдвое меньше прежнего. Земля теперь — освещаемая low-poly модель: один индексированный Mesh 192×192м, сетка 24×24 / 1152 треугольников, нормали и стандартный MeshLambertMaterial. Пока поверхность плоская для текущей физики; `TerrainSurface.heightAt/setHeightProvider` готовят рельеф и мировые точки размещения будущих декораций. Не создаются отдельные меши на каждый тайл.
-
-Сетка закреплена за мировыми клетками по 8м и переиспользуется вокруг игрока; UV больше не прокручиваются каждый кадр на неподвижной плоскости. Хеш полного ID клетки ограничивается по модулю 65536 и в GLSL, и на CPU — исправлено изменение вариантов при переходах через отрицательные/циклические координаты. Четыре не зеркальных варианта, общие края и RenderPose сохранены. Вблизи — nearest-пиксели, вдали — линейные mipmaps против субпиксельного мерцания.
-
-На границе: **материал A → рисованный переход → камень → повёрнутый переход → материал B**. Сохранён именно приложенный лист `art/terrain-transitions-attached.jpg`, выходы повёрнуты на 180°. Длины — **1.25 + 2.5 + 1.25м**. Одна непрозрачная albedo-выборка, без наложения покрытий.
-
-Один массив текстур: 64 базовых варианта + камень + 16 входов + 16 повёрнутых выходов, всего 97 слоёв по 128² с отдельными mipmaps (~8.1 МиБ RGBA). Источники и подготовка — [ASSETS.md](ASSETS.md).
-
-## Солнце, туман и тени
-
-Сутки проходят за **360 секунд игрового времени**, начиная с 9 утра; пауза останавливает цикл. Один виртуальный `LightingRig.key` непрерывно движется и меняет цвет/яркость между солнцем и белым лунным светом. На 6:00/18:00 нет переключения направления/ambient: все параметры и туман интерполируются плавно. Видимая луна удалена; второго скрытого источника нет. Камера Y=**8.5**, Z=12, FOV 50°, far 96м, туман 36–84м; покачивание плавно затухает при прыжке/паузе.
-
-Старая проекция силуэтов на плоскость удалена. Используется одна **256² BasicShadowMap**, тёмные тени солнца/луны и стандартный приём теней моделью земли. Самозатенение кактусов отключено ради экономии; будущие low-poly модели/рельеф могут использовать тот же механизм. На минимальном качестве тени **не отключаются**: устранена причина исчезновения примерно после 170м.
-
-Карта обновляется до 8 раз/с, на минимальном качестве — до 4, плюс сбросы/новые чанки/изменения света. Между обновлениями кешированная матрица корректируется под плавающий мировой origin, чтобы тени не двигались рывками с частотой захвата. Тексели закрепляются в системе камеры света. Без PCF, размытия и постобработки; одна карта с цветовым/depth-вложениями, а не отдельная карта на каждый объект. Тени ограничены ближней областью карты, а не всей бесконечной сценой.
-
-Вокруг проекции кактусов оставлен запас 8м: отсечение у края больше не убирает тени между захватами карты. Дино имеет отдельную дешёвую контактную тень (16 треугольников, без текстуры), обновляемую каждый кадр по интерполированной высоте/направлению/приседанию. В прыжке она смещается, расширяется и бледнеет; при приседании меняется отпечаток. Это приближённая тень, не точный силуэт и не проекция на неровный рельеф.
-
-Для проверки можно открыть `?time=9`, `?time=18` (закат), `?time=0` (ночь) — выбранный час фиксируется. Без параметра цикл автоматический. Для будущих событий через `?debug` доступны:
-
-```js
-__runner.lighting.setTimeOfDay(18);       // фиксированное время, часы 0–24
-__runner.lighting.setSunPosition(-8, 12, 4); // позиция в локальной сцене; час определяется направлением
-__runner.lighting.cycle.cycleSeconds = 360;
-__runner.render();                       // обновить кадр, если игра на паузе
-```
-
-Геометрия и материалы создаются один раз; матрицы инстансов загружаются только для живого префикса пула. Тени не создают объектов в игровом цикле и не увеличивают количество массивов текстур.
-
-## Архитектура и задел
-
-| Компонент                                                         | Ответственность                                                                   |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `Simulation`, `WorldSpawner`                                      | Фиксированный шаг 1/120 с, движение, 2D-окно и коллизии без DOM/Three.js          |
-| `ObjectRegistry`, `ObjectDefinition`                              | Веса спавна, виды, варианты коллайдеров, награды, бонусы и контракт разрушаемости |
-| `ObjectRendererRegistry`, `InstancedObjectType`                   | Регистрация instanced-рендереров по виду объекта, без изменения симуляции         |
-| `Wallet`, `Health`, `BonusSystem`                                 | Валюты, жизни, защита от повторного урона и фиксированный пул активных бонусов    |
-| `GameEvents`, `Haptics`, `GameSound`, `GameSettings`, `CameraRig` | События, настройки и независимые реакции устройства/камеры                        |
-| `ModelLibrary`, `AnimatedDinosaur`, `FootDust`, `Ground`, `View`  | Владение ассетами и GPU-ресурсами, анимация, видимые экземпляры                   |
-| `GestureRecognizer`, `Input`, `GameUI`, `GameApplication`         | Разделение жестов, touch-адаптер, интерфейс и жизненный цикл                      |
-
-**В мире появляются кактусы, монеты, алмазы и сердца.** Предметы занимают отдельные кандидаты в фиксированном пуле и не уменьшают число кактусов. Их X/Z случайны, рядом с потенциальными кактусами оставлен зазор. Веса предметов **250:10:1**: алмаз примерно в 25 раз реже монеты, сердце — в 250 раз. Это вероятности генерации, а не обещанное количество за забег.
-
-Объёмные воксельные модели повторяют иконки табло, без текстур. Синхронное вращение за 2.4с, покачивание ±0.1м и пауза общего таймера. Монета/алмаз дают +1, сердце лечит +1 до трёх жизней и расходуется при полном здоровье. Сбор работает при неуязвимости; высоко перепрыгнутый предмет можно пропустить.
-
-**Монеты и алмазы сохраняются между забегами и перезагрузками.** Cookie `dinoplat3d-wallet-v1` ограничена подпапкой игры, имеет срок до года, SameSite=Lax и Secure на HTTPS. Записи объединяются после подбора и сбрасываются при паузе/выходе; покадрового cookie I/O нет. Повреждённые значения отбрасываются. Если браузер запрещает/удаляет cookies, игра работает, но сохранение между посещениями не гарантируется. Это локальный прототипный кошелёк, не защищённая серверная экономика.
-
-Исходники моделей — `art/collectibles/*.vox`; повторная генерация: `npm run collectibles:build` (ImageMagick нужен только разработчику). `BonusSystem` поддерживает зарегистрированные модификаторы скорости/прыжка и щит, но бонусы/враги пока не спавнятся. `DestructionDefinition` оставляет место для здоровья/осколков, **разрушения кактусов ещё нет**.
-
-Новый вид добавляется через определение и рендерер. Новые эффекты подключаются подписками на события, а не условными ветками в цикле игры. I/O и подготовка ресурсов асинхронны; симуляция и RAF намеренно синхронны — Promise/async в каждом кадре увеличили бы задержки и сборки мусора.
-
-## Производительность и проверка
-
-- Фиксированные typed-array пулы, переиспользуемые bounds/frustum/матрицы, instancing по вариантам кактусов, без физического/частичного движка и без создания объектов на каждый кадр.
-- Up to **21 draw calls** on shadow capture / 14 otherwise; at most three collectible instanced draws. Warmed resources: **14 geometries / 4 GPU textures** (terrain, shadow colour/depth, bone texture). Cached low-resolution shadows, no postprocessing/CDN. Physical-phone performance requires device measurements.
-- Буфер до 900 000 пикселей, DPR до 1.25, адаптивное разрешение. Меню/пауза/Game Over не держат постоянный RAF. При уничтожении освобождаются GPU-ресурсы и подписки.
-- Нужны WebGL 2 и современный мобильный браузер. Вибрация не гарантируется на iOS/неподдерживающих устройствах. Измерений FPS физического слабого телефона пока нет.
-
-```sh
-npm ci
-npm test
-npm run build
-npx playwright install chromium # если системного Chromium нет
-npm run test:browser
-```
-
-Браузерные проверки поднимают preview на 4174 и сохраняют отчёт/скриншоты в `test-results/`. Проверяются реальные touch-события, отсутствие бокового движения на прыжке, бесконечная X/большие координаты, модели/анимация, иконки/HUD, рисованные переходы и стыки, жизни/рестарт, 100 перезапусков, WebGL recovery, ошибки загрузки и необязательный storage. Тест маршрута: 100 seeds × 5 минут, максимум скорости, реакция 300 мс, без потери жизней. Детали — [VERIFICATION.md](VERIFICATION.md); правила дальнейшей разработки — [AGENTS.md](AGENTS.md).
-
-`?debug` открывает `window.__runner` с состоянием, статистикой и камерой для проверок. В обычном URL этого доступа нет.
-
-## Запуск и GitHub Pages
-
-**Игровой сервер не нужен.** Игра — статические HTML/CSS/JS/GLB/WebP; Node.js/Vite нужны только для разработки/сборки. На телефоне открывается обычная HTTPS-страница. `file://` для ES-модулей не поддерживается.
+Requires Node.js22+ and npm.
 
 ```sh
 npm ci
 npm run dev
-# или
+# open the forwarded port5173 on a touch device / browser mobile emulation
 npm run build
 npm run preview
 ```
 
-Pages публикует `dist/`, не исходники TypeScript. Относительная `base: './'` поддерживает подкаталог `/DinoPlat3d/`.
+Codex Cloud: start the dev server and use its forwarded browser port/preview if the client provides one. Desktop browsers need touch/mobile emulation; otherwise the intentional phone prompt appears without loading GPU assets. If no preview/port forwarding is offered, use the deployed Pages link or run the commands locally.
 
-Ручное включение:
+```sh
+npm run model:build          # offline original character/cacti + voxel pickups → GLB
+npm run collectibles:build   # requires ImageMagick, rebuilds pickups + GLB
+npm run terrain:build        # requires ImageMagick; preserves authored connectors
+npm test
+npm run test:browser         # Playwright Chromium
+npm run test:mobile          # Playwright Chromium + WebKit
+```
 
-1. Открыть https://github.com/NQUAREx/DinoPlat3d/settings/pages .
-2. **Build and deployment → Source → GitHub Actions**.
-3. **Actions → Build and deploy static game → Run workflow**, ветка `main`.
-4. Дождаться зелёных `build` и `deploy`, затем открыть https://nquarex.github.io/DinoPlat3d/ .
+Install Playwright browser binaries/system dependencies as required by your environment. Some managed hosts need `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1` only after the needed libraries are available. Test outputs/screenshots go to ignored `test-results/`.
 
-Если запуск был до включения Pages — повторить workflow. При требовании подтверждения окружения `github-pages` подтвердить его владельцем. Ветка `gh-pages`/папка `docs` не нужны. Каждый push в `main` обновляет только этот сайт.
+## GitHub Pages
 
-## Лицензия
+The committed workflow `.github/workflows/pages.yml` builds/tests and deploys `dist/` on main. If Pages needs manual activation:
 
-Код DinoPlat3d и адаптации GPL-моделей распространяются под **GPL-3.0-only**, без гарантий. [LICENSE](LICENSE), [уведомления об ассетах](ASSETS.md), исходники VOX и инструменты подготовки находятся в репозитории; лицензия доступна и с игрового меню. Шрифт сохраняет собственную SIL OFL 1.1, Three.js — MIT, пользовательские изображения/иконки имеют отмеченное в ASSETS происхождение.
+1. Open NQUAREx/DinoPlat3d → Settings → Pages.
+2. Under Build and deployment → Source choose **GitHub Actions** (not a branch).
+3. Enable Actions if disabled; run **Build and deploy static game** or push to main.
+4. Wait for the deploy job/environment to finish, then open the URL above.
+
+Vite uses relative asset paths so the `/DinoPlat3d/` subpath works on static hosting. Only development/build needs Node.js; Pages serves HTML/JS/CSS/fonts/GLB/WebP/icons. No backend routes or server-only code.
+
+## Architecture and verification
+
+- `Simulation`, `WorldSpawner`, `ObjectRegistry`, wallet/health/bonus/events: numeric gameplay, fixed pools and extension contracts (future bonuses/enemies/destruction are not active features).
+- `RenderPose`, `CameraRig`, `View`, instanced renderers and `RenderQuality`: one floating origin, delayed camera, LOD/culling and bounded adaptive rendering.
+- `TerrainSurface`, `TerrainField`, `Ground`, `LightingRig`, `CachedShadows`: world-fixed biomes and lit terrain, one cached map with moving focus. The Three r186 upload-epoch fix must remain: actual GPU-matrix readback tests cover rotating cameras/shadow captures.
+- `ModelLibrary`, `AnimatedDinosaur`, `FootDust`, `FloatingFeedback`: explicit GPU/animation/DOM ownership, no runtime model generation or per-pickup node creation.
+- `MobileBrowser`, `GestureRecognizer`, `GameUI`, `CurrencyCookies`, sound/haptics/settings: mobile lifecycle/gesture/UI/persistence, user-activated optional browser features.
+
+Budget after warm-up: up to35 draws during shadow/LOD overlap,21 otherwise;21 geometries /4 textures, stable fixed pools. Finite100-restart tests are evidence of bounded resources, not proof against every leak. Physical-device FPS remains unmeasured. See [VERIFICATION.md](VERIFICATION.md), [ASSETS.md](ASSETS.md), and [AGENTS.md](AGENTS.md) for current results, licensing and mandatory invariants.
+
+GPL-3.0-only; no warranty. Preserve source/attribution when redistributing. Original reference artwork and third-party notices are documented in ASSETS.md.

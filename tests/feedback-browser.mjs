@@ -17,7 +17,7 @@ export async function checkFeedback(context, url) {
         w.active[0] = 1;
         w.kinds[0] = kind;
         w.x[0] = g.x;
-        w.z[0] = g.distance + 0.15;
+        w.z[0] = g.z + 0.15;
         w.halfX[0] = w.halfZ[0] = 0.4;
         w.height[0] = kind === 0 ? 3 : 0.75;
         w.baseY[0] = kind === 0 ? 0 : 0.5;
