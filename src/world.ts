@@ -165,7 +165,10 @@ export class WorldSpawner {
   private seed = 1;
   private centerX = Infinity;
   private centerZ = Infinity;
-  constructor(readonly registry = ObjectRegistry.defaults()) {}
+  constructor(
+    readonly registry = ObjectRegistry.defaults(),
+    readonly pickupRate = Rules.pickupSpawnChance,
+  ) {}
   reset(seed: number) {
     this.seed = seed >>> 0 || 1;
     this.active.fill(0);
@@ -254,6 +257,11 @@ export class WorldSpawner {
     this.active[slot] = 0;
     this.generated++;
     const pickup = candidate >= Rules.candidatesPerChunk;
+    if (
+      pickup &&
+      this.random(column, row, candidate, 0x63f1) >= this.pickupRate
+    )
+      return;
     const x =
       (column + this.random(column, row, candidate, 0x311a)) * Rules.chunkSize;
     const z =

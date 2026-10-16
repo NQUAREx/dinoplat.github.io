@@ -1,6 +1,6 @@
 /** Classifies before moving. Up-swipes never need positional rollback. */
 export class GestureRecognizer {
-  static readonly holdDelay = 40;
+  static readonly holdDelay = 36;
   private active = false;
   private state: "pending" | "hold" | "vertical" = "pending";
   private startX = 0;
@@ -43,7 +43,7 @@ export class GestureRecognizer {
       return;
     }
     if (Math.abs(dy) > 2 || Math.abs(dx) > 2) this.moved = true;
-    if (Math.abs(dx) > 3 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+    if (Math.abs(dx) > 2.7 && Math.abs(dx) > Math.abs(dy) * 1.4) {
       this.state = "hold";
       this.steer(direction);
     }

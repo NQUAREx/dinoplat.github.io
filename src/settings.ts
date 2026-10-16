@@ -1,7 +1,7 @@
 export class GameSettings {
   vibration = true;
   sound = true;
-  shake = 1;
+  readonly shake = 2.9;
   constructor() {
     try {
       const saved = JSON.parse(
@@ -11,8 +11,6 @@ export class GameSettings {
       if (typeof saved.vibration === "boolean")
         this.vibration = saved.vibration;
       if (typeof saved.sound === "boolean") this.sound = saved.sound;
-      if (typeof saved.shake === "number" && Number.isFinite(saved.shake))
-        this.shake = Math.max(0, Math.min(3, saved.shake));
     } catch {
       /* Storage is optional. */
     }
@@ -24,7 +22,6 @@ export class GameSettings {
         JSON.stringify({
           vibration: this.vibration,
           sound: this.sound,
-          shake: this.shake,
         }),
       );
     } catch {

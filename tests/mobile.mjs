@@ -9,6 +9,7 @@ import { checkContinuity } from "./continuity-browser.mjs";
 import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 import { checkFeedback } from "./feedback-browser.mjs";
 import { checkTurning, checkRetina } from "./turning-browser.mjs";
+import { checkDinoRun } from "./dino-run-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -287,9 +288,21 @@ try {
       ).json();
       assert.equal(manifest.display, "fullscreen");
       await page.tap("#action");
-      await page.waitForFunction(
-        () => window.__runner.game.phase === "running",
-      );
+      await page
+        .waitForFunction(() => window.__runner.game.phase === "running")
+        .catch(async (error) => {
+          console.error(
+            engine,
+            await page.evaluate(() => ({
+              phase: window.__runner.game.phase,
+              mobile: window.__runner.mobile(),
+              action: document.querySelector("#action").textContent,
+              viewport: [innerWidth, innerHeight],
+              visibility: document.visibilityState,
+            })),
+          );
+          throw error;
+        });
       const initial = await page.evaluate(() => window.__runner.mobile());
       await page.waitForFunction(
         () => window.__runner.audio().state === "running",
@@ -376,25 +389,11 @@ try {
       assert.equal(await page.evaluate(() => window.__runner.game.steering), 0);
       await page.tap("#pause");
       await page.tap("#settings-toggle");
-      const range = await page.locator("#shake").boundingBox();
-      if (engine === "chromium") {
-        const cdp = await context.newCDPSession(page);
-        const send = (type, x) =>
-          cdp.send("Input.dispatchTouchEvent", {
-            type,
-            touchPoints:
-              type === "touchEnd" ? [] : [{ x, y: range.y + range.height / 2 }],
-          });
-        await send("touchStart", range.x + range.width / 3);
-        await send("touchMove", range.x + range.width * 0.9);
-        await send("touchEnd", 0);
-        await cdp.detach();
-      } else
-        await page.touchscreen.tap(
-          range.x + range.width * 0.9,
-          range.y + range.height / 2,
-        );
-      await page.waitForFunction(() => window.__runner.settings.shake > 1);
+      assert.equal(await page.locator("#shake").count(), 0);
+      assert.equal(
+        await page.evaluate(() => window.__runner.settings.shake),
+        2.9,
+      );
       assert.equal(
         await page.evaluate(() => window.getSelection().toString()),
         "",
@@ -448,7 +447,7 @@ try {
         initial,
         guards,
         framebuffer,
-        rangeWorks: true,
+        fixedShakeWorks: true,
         lifecycle: true,
         resizeCoalescing: true,
         stats: await page.evaluate(() => window.__runner.stats()),
@@ -463,6 +462,7 @@ try {
       );
       results[engine].feedback = await checkFeedback(context, url);
       results[engine].turning = await checkTurning(context, url, engine);
+      results[engine].dinoRun = await checkDinoRun(context, url, engine);
       results[engine].retina = await checkRetina(browser, url, engine);
       results[engine].terrainMotion = await checkTerrainMotion(
         context,
@@ -542,7 +542,7 @@ try {
   );
   console.log(JSON.stringify(results, null, 2));
   console.log(
-    "PASS: Chromium Android profile + WebKit iPhone profile, render/run/jump, fullscreen fallbacks, home-screen mode, scroll/selection guards, native slider, viewport and background recovery.",
+    "PASS: Chromium Android profile + WebKit iPhone profile, render/run/jump, fullscreen fallbacks, home-screen mode, scroll/selection guards, fixed shake, viewport and background recovery.",
   );
 } finally {
   server.kill();

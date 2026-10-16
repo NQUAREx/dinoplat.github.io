@@ -33,8 +33,9 @@ export class CameraRig {
   private shakeAge = 0;
   private walkingBlend = 0;
   heading = 0;
-  readonly followDelay = 0.28;
-  shakeMultiplier = 1;
+  readonly followDelay = 0.42;
+  shakeMultiplier = 2.9;
+  firstPerson = false;
   constructor(private readonly reducedMotion = false) {
     this.update(0, 0, 0, false);
   }
@@ -66,10 +67,14 @@ export class CameraRig {
     dt: number,
     walking: boolean,
     heading = 0,
+    playerY = 0,
+    crouch = 0,
   ) {
-    this.heading +=
-      (heading - this.heading) *
-      (1 - Math.exp(-Math.max(0, dt) / this.followDelay));
+    if (this.firstPerson) this.heading = heading;
+    else
+      this.heading +=
+        (heading - this.heading) *
+        (1 - Math.exp(-Math.max(0, dt) / this.followDelay));
     const blend = 1 - Math.exp((-dt * 4) / this.blendTime);
     const p = this.current,
       t = this.target;
@@ -79,8 +84,11 @@ export class CameraRig {
     p.targetY += (t.targetY - p.targetY) * blend;
     p.targetZ += (t.targetZ - p.targetZ) * blend;
     p.fov += (t.fov - p.fov) * blend;
-    if (Math.abs(p.fov - this.camera.fov) > 0.001) {
-      this.camera.fov = p.fov;
+    const fov = this.firstPerson ? 65 : p.fov,
+      near = this.firstPerson ? 0.08 : 0.2;
+    if (Math.abs(fov - this.camera.fov) > 0.001 || near !== this.camera.near) {
+      this.camera.fov = fov;
+      this.camera.near = near;
       this.camera.updateProjectionMatrix();
     }
     const phase = (distance * Math.PI * 2) / Rules.stepStride;
@@ -103,6 +111,19 @@ export class CameraRig {
     const sin = Math.sin(this.heading),
       cos = Math.cos(this.heading);
     const x = p.offsetX + localPlayerX * 0.75;
+    if (this.firstPerson) {
+      const eye = 1.45 + playerY - crouch * 0.65 + bob * 0.2;
+      this.camera.position.set(
+        -sin * 0.05 + shake * cos * 0.35,
+        eye,
+        -cos * 0.05 - shake * sin * 0.35,
+      );
+      this.look.set(-sin * 10, eye - 0.12, -cos * 10);
+      this.camera.lookAt(this.look);
+      this.camera.rotateZ(bob * 0.015);
+      this.camera.updateMatrixWorld();
+      return;
+    }
     this.camera.position.set(
       (x + bob * 0.25 + shake) * cos + p.distance * sin,
       p.height + bob,

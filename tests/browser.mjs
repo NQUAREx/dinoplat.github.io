@@ -9,6 +9,7 @@ import { checkContinuity } from "./continuity-browser.mjs";
 import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 import { checkFeedback } from "./feedback-browser.mjs";
 import { checkTurning } from "./turning-browser.mjs";
+import { checkDinoRun } from "./dino-run-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -69,6 +70,7 @@ try {
   assert.equal(await desktop.locator("#mobile-required").isVisible(), true);
   await desktop.close();
   const context = await browser.newContext(phone);
+  report.dinoRun = await checkDinoRun(context, url, "chromium");
   report.feedback = await checkFeedback(context, url);
   report.turning = await checkTurning(context, url, "chromium");
   report.collectibles = await checkCollectibles(
@@ -190,13 +192,21 @@ try {
     touch("touchStart", 330, 500),
     touch("touchMove", 330, 650),
   ]);
-  await page.waitForFunction(() => window.__runner.game.crouch > 0.9);
-  assert.equal(
-    await page.evaluate(() => window.__runner.stats().playerState),
-    "duck",
-  );
-  assert.ok(await page.evaluate(() => window.__runner.game.bodyHeight < 0.8));
-  assert.equal(await page.evaluate(() => window.__runner.game.x), beforeJumpX);
+  await page.waitForFunction(() => {
+    const r = window.__runner;
+    if (r.game.crouch > 0.9 && r.stats().playerState === "duck") {
+      window.observedDuck = {
+        state: r.stats().playerState,
+        height: r.game.bodyHeight,
+        x: r.game.x,
+      };
+      return true;
+    }
+    return false;
+  });
+  assert.equal(await page.evaluate(() => window.observedDuck.state), "duck");
+  assert.ok(await page.evaluate(() => window.observedDuck.height < 0.8));
+  assert.equal(await page.evaluate(() => window.observedDuck.x), beforeJumpX);
   await touch("touchEnd");
   await page.screenshot({ path: "test-results/swipe-down-duck.png" });
   await page.waitForFunction(
@@ -211,8 +221,16 @@ try {
       ),
     ),
   );
+  const headingBeforeHold = await page.evaluate(
+    () => window.__runner.game.heading,
+  );
   await touch("touchStart");
-  await page.waitForFunction(() => window.__runner.game.x > 6);
+  // Steering traces a circle, not an unbounded lateral translation. Assert the
+  // intended rotation directly; an absolute X threshold depends on its centre.
+  await page.waitForFunction(
+    (heading) => window.__runner.game.heading < heading - 1.2,
+    headingBeforeHold,
+  );
   await touch("touchEnd");
   const stopped = await page.evaluate(() => window.__runner.game.heading);
   await page.waitForTimeout(180);
@@ -253,14 +271,10 @@ try {
     await page.evaluate(() => window.__runner.audio().enabled),
     false,
   );
-  await page.locator("#shake").evaluate((input) => {
-    input.value = "3";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  assert.equal(await page.locator("#shake-value").innerText(), "300%");
+  assert.equal(await page.locator("#shake").count(), 0);
   assert.equal(
     await page.evaluate(() => window.__runner.camera.shakeMultiplier),
-    3,
+    2.9,
   );
   assert.equal(
     await page.evaluate(() => window.__runner.game.time),
@@ -270,12 +284,12 @@ try {
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("dinoplat-settings")),
   );
-  assert.deepEqual(saved, { vibration: false, sound: false, shake: 3 });
+  assert.deepEqual(saved, { vibration: false, sound: false });
   const restored = await page.context().newPage();
   await ready(restored);
   assert.equal(
     await restored.evaluate(() => window.__runner.settings.shake),
-    3,
+    2.9,
   );
   assert.equal(
     await restored.evaluate(() => window.__runner.audio().enabled),
@@ -286,10 +300,6 @@ try {
   await page.tap("#sound");
   await page.waitForFunction(() => window.__runner.audio().state === "running");
   assert.equal(await page.evaluate(() => window.__runner.audio().voices), 1);
-  await page.locator("#shake").evaluate((input) => {
-    input.value = "1";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
   await page.tap("#settings-back");
   assert.equal(await page.locator("#menu-panel").isVisible(), true);
   await page.evaluate(() => {

@@ -1,3 +1,5 @@
+// Historical VOX archive authoring only; NOT the current collectibles pipeline.
+// Use npm run collectibles:build for tools/low-poly-collectibles.mjs and the GLB.
 // Original voxel authoring tool. HUD silhouettes/palettes become solid stepped
 // volumes, not textured planes. ImageMagick is an OFFLINE tool, never runtime.
 import { execFile } from "node:child_process";

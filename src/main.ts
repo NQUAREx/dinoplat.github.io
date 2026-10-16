@@ -167,6 +167,21 @@ class GameApplication {
       );
     };
     touchButton(this.ui.action, () => this.start());
+    touchButton(this.ui.cameraButton, () => {
+      if (!this.view) return;
+      this.input?.clear();
+      const rig = this.view.rig;
+      rig.firstPerson = !rig.firstPerson;
+      this.ui.cameraButton.setAttribute(
+        "aria-pressed",
+        String(rig.firstPerson),
+      );
+      this.ui.cameraButton.setAttribute(
+        "aria-label",
+        rig.firstPerson ? "Вид сзади" : "Вид от первого лица",
+      );
+      this.view.draw(1, 0);
+    });
     touchButton(
       document.getElementById("fullscreen") as HTMLButtonElement,
       () => {
@@ -193,18 +208,6 @@ class GameApplication {
     touchButton(
       document.getElementById("settings-back") as HTMLButtonElement,
       () => this.ui.showSettings(false),
-    );
-    const shake = document.getElementById("shake") as HTMLInputElement;
-    shake.addEventListener(
-      "input",
-      () => {
-        this.settings.shake = Math.max(
-          0,
-          Math.min(3, Number(shake.value) || 0),
-        );
-        this.applySettings();
-      },
-      options,
     );
     this.landscape.addEventListener(
       "change",
@@ -273,11 +276,6 @@ class GameApplication {
       button.setAttribute("aria-pressed", String(this.settings[key]));
       button.textContent = `${key === "vibration" ? "ВИБРАЦИЯ" : "ЗВУК"}: ${this.settings[key] ? "ДА" : "НЕТ"}`;
     }
-    (document.getElementById("shake") as HTMLInputElement).value = String(
-      this.settings.shake,
-    );
-    document.getElementById("shake-value")!.textContent =
-      `${Math.round(this.settings.shake * 100)}%`;
     this.settings.save();
   }
   start() {

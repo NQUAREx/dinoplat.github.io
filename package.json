@@ -1,5 +1,5 @@
 {
-  "name": "dinoplat-runner",
+  "name": "dino-run",
   "version": "1.0.0",
   "private": true,
   "license": "GPL-3.0-only",
@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "tsx --test tests/*.test.ts",
     "model:build": "node tools/build-reference-models.mjs",
-    "collectibles:build": "node tools/build-collectibles.mjs && npm run model:build",
+    "collectibles:build": "npm run model:build",
     "icons:build": "node tools/prepare-icons.mjs",
     "app-icons:build": "node tools/build-app-icons.mjs",
     "terrain:build": "node tools/prepare_terrains.mjs",

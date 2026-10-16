@@ -18,7 +18,7 @@ test("close dynamic camera remains bounded, and event pose can transition indepe
   assert.ok(Math.abs(rig.camera.position.x - 1.5) < 0.01);
   assert.ok(FOG_END < rig.camera.far - 2);
 });
-test("shake slider spans zero to three times original amplitude without altering baseline camera", () => {
+test("programmatic shake calibration spans zero to three times original amplitude without altering baseline camera", () => {
   const rig = new CameraRig();
   rig.shakeMultiplier = 0;
   rig.impulse(0.075, 0.22);
@@ -26,6 +26,7 @@ test("shake slider spans zero to three times original amplitude without altering
   assert.equal(rig.camera.position.y, 8.5);
   assert.equal(rig.camera.position.x, 0);
   const normal = new CameraRig();
+  normal.shakeMultiplier = 1;
   normal.update(1.1, 0, 0.016, true);
   normal.update(1.1, 0, 0.016, true);
   rig.shakeMultiplier = 3;
@@ -40,6 +41,7 @@ test("shake slider spans zero to three times original amplitude without altering
 });
 test("walking bob fades rather than snapping on jump, landing or pause", () => {
   const rig = new CameraRig();
+  rig.shakeMultiplier = 1;
   for (let i = 0; i < 60; i++) rig.update(1.1, 0, 1 / 60, true);
   const walking = rig.camera.position.y;
   rig.update(1.1, 0, 0, false);

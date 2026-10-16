@@ -32,7 +32,7 @@ test("camera follows unwrapped turns with delay, freezes on pause and catches up
   const h = rig.heading;
   rig.update(0, 0, 0, false, -Math.PI / 2);
   assert.equal(rig.heading, h);
-  for (let i = 0; i < 240; i++) rig.update(0, 0, 1 / 60, false, -Math.PI * 2.5);
+  for (let i = 0; i < 360; i++) rig.update(0, 0, 1 / 60, false, -Math.PI * 2.5);
   assert.ok(Math.abs(rig.heading + Math.PI * 2.5) < 0.00001);
   assert.ok(rig.camera.position.x < -11.9);
 });

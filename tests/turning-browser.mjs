@@ -76,7 +76,7 @@ export async function checkTurning(context, url, engine) {
       result.lod.cactusLodTriangles,
       [192, 192, 48, 192, 168, 192, 192],
     );
-    assert.ok(result.lag > 0.1 && result.lag < 0.6);
+    assert.ok(result.lag > 0.5 && result.lag < 0.9);
     assert.ok(result.direction < -Math.PI * 2);
     assert.equal(result.direction, result.afterDirection);
     assert.ok(result.moved > 2);

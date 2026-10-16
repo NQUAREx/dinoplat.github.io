@@ -13,7 +13,7 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <meta name="apple-mobile-web-app-title" content="DinoPlat 3D" />
+    <meta name="apple-mobile-web-app-title" content="Dino Run" />
     <meta
       name="format-detection"
       content="telephone=no,date=no,address=no,email=no,url=no"
@@ -22,9 +22,9 @@
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <meta
       name="description"
-      content="Удерживай экран и веди динозавра по 16 пиксельным мирам. Светлый мобильный 3D-раннер Dino Plat."
+      content="Dino Run — бесконечный мобильный 3D-раннер с динозавром и свободными поворотами."
     />
-    <title>Dino Plat — Бесконечный забег</title>
+    <title>Dino Run — Бесконечный забег</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23639947' d='M7 1h8v6h-5v3h-2v5H5v-4H3V9H1V5h2v3h4z'/%3E%3Cpath fill='%232f493b' d='M12 2h1v1h-1z'/%3E%3C/svg%3E"
@@ -37,8 +37,8 @@
         aria-label="Динозавр и кактусы в бесконечном пиксельном мире"
       ></canvas>
       <header class="topbar">
-        <a class="brand" href="./" aria-label="Dino Plat, главная"
-          >DINO<span>PLAT</span><small>3D</small></a
+        <a class="brand" href="./" aria-label="Dino Run, главная"
+          >DINO<span>RUN</span><small>3D</small></a
         >
         <span class="subtitle">МАЛЕНЬКИЙ ДИНО · БОЛЬШОЙ ЗАБЕГ</span>
       </header>
@@ -160,20 +160,6 @@
           >
             ЗВУК: ДА
           </button>
-          <label class="shake-label" for="shake"
-            >ТРЯСКА КАМЕРЫ
-            <output id="shake-value" for="shake">100%</output></label
-          >
-          <input
-            id="shake"
-            type="range"
-            min="0"
-            max="3"
-            step="0.1"
-            value="1"
-            aria-label="Сила тряски камеры"
-          />
-          <div class="range-labels"><span>0%</span><span>300%</span></div>
           <button id="settings-back" class="pixel-button settings-link">
             ← НАЗАД
           </button>
@@ -191,6 +177,21 @@
           disabled
         >
           <img src="/src/assets/icons/pause.png" alt="" />
+        </button>
+        <button
+          id="camera-mode"
+          class="pixel-button pause-button camera-button"
+          aria-label="Вид от первого лица"
+          aria-pressed="false"
+          disabled
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M7 3h10v3h5v15H2V6h5V3zm2 3v2H4v11h16V8h-5V6H9zm3 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"
+            />
+            <path fill="#ffe588" d="M12 11a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+          </svg>
         </button>
       </footer>
       <div id="live" class="sr-only" role="status" aria-live="polite"></div>

@@ -173,16 +173,15 @@ export class Simulation {
   private collisions() {
     const pool = this.world,
       dx = this.x - this.previousX,
-      dz = this.z - this.previousZ;
+      dz = this.z - this.previousZ,
+      minZ = Math.min(this.previousZ, this.z),
+      maxZ = Math.max(this.previousZ, this.z);
     for (let i = 0; i < pool.active.length; i++) {
       if (!pool.active[i]) continue;
-      const extentX = pool.halfX[i] + Rules.playerRadius,
-        extentZ = pool.halfZ[i] + Rules.playerRadius;
-      if (
-        pool.z[i] < Math.min(this.previousZ, this.z) - extentZ ||
-        pool.z[i] > Math.max(this.previousZ, this.z) + extentZ
-      )
-        continue;
+      // Broad phase uses full render bounds before any registry lookup. The
+      // forgiving blocking box below is a subset, never a culling replacement.
+      const broadZ = pool.halfZ[i] + Rules.playerRadius;
+      if (pool.z[i] < minZ - broadZ || pool.z[i] > maxZ + broadZ) continue;
       const definition = pool.registry.get(pool.kinds[i]);
       if (
         !definition ||
@@ -190,6 +189,13 @@ export class Simulation {
           (this.health.immunity > 0 || this.bonuses.shield))
       )
         continue;
+      const blocking = definition.blocking;
+      const scale =
+        pool.kinds[i] === ObjectKind.Cactus ? Rules.cactusHitScale : 1;
+      const radius = blocking ? Rules.blockingRadius : Rules.playerRadius;
+      const extentX = pool.halfX[i] * scale + radius,
+        extentZ = pool.halfZ[i] * scale + radius;
+      if (pool.z[i] < minZ - extentZ || pool.z[i] > maxZ + extentZ) continue;
       let enter = 0,
         leave = 1;
       if (Math.abs(dz) < 1e-9) {

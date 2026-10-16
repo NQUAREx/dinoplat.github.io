@@ -39,7 +39,7 @@ export class AnimatedDinosaur {
       }),
     ];
   }
-  update(game: Simulation, alpha: number) {
+  update(game: Simulation, alpha: number, animate = true) {
     const distance = THREE.MathUtils.lerp(
       game.previousDistance,
       game.distance,
@@ -71,24 +71,28 @@ export class AnimatedDinosaur {
     const airWeight = airborne
       ? Math.min(1, game.y / 0.15 + Math.abs(game.velocityY) / 20)
       : 0;
-    for (const action of this.actions) {
-      const name = action.getClip().name;
-      action.time = name === "run" ? this.frame * action.getClip().duration : 0;
-      const weight =
-        game.hitStopRemaining > 0
-          ? +(name === "hit")
-          : game.phase === "over"
-            ? +(name === "death")
-            : name === "duck"
-              ? duckWeight
-              : name === "jump"
-                ? (1 - duckWeight) * airWeight
-                : name === "run"
-                  ? (1 - duckWeight) * (1 - airWeight)
-                  : 0;
-      action.setEffectiveWeight(weight);
-    }
-    this.mixer.update(0);
+    if (animate)
+      for (const action of this.actions) {
+        const name = action.getClip().name;
+        action.time =
+          name === "run" || name === "duck"
+            ? this.frame * action.getClip().duration
+            : 0;
+        const weight =
+          game.hitStopRemaining > 0
+            ? +(name === "hit")
+            : game.phase === "over"
+              ? +(name === "death")
+              : name === "duck"
+                ? duckWeight
+                : name === "jump"
+                  ? (1 - duckWeight) * airWeight
+                  : name === "run"
+                    ? (1 - duckWeight) * (1 - airWeight)
+                    : 0;
+        action.setEffectiveWeight(weight);
+      }
+    if (animate) this.mixer.update(0);
     this.mesh.position.set(
       0,
       THREE.MathUtils.lerp(game.previousY, game.y, alpha),
@@ -137,12 +141,13 @@ export class FootDust {
   private readonly material = new THREE.MeshBasicMaterial({
     color: Palette.dust,
   });
-  readonly mesh = new THREE.InstancedMesh(this.geometry, this.material, 128);
-  private readonly life = new Float32Array(128);
-  private readonly worldX = new Float64Array(128);
-  private readonly worldZ = new Float64Array(128);
-  private readonly driftX = new Float32Array(128);
-  private readonly driftZ = new Float32Array(128);
+  readonly mesh = new THREE.InstancedMesh(this.geometry, this.material, 256);
+  private readonly life = new Float32Array(256);
+  private readonly worldX = new Float64Array(256);
+  private readonly worldZ = new Float64Array(256);
+  private readonly driftX = new Float32Array(256);
+  private readonly driftZ = new Float32Array(256);
+  private readonly lift = new Float32Array(256);
   private readonly matrix = new THREE.Matrix4();
   private cursor = 0;
   private state = 1;
@@ -155,8 +160,8 @@ export class FootDust {
     this.mesh.count = 0;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.off = [
-      game.events.on(GameEvent.Step, () => this.emit(game, 18)),
-      game.events.on(GameEvent.Land, () => this.emit(game, 30)),
+      game.events.on(GameEvent.Step, () => this.emit(game, 42)),
+      game.events.on(GameEvent.Land, () => this.emit(game, 72)),
       game.events.on(GameEvent.Start, () => {
         this.life.fill(0);
         this.cursor = 0;
@@ -170,11 +175,14 @@ export class FootDust {
       const i = this.cursor++ % this.life.length;
       this.state = (Math.imul(this.state, 1664525) + 1013904223) >>> 0;
       const spread = this.state / 4294967296 - 0.5;
-      this.life[i] = 0.65;
+      const variation = ((this.state >>> 16) & 255) / 255;
+      this.life[i] = 0.85;
       const sin = Math.sin(game.heading),
         cos = Math.cos(game.heading);
       this.worldX[i] = game.x + spread * cos * 0.5 + sin * 0.3;
-      this.worldZ[i] = game.z + spread * sin * 0.5 - cos * 0.3;
+      this.worldZ[i] =
+        game.z + spread * sin * 0.5 - cos * 0.3 + (variation - 0.5) * 0.4;
+      this.lift[i] = 0.35 + variation * 0.9;
       this.driftX[i] = spread * cos + sin * 0.6;
       this.driftZ[i] = spread * sin - cos * 0.6;
     }
@@ -190,11 +198,11 @@ export class FootDust {
     for (let i = 0; i < this.life.length; i++) {
       this.life[i] = Math.max(0, this.life[i] - dt);
       if (!this.life[i]) continue;
-      const age = 0.65 - this.life[i],
-        size = (0.23 * this.life[i]) / 0.65;
+      const age = 0.85 - this.life[i],
+        size = ((0.22 + this.lift[i] * 0.1) * this.life[i]) / 0.85;
       const x = this.worldX[i] - renderX + this.driftX[i] * age;
       const z = renderDistance - this.worldZ[i] - this.driftZ[i] * age;
-      const y = 0.04 + age * 0.55;
+      const y = 0.04 + age * this.lift[i];
       if (
         !visibility.intersects(x, -z, size / 2, size / 2, size, y - size / 2)
       ) {

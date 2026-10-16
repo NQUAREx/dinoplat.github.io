@@ -6,6 +6,7 @@ export class GameUI {
   private readonly overlay = this.element("overlay");
   readonly action = this.element<HTMLButtonElement>("action");
   readonly pauseButton = this.element<HTMLButtonElement>("pause");
+  readonly cameraButton = this.element<HTMLButtonElement>("camera-mode");
   private readonly title = this.element("title");
   private readonly description = this.element("description");
   private readonly chapter = this.element("chapter");
@@ -76,6 +77,7 @@ export class GameUI {
     this.showSettings(false);
     this.element("settings-toggle").hidden = phase !== "paused";
     this.pauseButton.disabled = phase !== "running" && phase !== "paused";
+    this.cameraButton.disabled = phase !== "running" && phase !== "paused";
     this.pauseButton.setAttribute(
       "aria-label",
       phase === "paused" ? "Продолжить" : "Пауза",
@@ -99,7 +101,7 @@ export class GameUI {
     } else if (phase === "paused") {
       this.title.innerHTML = "Отдохнём?<br /><em>Дино ждёт!</em>";
       this.description.textContent = "Приключение продолжится с этого места.";
-      this.chapter.textContent = "ПАУЗА";
+      this.chapter.textContent = "DINO RUN · ПАУЗА";
       this.action.textContent = "ПРОДОЛЖИТЬ →";
     } else if (phase === "ready") {
       this.action.textContent = "ИГРАТЬ →";

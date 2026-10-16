@@ -220,7 +220,8 @@ export class View {
     this.renderer.setClearColor(this.lighting.fogColour);
     (this.scene.fog as THREE.Fog).color.copy(this.lighting.fogColour);
     this.ground.update(game, this.pose);
-    this.dinosaur.update(game, alpha);
+    this.dinosaur.mesh.visible = !this.rig.firstPerson;
+    this.dinosaur.update(game, alpha, !this.rig.firstPerson);
     this.dinosaurShadow.update(
       this.dinosaur,
       this.lighting,
@@ -232,7 +233,16 @@ export class View {
       !game.y &&
       !game.velocityY;
     const activeDt = game.phase === "running" ? dt : 0;
-    this.rig.update(this.pose.distance, 0, activeDt, moving, this.pose.heading);
+    this.rig.update(
+      this.pose.distance,
+      0,
+      activeDt,
+      moving,
+      this.pose.heading,
+      this.dinosaur.mesh.position.y,
+      game.previousCrouch + (game.crouch - game.previousCrouch) * alpha,
+    );
+    if (this.rig.firstPerson) this.dinosaurShadow.mesh.visible = false;
     this.lighting.followView(this.rig.heading);
     this.feedbackAnchor
       .set(0, this.dinosaur.mesh.position.y + 1.95 - game.crouch * 0.55, 0)
@@ -240,8 +250,12 @@ export class View {
     this.feedback.update(
       game.previousFeedbackTime +
         (game.feedbackTime - game.previousFeedbackTime) * alpha,
-      (this.feedbackAnchor.x * 0.5 + 0.5) * this.viewportWidth,
-      (-this.feedbackAnchor.y * 0.5 + 0.5) * this.viewportHeight,
+      this.rig.firstPerson
+        ? this.viewportWidth * 0.5
+        : (this.feedbackAnchor.x * 0.5 + 0.5) * this.viewportWidth,
+      this.rig.firstPerson
+        ? this.viewportHeight * 0.45
+        : (-this.feedbackAnchor.y * 0.5 + 0.5) * this.viewportHeight,
     );
     this.visibility.update(this.rig.camera);
     this.dust.update(
@@ -355,6 +369,8 @@ export class View {
       pixelRatio: this.pixelRatio,
       antialias: this.renderer.getContext().getContextAttributes()?.antialias,
       cameraHeading: this.rig.heading,
+      firstPerson: this.rig.firstPerson,
+      playerVisible: this.dinosaur.mesh.visible,
       width: this.renderer.domElement.width,
       height: this.renderer.domElement.height,
       bufferResizes: this.bufferResizes,

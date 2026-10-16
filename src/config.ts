@@ -1,7 +1,10 @@
 /** Shared numeric rules, no rendering or browser dependencies. Forward is world Z. */
 export class Rules {
   static readonly step = 1 / 120;
-  static readonly turnSpeed = 1.35;
+  static readonly turnSpeed = 1.6;
+  static readonly blockingRadius = 0.22;
+  static readonly cactusHitScale = 0.65;
+  static readonly pickupSpawnChance = 0.9;
   static readonly maxSpeed = 24;
   static readonly startSpeed = 12;
   static readonly immunitySeconds = 2;

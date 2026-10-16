@@ -411,6 +411,22 @@ export class LowPolyDinosaur {
       },
       0.72,
     );
+    // Keep the duck silhouette but alternate hips, knees and arms with distance.
+    duck.duration = duration;
+    for (const [bone, pose] of [
+      [5, ({ s }) => [-1 + s * 0.32, 0, 0]],
+      [7, ({ s }) => [-1 - s * 0.32, 0, 0]],
+      [6, ({ s }) => [1.9 - Math.max(0, s) * 0.38, 0, 0]],
+      [8, ({ s }) => [1.9 - Math.max(0, -s) * 0.38, 0, 0]],
+      [9, ({ s }) => [-0.65 - s * 0.15, 0, -0.15]],
+      [10, ({ s }) => [-0.65 + s * 0.15, 0, 0.15]],
+    ]) {
+      const index = duck.tracks.findIndex(
+        (t) => t.name === `${names[bone]}.quaternion`,
+      );
+      duck.tracks[index] = rotation(bone, poses.map(pose), times);
+    }
+    duck.trim().optimize();
     const death = staticClip(
       "death",
       {

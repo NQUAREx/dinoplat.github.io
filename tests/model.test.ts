@@ -38,6 +38,20 @@ test("exported low-poly rig animates limbs and lowers the head when ducking", as
   mixer.setTime(0.5);
   mesh.updateMatrixWorld(true);
   assert.ok(head.getWorldPosition(new Vector3()).y < standing - 0.3);
+  const duck = mixer.clipAction(
+    gltf.animations.find((c) => c.name === "duck")!,
+  );
+  mixer.setTime(0.1);
+  const duckLeg = leg.quaternion.clone();
+  mixer.setTime(0.3);
+  assert.ok(
+    duckLeg.angleTo(leg.quaternion) > 0.1,
+    "ducking must animate legs rather than slide",
+  );
+  assert.ok(
+    duck.getClip().duration < 0.7,
+    "static pose endpoints must not pad the gait loop",
+  );
   mixer.stopAllAction();
   mixer.uncacheRoot(mesh);
   const game = new Simulation(123);
@@ -81,6 +95,21 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
     ["run", "jump", "duck", "hit", "death"],
   );
   assert.ok(buffer.length < 800000);
+  for (const name of ["coin", "diamond", "heart"]) {
+    const node = json.nodes.find(
+      (n: { name: string }) => n.name === `pickup-${name}`,
+    );
+    const primitive = json.meshes[node.mesh].primitives[0];
+    assert.ok(
+      json.accessors[primitive.indices].count / 3 <= 200,
+      "new faceted pickups are lighter than voxel meshes",
+    );
+    const bounds = json.accessors[primitive.attributes.POSITION];
+    assert.ok(
+      bounds.max[2] - bounds.min[2] > 0.19,
+      "real 3D volume, not flat icons",
+    );
+  }
   const names = json.nodes.map((node: { name: string }) => node.name);
   assert.ok(names.includes("dinosaur"));
   assert.ok(!names.includes("run-0"));
