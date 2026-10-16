@@ -10,13 +10,14 @@ export enum GameEvent {
   Duck,
   Dive,
   Heal,
+  Collected,
 }
-export type EventListener = (value: number) => void;
+export type EventListener = (value: number, amount: number) => void;
 
 /** Subscribers are installed once. Emit numeric payloads without frame garbage. */
 export class GameEvents {
   private readonly listeners = Array.from(
-    { length: GameEvent.Heal + 1 },
+    { length: GameEvent.Collected + 1 },
     () => new Set<EventListener>(),
   );
   on(type: GameEvent, listener: EventListener) {
@@ -25,8 +26,8 @@ export class GameEvents {
       this.listeners[type].delete(listener);
     };
   }
-  emit(type: GameEvent, value = 0) {
-    for (const listener of this.listeners[type]) listener(value);
+  emit(type: GameEvent, value = 0, amount = 1) {
+    for (const listener of this.listeners[type]) listener(value, amount);
   }
   dispose() {
     for (const listeners of this.listeners) listeners.clear();

@@ -6,7 +6,7 @@ export async function checkInstanceMotion(context, url, engine) {
   const page = await context.newPage();
   try {
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 3);
+    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
     const result = await page.evaluate(() => {
       const r = window.__runner, g = r.game;
       g.phase = "paused"; g.world.reset(1979);

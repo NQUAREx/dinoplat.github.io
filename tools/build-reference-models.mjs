@@ -14,6 +14,7 @@ import {
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { LowPolyCacti } from "./low-poly-cacti.mjs";
+import { LowPolyDinosaur } from "./low-poly-dinosaur.mjs";
 
 globalThis.FileReader = class {
   readAsArrayBuffer(blob) {
@@ -29,7 +30,7 @@ class VoxelModel {
     if (buffer.toString("ascii", 0, 4) !== "VOX ")
       throw new Error("Invalid VOX");
     this.palette = new Uint32Array(256);
-    for (let offset = 8; offset + 12 <= buffer.length;) {
+    for (let offset = 8; offset + 12 <= buffer.length; ) {
       const id = buffer.toString("ascii", offset, offset + 4),
         length = buffer.readUInt32LE(offset + 4),
         start = offset + 12;
@@ -52,7 +53,7 @@ class VoxelModel {
     if (!this.voxels || !this.size || !this.palette[1])
       throw new Error("VOX needs XYZI, SIZE and RGBA");
   }
-  geometry(height, dinosaur) {
+  geometry(height) {
     const [sx, sy, sz] = this.size;
     const grid = new Uint8Array(sx * sy * sz);
     const at = (x, y, z) =>
@@ -68,15 +69,9 @@ class VoxelModel {
       colours = [];
     const colour = new Color();
     const emit = (p, normal, index) => {
-      // MagicaVoxel Z is up; raw dinosaur faces +X, ours faces -Z.
-      positions.push(
-        ...(dinosaur ? [-p[1], p[2], -p[0]] : [p[0], p[2], -p[1]]),
-      );
-      normals.push(
-        ...(dinosaur
-          ? [-normal[1], normal[2], -normal[0]]
-          : [normal[0], normal[2], -normal[1]]),
-      );
+      // Collectibles only: MagicaVoxel Z is up.
+      positions.push(p[0], p[2], -p[1]);
+      normals.push(normal[0], normal[2], -normal[1]);
       const rgba = this.palette[index];
       colour.setRGB(
         (rgba & 255) / 255,
@@ -103,7 +98,7 @@ class VoxelModel {
             mask[p[v] * width + p[u]] = a && b ? 0 : a ? a : -b;
           }
         for (let j = 0; j < rows; j++)
-          for (let i = 0; i < width;) {
+          for (let i = 0; i < width; ) {
             const value = mask[j * width + i];
             if (!value) {
               i++;
@@ -173,44 +168,44 @@ class ModelBuilder {
     const scene = new Scene(),
       material = new MeshBasicMaterial({ vertexColors: true });
     const entries = [
-      ...Array.from({ length: 8 }, (_, i) => [
-        `t-rex/${i}`,
-        `run-${i}`,
-        1.65,
-        true,
-      ]),
-      ["t-rex/death", "death", 1.65, true],
-      ["../collectibles/coin", "pickup-coin", 0.75, false],
-      ["../collectibles/diamond", "pickup-diamond", 0.7, false],
-      ["../collectibles/heart", "pickup-heart", 0.7, false],
+      ["../collectibles/coin", "pickup-coin", 0.75],
+      ["../collectibles/diamond", "pickup-diamond", 0.7],
+      ["../collectibles/heart", "pickup-heart", 0.7],
     ];
     const colliders = [];
-    for (const [file, name, height, dinosaur] of entries) {
+    for (const [file, name, height] of entries) {
       const source = await readFile(
         new URL(`../art/reference-models/${file}.vox`, import.meta.url),
       );
-      const geometry = new VoxelModel(source).geometry(height, dinosaur),
+      const geometry = new VoxelModel(source).geometry(height),
         mesh = new Mesh(geometry, material);
       mesh.name = name;
       scene.add(mesh);
       console.log(name, geometry.index.count / 3, "triangles");
     }
+    const dinosaur = new LowPolyDinosaur().build();
+    scene.add(dinosaur.mesh);
     const cacti = new LowPolyCacti();
     for (let i = 0; i < 7; i++) {
-      const geometry = cacti.build(i), mesh = new Mesh(geometry, material);
+      const geometry = cacti.build(i),
+        mesh = new Mesh(geometry, material);
       mesh.name = `cactus-${i}`;
       scene.add(mesh);
       const b = geometry.boundingBox;
-      colliders.push({ halfX: +b.max.x.toFixed(5), halfZ: +b.max.z.toFixed(5),
-        height: +b.max.y.toFixed(5) });
+      colliders.push({
+        halfX: +b.max.x.toFixed(5),
+        halfZ: +b.max.z.toFixed(5),
+        height: +b.max.y.toFixed(5),
+      });
       console.log(mesh.name, geometry.index.count / 3, "triangles");
     }
     const glb = await new GLTFExporter().parseAsync(scene, {
       binary: true,
       onlyVisible: false,
+      animations: dinosaur.clips,
     });
     await writeFile(
-      new URL("../src/assets/voxel-models.glb", import.meta.url),
+      new URL("../src/assets/game-models.glb", import.meta.url),
       Buffer.from(glb),
     );
     await writeFile(

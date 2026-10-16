@@ -30,6 +30,7 @@ export class CameraRig {
   private blendTime = 0.35;
   private shake = 0;
   private shakeTime = 0;
+  private shakeAge = 0;
   private walkingBlend = 0;
   shakeMultiplier = 1;
   constructor(private readonly reducedMotion = false) {
@@ -55,6 +56,7 @@ export class CameraRig {
   impulse(strength: number, seconds: number) {
     this.shake = Math.min(0.12, Math.max(this.shake, strength));
     this.shakeTime = Math.max(0, seconds);
+    this.shakeAge = 0;
   }
   update(distance: number, localPlayerX: number, dt: number, walking: boolean) {
     const blend = 1 - Math.exp((-dt * 4) / this.blendTime);
@@ -71,17 +73,20 @@ export class CameraRig {
       this.camera.updateProjectionMatrix();
     }
     const phase = (distance * Math.PI * 2) / Rules.stepStride;
-    const intensity = Math.max(0, Math.min(3, this.shakeMultiplier));
-    this.walkingBlend += ((walking ? 1 : 0) - this.walkingBlend) *
+    const intensity = Math.max(0, Math.min(3, this.shakeMultiplier)) * 1.5;
+    this.walkingBlend +=
+      ((walking ? 1 : 0) - this.walkingBlend) *
       (1 - Math.exp(-Math.max(0, dt) * 12));
     const bob = !this.reducedMotion
-      ? Math.sin(phase) * 0.035 * intensity * this.walkingBlend : 0;
+      ? Math.sin(phase) * 0.035 * intensity * this.walkingBlend
+      : 0;
     this.shakeTime = Math.max(0, this.shakeTime - dt);
+    this.shakeAge += dt;
     const shake =
       this.shakeTime > 0 && !this.reducedMotion
         ? this.shake *
           intensity *
-          Math.sin(distance * 21) *
+          Math.sin(this.shakeAge * 55) *
           Math.min(1, this.shakeTime * 8)
         : 0;
     this.camera.position.set(
@@ -96,6 +101,7 @@ export class CameraRig {
   }
   reset() {
     this.shake = this.shakeTime = 0;
+    this.shakeAge = 0;
     this.walkingBlend = 0;
     this.setPose(
       {

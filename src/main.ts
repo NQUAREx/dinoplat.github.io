@@ -11,6 +11,7 @@ import { GameSettings } from "./settings";
 import { GameSound } from "./sound";
 import { MobileBrowser } from "./mobile-browser";
 import { CurrencyCookies } from "./currency-cookies";
+import { GameEvent } from "./events";
 
 class GameApplication {
   readonly game = new Simulation(1979);
@@ -94,6 +95,7 @@ class GameApplication {
         },
       );
       this.bind();
+      this.game.events.on(GameEvent.Hit, () => this.input?.clear());
       this.applySettings();
       this.ui.show(this.game);
       this.schedule();

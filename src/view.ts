@@ -14,6 +14,7 @@ import { RenderPose } from "./render-pose";
 import { CachedShadows } from "./shadows";
 import { PickupMotion } from "./pickup-motion";
 import { DinosaurShadow } from "./dinosaur-shadow";
+import { FloatingFeedback } from "./floating-feedback";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
@@ -28,6 +29,8 @@ export class View {
   private readonly dinosaur: AnimatedDinosaur;
   private readonly dinosaurShadow = new DinosaurShadow();
   private readonly dust: FootDust;
+  private readonly feedback: FloatingFeedback;
+  private readonly feedbackAnchor = new THREE.Vector3();
   private readonly cactusMaterial = new THREE.MeshLambertMaterial({
     vertexColors: true,
   });
@@ -76,6 +79,12 @@ export class View {
       powerPreference: "low-power",
     });
     this.renderer.setClearColor(Palette.sky);
+    this.feedback = new FloatingFeedback(
+      game.events,
+      canvas.parentElement!,
+      () => game.feedbackTime,
+      reducedMotion,
+    );
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.BasicShadowMap;
@@ -109,8 +118,12 @@ export class View {
       [models.heart],
       this.pickupMaterial,
     );
-    this.scene.add(this.ground.mesh, this.dinosaurShadow.mesh,
-      this.dinosaur.mesh, this.dust.mesh);
+    this.scene.add(
+      this.ground.mesh,
+      this.dinosaurShadow.mesh,
+      this.dinosaur.mesh,
+      this.dust.mesh,
+    );
     for (const mesh of this.objectRenderers.get(ObjectKind.Cactus)!.meshes) {
       mesh.castShadow = true;
       // Only the terrain needs reception today. Avoid a depth lookup on every
@@ -194,20 +207,38 @@ export class View {
   draw(alpha = 1, dt = 0) {
     const game = this.game;
     this.pose.update(game, alpha);
-    this.lighting.update(game.previousTime + (game.time - game.previousTime) * alpha);
+    this.lighting.update(
+      game.previousTime + (game.time - game.previousTime) * alpha,
+    );
     this.renderer.setClearColor(this.lighting.fogColour);
     (this.scene.fog as THREE.Fog).color.copy(this.lighting.fogColour);
     this.ground.update(game, this.pose);
     this.dinosaur.update(game, alpha);
-    this.dinosaurShadow.update(this.dinosaur, this.lighting,
-      this.ground.surface.heightAt(this.pose.x, this.pose.distance));
-    const moving = game.phase === "running" && !game.y && !game.velocityY;
+    this.dinosaurShadow.update(
+      this.dinosaur,
+      this.lighting,
+      this.ground.surface.heightAt(this.pose.x, this.pose.distance),
+    );
+    const moving =
+      game.phase === "running" &&
+      !game.hitStopRemaining &&
+      !game.y &&
+      !game.velocityY;
     const activeDt = game.phase === "running" ? dt : 0;
     this.rig.update(this.pose.distance, 0, activeDt, moving);
+    this.feedbackAnchor
+      .set(0, this.dinosaur.mesh.position.y + 1.95 - game.crouch * 0.55, 0)
+      .project(this.rig.camera);
+    this.feedback.update(
+      game.previousFeedbackTime +
+        (game.feedbackTime - game.previousFeedbackTime) * alpha,
+      (this.feedbackAnchor.x * 0.5 + 0.5) * this.viewportWidth,
+      (-this.feedbackAnchor.y * 0.5 + 0.5) * this.viewportHeight,
+    );
     this.visibility.update(this.rig.camera);
     this.dust.update(
       game,
-      activeDt,
+      game.hitStopRemaining ? 0 : activeDt,
       this.visibility,
       this.pose.x,
       this.pose.distance,
@@ -263,10 +294,12 @@ export class View {
           sz = this.lighting.shadowSlope.y;
         const mid = world.baseY[i] + world.height[i] / 2;
         caster = this.visibility.intersects(
-          x - mid * sx, forward + mid * sz,
-          world.halfX[i] + Math.abs(sx) * world.height[i] / 2 + 8,
-          world.halfZ[i] + Math.abs(sz) * world.height[i] / 2 + 8,
-          .02, 0,
+          x - mid * sx,
+          forward + mid * sz,
+          world.halfX[i] + (Math.abs(sx) * world.height[i]) / 2 + 8,
+          world.halfZ[i] + (Math.abs(sz) * world.height[i]) / 2 + 8,
+          0.02,
+          0,
         );
       }
       if (!visible && !caster) continue;
@@ -342,7 +375,8 @@ export class View {
       playerFrame: this.dinosaur.frame,
       playerState: this.dinosaur.state,
       dustCount: this.dust.mesh.count,
-      loadedPoses: this.models.run.length,
+      animationClips: this.models.animations.length,
+      dinosaurBones: this.models.dinosaur.skeleton.bones.length,
       hours: this.lighting.cycle.hours,
       fogColour: this.lighting.fogColour.getHex(),
       sunX: this.lighting.key.position.x,
@@ -358,6 +392,7 @@ export class View {
           ? this.objectRenderers.get(ObjectKind.Cactus)!.visible
           : 0,
       shadowStrength: this.lighting.shadowStrength,
+      feedbackCount: this.feedback.active,
       dinosaurShadowX: this.dinosaurShadow.mesh.position.x,
       dinosaurShadowZ: this.dinosaurShadow.mesh.position.z,
       dinosaurShadowWidth: this.dinosaurShadow.mesh.scale.x,
@@ -374,6 +409,7 @@ export class View {
     this.dinosaur.dispose();
     this.dinosaurShadow.dispose();
     this.dust.dispose();
+    this.feedback.dispose();
     this.ground.dispose();
     this.models.dispose();
     this.lighting.dispose();

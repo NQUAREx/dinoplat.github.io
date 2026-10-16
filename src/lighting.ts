@@ -7,8 +7,7 @@ import {
 } from "three";
 import { DayCycle } from "./day-cycle";
 
-/** One continuously moving virtual source. Sun/moon is a semantic label only:
- * never switch light direction, ambient brightness or shadow strength at 6/18. */
+/** One virtual source, smooth dimmed handoff to the opposite moonrise side. */
 export class LightingRig {
   readonly cycle = new DayCycle();
   readonly key = new DirectionalLight(0xffffff, 1.8);
@@ -72,28 +71,35 @@ export class LightingRig {
     const elevation = Math.sin(angle);
     const day = this.smooth((elevation + 0.15) / 0.5);
     const twilight = 4 * day * (1 - day);
+    const orbitSide = 2 * this.smooth((elevation + 0.12) / 0.24) - 1;
+    const handoff = this.smooth(Math.abs(elevation) / 0.24);
     // An artistic orbit stays above the horizon and travels continuously through
     // dawn/dusk. Avoid grazing-angle kilometre-long shadows and direction flips.
     if (!this.manualPosition)
       this.position.set(
-        Math.cos(angle) * 40,
-        14 + 26 * Math.sqrt(elevation * elevation + 0.01) / Math.sqrt(1.01),
-        -12 + Math.cos(angle) * 18 + 10 * (1 - day),
+        Math.cos(angle) * 40 * orbitSide,
+        14 +
+          (26 * Math.sqrt(elevation * elevation + 0.01)) / Math.sqrt(1.01) +
+          14 * (1 - handoff),
+        -12 + Math.cos(angle) * 18 * orbitSide + 10 * (1 - day),
       );
     this.key.target.position.set(0, 0, -12);
     this.key.position.copy(this.position);
     const dx = this.position.x,
       dy = this.position.y,
       dz = this.position.z + 12;
-    this.key.intensity = 0.65 + 1.15 * day;
-    this.key.color.copy(this.moonWhite).lerp(this.whiteSun, day)
+    this.key.intensity =
+      (0.65 + 1.15 * day) * (this.manualPosition ? 1 : handoff);
+    this.key.color
+      .copy(this.moonWhite)
+      .lerp(this.whiteSun, day)
       .lerp(this.warmSun, twilight * 0.55);
     this.ambient.intensity = 0.42 + 0.7 * day + twilight * 0.12;
     this.ambient.color.copy(this.nightSky).lerp(this.daySky, day);
     this.ambient.color.lerp(this.warmSun, twilight * 0.3);
     this.ambient.groundColor.copy(this.nightGround).lerp(this.dayGround, day);
     this.shadowStrength = this.shadowsEnabled
-      ? 0.9 + 0.05 * day
+      ? (0.9 + 0.05 * day) * (this.manualPosition ? 1 : handoff)
       : 0;
     this.key.shadow.intensity = this.shadowStrength;
     const denom = Math.max(dy, Math.hypot(dx, dz) / 3, 0.01);
@@ -104,7 +110,10 @@ export class LightingRig {
       .copy(this.sky[stop])
       .lerp(
         this.sky[stop + 1],
-        this.smooth((hours - this.stops[stop]) / (this.stops[stop + 1] - this.stops[stop])),
+        this.smooth(
+          (hours - this.stops[stop]) /
+            (this.stops[stop + 1] - this.stops[stop]),
+        ),
       );
   }
   private smooth(value: number) {

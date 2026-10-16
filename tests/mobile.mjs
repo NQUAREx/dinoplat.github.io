@@ -7,6 +7,7 @@ import { checkCollectibles } from "./collectibles-browser.mjs";
 import { checkTerrainMotion } from "./terrain-browser.mjs";
 import { checkContinuity } from "./continuity-browser.mjs";
 import { checkInstanceMotion } from "./instance-motion-browser.mjs";
+import { checkFeedback } from "./feedback-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -28,7 +29,7 @@ async function checkLighting(context, engine) {
   try {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 3);
+    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
     await page.evaluate(() => {
       const r = window.__runner,
         g = r.game;
@@ -139,7 +140,7 @@ async function checkLighting(context, engine) {
         assert.ok(probe.stats.shadows > 0);
       }
       assert.ok(probe.stats.calls <= 15);
-      assert.equal(probe.stats.textures, 3);
+      assert.equal(probe.stats.textures, 4);
       frames[hour] = probe;
       // Let WebKit present the manually drawn paused frame to its compositor.
       await page.evaluate(
@@ -211,7 +212,7 @@ try {
           errors.push(message.text());
       });
       await page.goto(`${url}/?debug`);
-      await page.waitForFunction(() => window.__runner?.stats().textures === 3);
+      await page.waitForFunction(() => window.__runner?.stats().textures === 4);
       assert.equal(
         await page.evaluate(() => getComputedStyle(document.body).position),
         "fixed",
@@ -450,6 +451,7 @@ try {
       results[engine].lighting = await checkLighting(context, engine);
       results[engine].continuity = await checkContinuity(context, url, engine);
       results[engine].instanceMotion = await checkInstanceMotion(context, url, engine);
+      results[engine].feedback = await checkFeedback(context, url);
       results[engine].terrainMotion = await checkTerrainMotion(
         context,
         url,
@@ -485,7 +487,7 @@ try {
         fallback.on("pageerror", (error) => errors.push(error.message));
         await fallback.goto(`${url}/?debug`);
         await fallback.waitForFunction(
-          () => window.__runner?.stats().textures === 3,
+          () => window.__runner?.stats().textures === 4,
         );
         await fallback.tap("#action");
         await fallback.waitForFunction(

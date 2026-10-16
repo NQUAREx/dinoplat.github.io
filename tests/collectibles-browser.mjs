@@ -11,7 +11,7 @@ export async function checkCollectibles(context, url, engine) {
   });
   try {
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 3);
+    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
     await page.tap("#action");
     await page.evaluate(() => window.__runner.pause());
     await page.addStyleTag({
@@ -71,7 +71,7 @@ export async function checkCollectibles(context, url, engine) {
       JSON.stringify(initial),
     );
     assert.equal(initial.glError, 0);
-    assert.equal(initial.textures, 3);
+    assert.equal(initial.textures, 4);
     const animated = await page.evaluate(() => {
       const r = window.__runner;
       r.game.time = r.game.previousTime = 0.3;
@@ -153,7 +153,7 @@ export async function checkCollectibles(context, url, engine) {
     assert.equal(saved?.value, "1.1.1");
     assert.equal(saved?.sameSite, "Lax");
     await page.reload();
-    await page.waitForFunction(() => window.__runner?.stats().textures === 3);
+    await page.waitForFunction(() => window.__runner?.stats().textures === 4);
     assert.equal(
       await page.evaluate(() => window.__runner.game.wallet.coins),
       1,

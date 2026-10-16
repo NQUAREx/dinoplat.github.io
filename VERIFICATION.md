@@ -1,6 +1,8 @@
 # Проверка прототипа — 16 октября 2026
 
-## Current update: recorded cactus jitter fixed at the GPU upload boundary
+Latest verification: see **Current update: low-poly dinosaur, item feedback and impact freeze (2026-10-16)** below. Earlier measurements apply only to their historical builds.
+
+## Historical update: recorded cactus jitter fixed at the GPU upload boundary
 
 - Inspected the owner's 9.93s/45fps recording and its consecutive frames, plus the attached Brawl Stars environment screenshot. The recorded problem includes silhouettes collapsing into slivers/pop-in, not merely edge aliasing. The previous explanation attributing the fixed-camera pixel differences solely to raster precision was incomplete: stale GPU instance matrices were the concrete cause found here.
 - In Three **0.186.1**, visibility traversal updates objects with frame N, the renderer increments to N+1, then a shadow capture stamps its casters N+1. Next frame's visibility traversal reuses N+1 and skips their fresh instance data. If compaction/counts change, colour draws can use matrices from different instances or older positions. CPU transforms/colliders remain correct, so previous CPU-only tests missed this. A readback probe reproduced stale positions at 900.2m. `View.draw` now begins a fresh upload epoch before traversal; no timing smoothing, rollback, buffer creation or shadow-setting changes.
@@ -176,3 +178,13 @@
 ## Проверка совместимости с GitHub Pages
 
 В отдельной копии `DinoPlat3d` повторно выполнены `npm ci`, все 8 тестов и production-сборка. `dist/` обслуживался простым статическим HTTP-сервером по префиксу `/DinoPlat3d/`, без Vite и без backend-маршрутов. Chromium загрузил только три файла: HTML, JavaScript и CSS. После старта дистанция росла, состояние было `running`, необработанных ошибок не было. Относительные пути ресурсов работают в подкаталоге. Игре достаточно статического хостинга; Node.js на GitHub Pages не требуется.
+
+## Current update: low-poly dinosaur, item feedback and impact freeze (2026-10-16)
+
+- Replaced runtime voxel dinosaur geometry with original 990-triangle skinned character, 11 joints and five exported/blended clips. Offline source remains editable. Runtime GLB: 534,420 bytes / 11 meshes, down from 661,040 bytes / 19 meshes. Original imported VOX archives retained for GPL attribution; superseded runtime bundle removed (recoverable from git).
+- Seven cactus variants now include cream/yellow pointed spines, rounded green bumps and 2–8 scattered low-poly stones, merged into existing meshes. Triangle counts: 750/774/468/930/886/810/936; collider envelopes unchanged. Dust: 96 pooled low-poly puffs, one draw.
+- Pooled 2D pickup/damage icon notices, MAX for full-health hearts, one-second swept-contact hit stop including fatal collisions, then existing two-second immunity. World, bonuses, immunity and dust freeze; feedback/impact shake continue. Manual pause stops both clocks. Restart clears notices/freeze. Shake amplitude 1.5× previous baseline, settings/reduced-motion retained.
+- Geometry/animation/lighting skills guided indexed single-mesh assembly, cached bone animation blending, and one smoothly dimmed virtual moonlight source on the opposite side of sunset. No extra shadow map, visible moon, texture assets or runtime dependency.
+- Production TypeScript/build and browser regression passed. Chromium Android and WebKit iPhone profiles passed mobile shell, controls, lifecycle, rendering, terrain, cookies, context recovery and GPU instance-motion checks. Dedicated two-engine feedback tests confirm +1 coin/diamond/heart, MAX, -1 heart, exactly one-second stationary contact, pause, popup expiry and fixed 12-node pool over 100 resets. Full-day numeric and framebuffer continuity checks retained; exported rig test verifies moving legs and lowered duck head.
+- Chromium browser regression: warmed **14 geometries / 4 textures**, stable over 100 restarts; no JS/shader/GL errors. Fourth texture is the small skeleton bone texture. Existing Three r186 upload-epoch correction remains intact. No physical phones available; software GPU/emulated-browser results are not mobile FPS claims. Vite's nonfatal >500KB chunk warning remains.
+- All 54 unit tests pass, including 100 seeds × 300 seconds at maximum speed with a 300ms reaction budget. Historical reports above describe earlier builds, not current budgets/behaviour.

@@ -38,6 +38,9 @@ export class Simulation {
   speed = Rules.startSpeed;
   time = 0;
   previousTime = 0;
+  feedbackTime = 0;
+  previousFeedbackTime = 0;
+  hitStopRemaining = 0;
   private previousBob = 0;
   private nextStep = 0;
   constructor(seed = 1, registry = ObjectRegistry.defaults()) {
@@ -51,6 +54,7 @@ export class Simulation {
     this.heading = this.previousHeading = this.movingX = this.steering = 0;
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
     this.previousTime = this.previousBob = 0;
+    this.feedbackTime = this.previousFeedbackTime = this.hitStopRemaining = 0;
     this.pickupMotion.update(0);
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
@@ -64,10 +68,14 @@ export class Simulation {
     this.events.emit(GameEvent.Start);
   }
   move(direction: number) {
-    this.steering = this.phase === "running" ? Math.sign(direction) : 0;
+    this.steering =
+      this.phase === "running" && !this.hitStopRemaining
+        ? Math.sign(direction)
+        : 0;
   }
   jump() {
-    if (this.phase !== "running" || this.y !== 0) return;
+    if (this.phase !== "running" || this.hitStopRemaining || this.y !== 0)
+      return;
     this.velocityY = Rules.jumpSpeed * this.bonuses.jumpFactor;
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
@@ -80,7 +88,7 @@ export class Simulation {
     );
   }
   down() {
-    if (this.phase !== "running") return;
+    if (this.phase !== "running" || this.hitStopRemaining) return;
     if (this.y > 0 || this.velocityY > 0) {
       this.velocityY = Math.min(this.velocityY, -Rules.diveSpeed);
       if (!this.diving) this.events.emit(GameEvent.Dive);
@@ -92,12 +100,22 @@ export class Simulation {
   }
   step(dt: number) {
     if (this.phase !== "running") return;
+    this.previousFeedbackTime = this.feedbackTime;
+    this.feedbackTime += dt;
     this.previousX = this.x;
     this.previousY = this.y;
     this.previousCrouch = this.crouch;
     this.previousHeading = this.heading;
     this.previousDistance = this.distance;
     this.previousTime = this.time;
+    if (this.hitStopRemaining > 0) {
+      this.hitStopRemaining = Math.max(0, this.hitStopRemaining - dt);
+      if (this.hitStopRemaining < 1e-9) {
+        this.hitStopRemaining = 0;
+        if (!this.health.lives) this.phase = "over";
+      }
+      return;
+    }
     this.previousBob = this.pickupMotion.bob;
     this.time += dt;
     this.pickupMotion.update(this.time);
@@ -209,25 +227,34 @@ export class Simulation {
       if (definition.blocking) {
         if (!this.bonuses.shield && this.health.damage()) {
           this.speed = Rules.startSpeed;
-          if (!this.health.lives) {
-            this.phase = "over";
-            this.move(0);
-            return;
-          }
+          // Hold the swept contact pose, not a later penetrated/end-of-step pose.
+          this.x = this.previousX + dx * enter;
+          this.distance = this.previousDistance + dz * enter;
+          this.y = this.previousY + (this.y - this.previousY) * enter;
+          this.previousX = this.x;
+          this.previousDistance = this.distance;
+          this.previousY = this.y;
+          this.hitStopRemaining = Rules.hitStopSeconds;
+          this.move(0);
+          return;
         }
       } else {
+        let amount = definition.reward ?? 1;
         if (definition.kind === ObjectKind.Coin)
           this.wallet.add(Currency.Coin, definition.reward ?? 1);
         else if (definition.kind === ObjectKind.Diamond)
           this.wallet.add(Currency.Diamond, definition.reward ?? 1);
-        else if (definition.healing !== undefined)
+        else if (definition.healing !== undefined) {
+          const before = this.health.lives;
           this.health.heal(definition.healing);
-        else if (
+          amount = this.health.lives - before;
+        } else if (
           definition.kind === ObjectKind.Bonus &&
           definition.bonusId !== undefined
         )
           this.bonuses.activate(definition.bonusId);
         pool.consume(i);
+        this.events.emit(GameEvent.Collected, definition.kind, amount);
       }
     }
   }

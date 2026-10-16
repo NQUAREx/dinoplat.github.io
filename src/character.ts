@@ -8,20 +8,25 @@ import type { ObjectVisibility } from "./camera";
 export class AnimatedDinosaur {
   private readonly material = new THREE.MeshLambertMaterial({
     vertexColors: true,
-    flatShading: true,
     transparent: true,
-    depthWrite: false,
+    depthWrite: true,
   });
-  readonly mesh: THREE.Mesh;
+  readonly mesh: THREE.SkinnedMesh;
+  private readonly mixer: THREE.AnimationMixer;
+  private readonly actions: THREE.AnimationAction[];
   frame = 0;
   state = "idle";
   private landedAt = -Infinity;
   private readonly off: (() => void)[];
-  constructor(
-    private readonly models: ModelLibrary,
-    game: Simulation,
-  ) {
-    this.mesh = new THREE.Mesh(models.run[0], this.material);
+  constructor(models: ModelLibrary, game: Simulation) {
+    this.mesh = models.dinosaur;
+    this.mesh.material = this.material;
+    this.mixer = new THREE.AnimationMixer(this.mesh);
+    this.actions = models.animations.map((clip) => {
+      const action = this.mixer.clipAction(clip);
+      action.setEffectiveTimeScale(0).play();
+      return action;
+    });
     this.mesh.frustumCulled = false;
     this.off = [
       game.events.on(GameEvent.Land, () => {
@@ -40,26 +45,48 @@ export class AnimatedDinosaur {
     );
     const airborne = game.y > 0 || game.velocityY > 0;
     this.state =
-      game.phase === "over"
-        ? "dead"
-        : airborne
-          ? game.diving
-            ? "dive"
-            : game.velocityY > 0
-              ? "jump-up"
-              : "jump-down"
-          : game.crouch > 0
-            ? "duck"
-            : game.phase === "running"
-              ? "run"
-              : "idle";
-    this.frame = airborne
-      ? game.velocityY > 0
-        ? 2
-        : 6
-      : Math.floor(distance * Rules.runFramesPerMetre) % this.models.run.length;
-    this.mesh.geometry =
-      game.phase === "over" ? this.models.death : this.models.run[this.frame];
+      game.hitStopRemaining > 0
+        ? "hit"
+        : game.phase === "over"
+          ? "dead"
+          : airborne
+            ? game.diving
+              ? "dive"
+              : game.velocityY > 0
+                ? "jump-up"
+                : "jump-down"
+            : game.crouch > 0
+              ? "duck"
+              : game.phase === "running"
+                ? "run"
+                : "idle";
+    this.frame = (distance / (Rules.stepStride * 2)) % 1;
+    const duckWeight = THREE.MathUtils.lerp(
+      game.previousCrouch,
+      game.crouch,
+      alpha,
+    );
+    const airWeight = airborne
+      ? Math.min(1, game.y / 0.15 + Math.abs(game.velocityY) / 20)
+      : 0;
+    for (const action of this.actions) {
+      const name = action.getClip().name;
+      action.time = name === "run" ? this.frame * action.getClip().duration : 0;
+      const weight =
+        game.hitStopRemaining > 0
+          ? +(name === "hit")
+          : game.phase === "over"
+            ? +(name === "death")
+            : name === "duck"
+              ? duckWeight
+              : name === "jump"
+                ? (1 - duckWeight) * airWeight
+                : name === "run"
+                  ? (1 - duckWeight) * (1 - airWeight)
+                  : 0;
+      action.setEffectiveWeight(weight);
+    }
+    this.mixer.update(0);
     this.mesh.position.set(
       0,
       THREE.MathUtils.lerp(game.previousY, game.y, alpha),
@@ -83,11 +110,12 @@ export class AnimatedDinosaur {
         : THREE.MathUtils.lerp(game.previousCrouch, game.crouch, alpha);
     this.mesh.scale.set(
       1 + squash * 0.3 + duck * 0.12,
-      (1 - squash) * (1 - duck * 0.55),
+      1 - squash,
       1 + squash * 0.3 + duck * 0.12,
     );
     this.material.opacity =
       game.phase !== "over" &&
+      game.hitStopRemaining === 0 &&
       game.health.immunity > 0 &&
       Math.floor((Rules.immunitySeconds - game.health.immunity) * 10) % 2 === 0
         ? 0.5
@@ -95,21 +123,23 @@ export class AnimatedDinosaur {
   }
   dispose() {
     for (const off of this.off) off();
+    this.mixer.stopAllAction();
+    this.mixer.uncacheRoot(this.mesh);
     this.material.dispose();
   }
 }
 
-/** Tiny opaque voxel puffs, one instanced draw and a fixed particle pool. */
+/** Low-poly puffs, one instanced draw and a fixed particle pool. */
 export class FootDust {
-  private readonly geometry = new THREE.BoxGeometry(1, 1, 1);
+  private readonly geometry = new THREE.IcosahedronGeometry(0.65, 0);
   private readonly material = new THREE.MeshBasicMaterial({
     color: Palette.dust,
   });
-  readonly mesh = new THREE.InstancedMesh(this.geometry, this.material, 32);
-  private readonly life = new Float32Array(32);
-  private readonly worldX = new Float64Array(32);
-  private readonly worldZ = new Float64Array(32);
-  private readonly spread = new Float32Array(32);
+  readonly mesh = new THREE.InstancedMesh(this.geometry, this.material, 96);
+  private readonly life = new Float32Array(96);
+  private readonly worldX = new Float64Array(96);
+  private readonly worldZ = new Float64Array(96);
+  private readonly spread = new Float32Array(96);
   private readonly matrix = new THREE.Matrix4();
   private cursor = 0;
   private state = 1;
@@ -122,8 +152,8 @@ export class FootDust {
     this.mesh.count = 0;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.off = [
-      game.events.on(GameEvent.Step, () => this.emit(game, 4)),
-      game.events.on(GameEvent.Land, () => this.emit(game, 7)),
+      game.events.on(GameEvent.Step, () => this.emit(game, 10)),
+      game.events.on(GameEvent.Land, () => this.emit(game, 16)),
       game.events.on(GameEvent.Start, () => {
         this.life.fill(0);
         this.cursor = 0;
@@ -137,7 +167,7 @@ export class FootDust {
       const i = this.cursor++ % this.life.length;
       this.state = (Math.imul(this.state, 1664525) + 1013904223) >>> 0;
       const spread = this.state / 4294967296 - 0.5;
-      this.life[i] = 0.38;
+      this.life[i] = 0.65;
       this.worldX[i] = game.x + spread * 0.3;
       this.worldZ[i] = game.distance - 0.4;
       this.spread[i] = spread;
@@ -154,8 +184,8 @@ export class FootDust {
     for (let i = 0; i < this.life.length; i++) {
       this.life[i] = Math.max(0, this.life[i] - dt);
       if (!this.life[i]) continue;
-      const age = 0.38 - this.life[i],
-        size = (0.12 * this.life[i]) / 0.38;
+      const age = 0.65 - this.life[i],
+        size = (0.23 * this.life[i]) / 0.65;
       const x = this.worldX[i] - renderX + this.spread[i] * age;
       const z = renderDistance - this.worldZ[i] + age * 0.6;
       const y = 0.04 + age * 0.55;

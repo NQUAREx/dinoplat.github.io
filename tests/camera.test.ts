@@ -44,7 +44,7 @@ test("walking bob fades rather than snapping on jump, landing or pause", () => {
   rig.update(1.1, 0, 0, false);
   assert.equal(rig.camera.position.y, walking, "pause cannot reset bob instantly");
   rig.update(1.1, 0, 1 / 120, false);
-  assert.ok(Math.abs(rig.camera.position.y - walking) < .004);
+  assert.ok(Math.abs(rig.camera.position.y - walking) < .006);
 });
 test("cacti remain until their full volume exits; pool retirement never removes a visible cell", () => {
   const rig = new CameraRig(),

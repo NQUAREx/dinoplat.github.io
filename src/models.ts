@@ -1,13 +1,19 @@
-import { BufferGeometry, Mesh, type Material } from "three";
+import {
+  BufferGeometry,
+  Mesh,
+  SkinnedMesh,
+  type AnimationClip,
+  type Material,
+} from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import modelUrl from "./assets/voxel-models.glb?url";
+import modelUrl from "./assets/game-models.glb?url";
 import { Rules } from "./config";
 
 /** Owns all preloaded poses/variants. No scenes are cloned during gameplay. */
 export class ModelLibrary {
   constructor(
-    readonly run: BufferGeometry[],
-    readonly death: BufferGeometry,
+    readonly dinosaur: SkinnedMesh,
+    readonly animations: AnimationClip[],
     readonly cacti: BufferGeometry[],
     readonly coin: BufferGeometry,
     readonly diamond: BufferGeometry,
@@ -26,10 +32,13 @@ export class ModelLibrary {
         "",
       );
       const named = new Map<string, BufferGeometry>();
+      let dinosaur: SkinnedMesh | undefined;
       gltf.scene.updateMatrixWorld(true);
       gltf.scene.traverse((object) => {
         if (!(object instanceof Mesh)) return;
-        const geometry = object.geometry.applyMatrix4(object.matrixWorld);
+        const geometry = object.geometry;
+        if (object instanceof SkinnedMesh) dinosaur = object;
+        else geometry.applyMatrix4(object.matrixWorld);
         if (object.name.startsWith("cactus-"))
           geometry.scale(
             Rules.cactusScale,
@@ -50,9 +59,11 @@ export class ModelLibrary {
         if (!geometry) throw new Error(`Missing model ${name}`);
         return geometry;
       };
+      if (!dinosaur || gltf.animations.length !== 5)
+        throw new Error("Missing dinosaur rig");
       return new ModelLibrary(
-        Array.from({ length: 8 }, (_, i) => requireGeometry(`run-${i}`)),
-        requireGeometry("death"),
+        dinosaur,
+        gltf.animations,
         Array.from({ length: 7 }, (_, i) => requireGeometry(`cactus-${i}`)),
         requireGeometry("pickup-coin"),
         requireGeometry("pickup-diamond"),
@@ -69,9 +80,9 @@ export class ModelLibrary {
     }
   }
   dispose() {
-    for (const geometry of this.run) geometry.dispose();
+    this.dinosaur.geometry.dispose();
+    this.dinosaur.skeleton.dispose();
     for (const geometry of this.cacti) geometry.dispose();
-    this.death.dispose();
     this.coin.dispose();
     this.diamond.dispose();
     this.heart.dispose();

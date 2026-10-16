@@ -39,9 +39,10 @@
 
 - `art/reference-models/`: восемь кадров бега, поза столкновения; старые VOX-кактусы сохранены только как архив GPL-исходников, не используются сборщиком/игрой.
 - `tools/build-reference-models.mjs`: собственный VOX-конвертер, удаляющий внутренние грани и объединяющий одноцветные поверхности/вершины.
-- `tools/low-poly-cacti.mjs`: семь собственных невоксельных кактусов в стиле приложенного окружения: округлые стебли с мягкими нормалями, вертикальные полоски, светлые крапинки, объёмные короткие колючки и цветы. 316–668 треугольников на вариант; размеры и коллайдеры сохранены. Все детали объединены в один индексированный меш на вариант, цвета Uint8, без новых текстур/материалов/draw calls.
-- `src/assets/voxel-models.glb`: историческое имя смешанного GLB, 19 мешей / 661040 байт; без текстур, скелета и внешних декодеров. Только дино/предметы остаются воксельными.
-- Бег переключает загруженные позы по пройденной дистанции; в прыжке используются позы подъёма/падения, высоту задаёт симуляция. После приземления есть небольшая компрессия; пыль — один instanced draw с пулом 32 частиц, без Nebula.
+- `tools/low-poly-cacti.mjs`: семь собственных невоксельных кактусов в стиле приложенного окружения: округлые стебли с мягкими нормалями, вертикальные полоски, светлые крапинки, объёмные короткие колючки и цветы. 468–936 треугольников на вариант; размеры и коллайдеры сохранены. Все детали объединены в один индексированный меш на вариант, цвета Uint8, без новых текстур/материалов/draw calls.
+- `src/assets/game-models.glb`: 11 meshes / 534420 bytes, no texture maps or external decoders. Original low-poly dinosaur: 990 triangles, 11 bones, five blended run/jump/duck/hit/death clips. Only collectibles remain voxel models. Editable source: `tools/low-poly-dinosaur.mjs`.
+- Running follows distance; root height follows physics. Dust uses one instanced draw and 96 pooled low-poly puffs. Cacti include cream/yellow pointed spines, green bumps and 2–8 scattered stones per variant, without extra draw calls.
+- Pickups/damage show pooled 2D icon notices above the dinosaur; full-health hearts show MAX. Every damaging contact freezes the world at impact for one second, including fatal hits, then resumes the existing two-second immunity/recovery. Pause freezes both world/feedback clocks. Shake is 50% stronger (settings/reduced motion preserved). Moonlight emerges opposite sunset through a smooth dimmed handoff; no moon mesh.
 - Кактусы и коллайдеры увеличены вдвое по всем осям. Высота прыжка согласована с новым масштабом.
 - Исправлено реальное отставание GPU-матриц после захвата теней в Three r186: перед обходом видимости начинается новая upload-эпоха. Это не сглаживание поверх ошибки: тест читает GPU-буферы перед отрисовкой и сравнивает X/Z, yaw и основание с миром. Настройки/частота/вид теней не менялись.
 - `CameraRig` имеет `setPose` и `impulse` для будущих событий. Положение/FOV 50° не изменены; дальность 96 м, туман 36–84 м (+50%). Покачивание в такт шагам и реакция на попадание/приземление регулируются в паузе. Учитывается reduced motion.
@@ -112,7 +113,7 @@ __runner.render();                       // обновить кадр, если 
 ## Производительность и проверка
 
 - Фиксированные typed-array пулы, переиспользуемые bounds/frustum/матрицы, instancing по вариантам кактусов, без физического/частичного движка и без создания объектов на каждый кадр.
-- До **21 draw calls** в кадре обновления теней / до 14 в обычном; предметы — максимум три instanced draws. После прогрева — 22 геометрии и **3 GPU-текстуры**: массив покрытия и цветовое/depth-вложения одной карты теней. Стандартный свет/тени дороже прежнего unlit-пола; карта низкого разрешения обновляется ограниченно, без постобработки и CDN.
+- Up to **21 draw calls** on shadow capture / 14 otherwise; at most three collectible instanced draws. Warmed resources: **14 geometries / 4 GPU textures** (terrain, shadow colour/depth, bone texture). Cached low-resolution shadows, no postprocessing/CDN. Physical-phone performance requires device measurements.
 - Буфер до 900 000 пикселей, DPR до 1.25, адаптивное разрешение. Меню/пауза/Game Over не держат постоянный RAF. При уничтожении освобождаются GPU-ресурсы и подписки.
 - Нужны WebGL 2 и современный мобильный браузер. Вибрация не гарантируется на iOS/неподдерживающих устройствах. Измерений FPS физического слабого телефона пока нет.
 

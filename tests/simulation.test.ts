@@ -252,6 +252,7 @@ test("lives, damage immunity, game over, pause and reset retain bounded pools", 
     obstacle(game, game.x, 0.3);
     game.step(STEP);
     assert.equal(game.health.lives, 2 - hit);
+    for (let i = 0; i < 120; i++) game.step(STEP);
     if (hit < 2) {
       game.step(STEP);
       assert.equal(game.health.lives, 2 - hit);
@@ -274,6 +275,25 @@ test("hit gives exactly two seconds of immunity and temporary start speed, then 
   assert.equal(game.health.lives, 2);
   assert.equal(game.health.immunity, 2);
   assert.equal(game.speed, Rules.startSpeed);
+  const frozen = [
+    game.x,
+    game.y,
+    game.distance,
+    game.time,
+    game.health.immunity,
+  ];
+  for (let i = 0; i < 120; i++) {
+    game.move(1);
+    game.jump();
+    game.down();
+    game.step(STEP);
+    assert.deepEqual(
+      [game.x, game.y, game.distance, game.time, game.health.immunity],
+      frozen,
+    );
+  }
+  assert.equal(game.hitStopRemaining, 0);
+  assert.ok(game.feedbackTime > 1);
   for (let i = 0; i < 239; i++) {
     obstacle(game, game.x, 0.3);
     game.step(STEP);

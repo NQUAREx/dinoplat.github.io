@@ -7,6 +7,7 @@ import { checkCollectibles } from "./collectibles-browser.mjs";
 import { checkTerrainMotion } from "./terrain-browser.mjs";
 import { checkContinuity } from "./continuity-browser.mjs";
 import { checkInstanceMotion } from "./instance-motion-browser.mjs";
+import { checkFeedback } from "./feedback-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -46,7 +47,7 @@ async function ready(page) {
       errors.push(message.text());
   });
   await page.goto(`${url}/?debug`);
-  await page.waitForFunction(() => window.__runner?.stats().textures === 3);
+  await page.waitForFunction(() => window.__runner?.stats().textures === 4);
 }
 try {
   for (let i = 0; i < 50; i++) {
@@ -67,6 +68,7 @@ try {
   assert.equal(await desktop.locator("#mobile-required").isVisible(), true);
   await desktop.close();
   const context = await browser.newContext(phone);
+  report.feedback = await checkFeedback(context, url);
   report.collectibles = await checkCollectibles(
     context,
     url,
@@ -104,7 +106,7 @@ try {
   report.initial = await page.evaluate(() => window.__runner.snapshot());
   assert.equal(report.initial.boundaryCount, 0);
   assert.equal(report.initial.obstacleVariants, 7);
-  assert.equal(report.initial.loadedPoses, 8);
+  assert.equal(report.initial.animationClips, 5);
   assert.equal(report.initial.terrainLayers, 97);
   assert.equal(report.initial.terrainTileMetres, 2.5);
   assert.equal(report.initial.cameraFov, 50);
@@ -506,7 +508,7 @@ try {
       opacity: r.stats().playerOpacity,
     };
   });
-  assert.deepEqual(hit, { lives: 2, immunity: 2, speed: 12, opacity: 0.5 });
+  assert.deepEqual(hit, { lives: 2, immunity: 2, speed: 12, opacity: 1 });
   assert.equal(await page.locator("#lives .empty-heart").count(), 1);
   await page.evaluate(() => {
     window.__runner.game.health.immunity = 1.85;
@@ -564,7 +566,7 @@ try {
     ...window.__runner.stats(),
   }));
   assert.equal(report.memoryBefore.geometries, report.memoryAfter.geometries);
-  assert.equal(report.memoryAfter.textures, 3);
+  assert.equal(report.memoryAfter.textures, 4);
   assert.ok(report.memoryAfter.heap - report.memoryBefore.heap < 2000000);
   report.performance = await page.evaluate(async () => {
     const samples = [];
@@ -731,7 +733,7 @@ try {
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(
-    "PASS: infinite 2D window, animated voxel models, separated gestures, HUD, painted terrain/stone transitions, haptics, culling, 100 restarts, recovery and errors.",
+    "PASS: infinite 2D window, animated low-poly rig and pooled feedback, separated gestures, HUD, painted terrain/stone transitions, haptics, culling, 100 restarts, recovery and errors.",
   );
 } finally {
   await browser.close();
