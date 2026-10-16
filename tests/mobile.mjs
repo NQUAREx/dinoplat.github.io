@@ -12,6 +12,7 @@ import { checkTurning, checkRetina } from "./turning-browser.mjs";
 import { checkDinoRun } from "./dino-run-browser.mjs";
 import { checkShop } from "./shop-browser.mjs";
 import { checkPolish } from "./polish-browser.mjs";
+import { checkMenuWorld } from "./menu-world-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -535,6 +536,7 @@ try {
       assert.deepEqual(errors, []);
       results[engine].shop = await checkShop(context, url, engine);
       results[engine].polish = await checkPolish(context,url,engine);
+      results[engine].menuWorld=await checkMenuWorld(context,url,engine);
       await context.close();
     } finally {
       await browser.close();

@@ -73,6 +73,14 @@ export async function checkShop(context, url, engine) {
     });
     assert.equal(purchased.coins, 1120);
     assert.equal(purchased.diamonds, 1940);
+    assert.equal(
+      await page.locator("#shop-coins").innerText(),
+      String(purchased.coins),
+    );
+    assert.equal(
+      await page.locator("#shop-diamonds").innerText(),
+      String(purchased.diamonds),
+    );
     assert.equal(purchased.render.hatVisible, true);
     assert.equal(purchased.render.bootsVisible, true);
     assert.equal(purchased.render.hatParent, "dino-head");

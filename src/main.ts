@@ -211,7 +211,12 @@ class GameApplication {
           // otherwise its compositor can show the old world through Home.
           if (this.game.phase !== "running" && this.game.phase !== "dying")
             this.view?.draw();
-          this.schedule();
+          if (
+            this.game.phase === "running" ||
+            this.game.phase === "dying" ||
+            this.view?.rig.transitioning
+          )
+            this.schedule();
         },
         options,
       );

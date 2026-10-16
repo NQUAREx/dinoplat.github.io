@@ -115,10 +115,14 @@ export class GameUI {
             this.hearts[h].classList.toggle("empty-heart", h >= value);
         } else {
           this.counters[i].textContent = this.format(value);
-          if (i === 0)
+          if (i === 0) {
             this.element("menu-coins").textContent = this.format(value);
-          if (i === 1)
+            this.element("shop-coins").textContent = this.format(value);
+          }
+          if (i === 1) {
             this.element("menu-diamonds").textContent = this.format(value);
+            this.element("shop-diamonds").textContent = this.format(value);
+          }
         }
       }
     }

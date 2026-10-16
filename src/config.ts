@@ -27,9 +27,9 @@ export class Rules {
   static readonly duckDuration = 0.85;
   static readonly duckBlendSpeed = 12;
   static readonly diveSpeed = 22;
-  static readonly gravity = 22;
+  static readonly gravity = 31.68;
   // Preserve jump clearance after doubling cactus height (v² / 2g).
-  static readonly jumpSpeed = 13.3;
+  static readonly jumpSpeed = 15.96;
   static readonly runFramesPerMetre = 0.9;
   static readonly stepStride = 4 / Rules.runFramesPerMetre;
 }

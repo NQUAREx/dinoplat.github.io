@@ -811,11 +811,24 @@ body[data-device="unsupported"] #mobile-required {
   }
 }
 
-#app[data-menu="home"] #overlay {
+#app[data-menu="home"] #overlay,
+#app[data-menu="shop"] #overlay,
+#app[data-menu="settings"] #overlay {
   background: transparent;
 }
 #app[data-menu="home"] .menu-content {
   background: transparent;
+}
+.shop-wallet {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 0 10px;
+}
+.shop-wallet > div {
+  flex-direction: row;
+  gap: 8px;
 }
 #menu-avatar {
   width: 100%;

@@ -13,6 +13,8 @@ A lightweight, touch-only endless 3D runner built with Three.js 0.186.1, TypeScr
 - Consecutive top-left tabs open Home, Shop and Settings only before a run or after death. Pause is separate and contains only Resume and Settings. Sound effects and music have independent saved toggles. Camera shake stays fixed at290%; landing impact is50% stronger, respecting reduced motion. Portrait touch browsers only; keyboard/mouse and landscape gameplay are intentionally unsupported.
 - Damage displays a small 2D -1 heart notice and freezes the contact pose for one second, including fatal hits; then two seconds of immunity/blinking and temporary start speed. Pickups display +1 icons; a full-health heart displays MAX. Pause freezes timers and restart clears feedback.
 - Coins/diamonds survive new runs via a validated, year-long, project-scoped cookie. Hearts restore one up to three. Browser privacy/deletion can clear storage; this is a client-side prototype economy, not secure server money.
+- Shop shows a sticky coin/diamond balance, refreshed after purchases. Home, Shop and Settings share the world background; the rotatable character preview retains its own framed area. Menus draw on interaction only, not an idle loop, and use no extra WebGL context or background texture.
+- Jump flight lasts about1.008s (16.7% shorter), with the same4.020m apex/obstacle clearance. Take-off speed15.96m/s and gravity31.68m/s² replace13.3/22; jump/dive collisions remain swept.
 
 ## iPhone / Android rendering
 
@@ -89,3 +91,7 @@ Vite uses relative asset paths so the `/DinoPlat3d/` subpath works on static hos
 Budget after warm-up: up to38 draws during shadow/LOD overlap with accessories,24 otherwise; at most30geometries/5textures with the full wardrobe and preview. The default100-restart probe stays at21geometries/5textures. Fixed pools and finite tests are evidence of bounded resources, not proof against every leak. Physical-device FPS remains unmeasured. See [VERIFICATION.md](VERIFICATION.md), [ASSETS.md](ASSETS.md), and [AGENTS.md](AGENTS.md) for current results, licensing and mandatory invariants.
 
 GPL-3.0-only; no warranty. Preserve source/attribution when redistributing. Original reference artwork and third-party notices are documented in ASSETS.md.
+
+## Optional Codex communication skill
+
+The environment has the authentic [JuliusBrussee/caveman](https://github.com/JuliusBrussee/caveman) skill installed globally using `DO_NOT_TRACK=1 npx --yes skills add JuliusBrussee/caveman --skill caveman --agent codex --global --yes`. Installed file: `/home/agent/.agents/skills/caveman/SKILL.md`; its Git blob hash matches the official source: `9a94044529e5ee1576361c891b4a271504518e6f`. This installs the skill only, not Caveman's proxy, model routing or CLI suite. It does not add a game dependency or change code/documentation style. Global installation belongs to this environment; a different environment needs installation again.

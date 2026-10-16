@@ -81,8 +81,7 @@ export class MenuPreview {
     renderer.getClearColor(this.colour);
     const auto = renderer.autoClear;
     renderer.setScissorTest(false);
-    renderer.setClearColor(0x73d8ff);
-    renderer.clear();
+    // Preserve the world already rendered behind every menu.
     const canvas = renderer.domElement.getBoundingClientRect();
     const clearRect = (element: HTMLElement, colour: number) => {
       const r = element.getBoundingClientRect();

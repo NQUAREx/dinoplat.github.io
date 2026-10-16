@@ -12,6 +12,7 @@ import { checkTurning } from "./turning-browser.mjs";
 import { checkDinoRun } from "./dino-run-browser.mjs";
 import { checkShop } from "./shop-browser.mjs";
 import { checkPolish } from "./polish-browser.mjs";
+import { checkMenuWorld } from "./menu-world-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -776,6 +777,7 @@ try {
   report.errors = errors;
   report.shop = await checkShop(context, url, "chromium");
   report.polish = await checkPolish(context,url,"chromium");
+  report.menuWorld=await checkMenuWorld(context,url,"chromium");
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(

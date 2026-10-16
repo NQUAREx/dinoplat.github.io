@@ -5,6 +5,33 @@ import { Simulation, STEP } from "../src/simulation.ts";
 import { Rules } from "../src/config.ts";
 import { GameSettings } from "../src/settings.ts";
 import { COSMETICS } from "../src/cosmetics.ts";
+import { GameEvent } from "../src/events.ts";
+
+test("quicker jump preserves apex and shortens airtime without double landing", () => {
+  const oldApex = (13.3 * 13.3) / (2 * 22),
+    oldFlight = (2 * 13.3) / 22;
+  assert.ok(
+    Math.abs(Rules.jumpSpeed ** 2 / (2 * Rules.gravity) - oldApex) < 1e-9,
+  );
+  assert.ok((2 * Rules.jumpSpeed) / Rules.gravity < oldFlight * 0.84);
+  const game = new Simulation(1);
+  game.phase = "running";
+  game.health.immunity = 1e9;
+  let landed = 0;
+  game.events.on(GameEvent.Land, () => landed++);
+  game.jump();
+  let peak = 0,
+    ticks = 0;
+  do {
+    game.step(STEP);
+    peak = Math.max(peak, game.y);
+    ticks++;
+  } while (game.y > 0 || game.velocityY > 0);
+  assert.ok(Math.abs(peak - oldApex) < 0.01);
+  assert.ok(ticks * STEP < 1.02 && ticks * STEP > 1);
+  for (let i = 0; i < 60; i++) game.step(STEP);
+  assert.equal(landed, 1);
+});
 
 test("root death falls sideways, bounces twice, is continuous and stops world travel", () => {
   const motion = new DeathMotion();

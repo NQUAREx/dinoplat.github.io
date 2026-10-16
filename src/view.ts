@@ -33,7 +33,6 @@ export class View {
   private readonly dinosaur: AnimatedDinosaur;
   private readonly cosmetics: DinosaurCosmetics;
   private readonly preview: MenuPreview;
-  private warmed = false;
   private deathFirstPerson = false;
   private readonly dinosaurShadow = new DinosaurShadow();
   private readonly dust: FootDust;
@@ -238,10 +237,6 @@ export class View {
     const game = this.game;
     const home =
       (game.phase === "ready" || game.phase === "over") && this.preview.visible;
-    if (this.warmed && home) {
-      this.preview.draw(this.renderer);
-      return;
-    }
     this.pose.update(game, alpha);
     this.lighting.update(
       game.previousTime + (game.time - game.previousTime) * alpha,
@@ -395,7 +390,6 @@ export class View {
     this.renderer.info.render.frame++;
     this.renderer.render(this.scene, this.rig.camera);
     this.shadows.complete(this.lighting);
-    this.warmed = true;
     if (home) this.preview.draw(this.renderer);
   }
   stats() {
