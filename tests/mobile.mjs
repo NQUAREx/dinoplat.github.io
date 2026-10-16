@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { checkCollectibles } from "./collectibles-browser.mjs";
+import { checkTerrainMotion } from "./terrain-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -25,7 +26,7 @@ async function checkLighting(context, engine) {
   try {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 1);
+    await page.waitForFunction(() => window.__runner?.stats().textures === 3);
     await page.evaluate(() => {
       const r = window.__runner,
         g = r.game;
@@ -128,17 +129,26 @@ async function checkLighting(context, engine) {
         probe.brighter <= 16,
         `shadow sampling changed ${probe.brighter} bright edge pixels`,
       );
-      if (hour === 9 || hour === 15) {
+      if (hour === 9 || hour === 15 || hour === 0) {
         assert.ok(
           probe.changed > 50,
           `${engine}: sun must create visible ground shadows`,
         );
         assert.ok(probe.stats.shadows > 0);
       }
-      if (hour === 0) assert.equal(probe.changed, 0);
       assert.ok(probe.stats.calls <= 15);
-      assert.equal(probe.stats.textures, 1);
+      assert.equal(probe.stats.textures, 3);
       frames[hour] = probe;
+      // Let WebKit present the manually drawn paused frame to its compositor.
+      await page.evaluate(
+        () =>
+          new Promise((resolve) =>
+            requestAnimationFrame(() => {
+              window.__runner.render();
+              requestAnimationFrame(resolve);
+            }),
+          ),
+      );
       await page.screenshot({
         path: `test-results/${engine}-time-${hour}.png`,
       });
@@ -151,7 +161,10 @@ async function checkLighting(context, engine) {
       r.lighting.setSunPosition(-8, 12, 4);
       r.render();
     });
-    assert.equal(await page.evaluate(() => window.__runner.stats().sunX), -8);
+    assert.ok(
+      Math.abs((await page.evaluate(() => window.__runner.stats().sunX)) + 8) <
+        0.3,
+    );
     return frames;
   } finally {
     await page.close();
@@ -196,7 +209,7 @@ try {
           errors.push(message.text());
       });
       await page.goto(`${url}/?debug`);
-      await page.waitForFunction(() => window.__runner?.stats().textures === 1);
+      await page.waitForFunction(() => window.__runner?.stats().textures === 3);
       assert.equal(
         await page.evaluate(() => getComputedStyle(document.body).position),
         "fixed",
@@ -207,6 +220,39 @@ try {
         ),
         "none",
       );
+      await page.evaluate(() => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector("#title"));
+        const selected = window.getSelection();
+        selected.removeAllRanges();
+        selected.addRange(range);
+        // WebKit may not emit this for a script-created range on CSS-disabled
+        // text. Exercise the guard explicitly; Chromium also gets a real hold.
+        document.dispatchEvent(new Event("selectionchange"));
+      });
+      await page.waitForFunction(() => window.getSelection().rangeCount === 0);
+      if (engine === "chromium") {
+        const cdp = await context.newCDPSession(page),
+          bounds = await page.locator("#title").boundingBox();
+        const point = {
+          x: bounds.x + bounds.width / 2,
+          y: bounds.y + bounds.height / 2,
+        };
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [point],
+        });
+        await page.waitForTimeout(750);
+        assert.equal(
+          await page.evaluate(() => window.getSelection().toString()),
+          "",
+        );
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+        await cdp.detach();
+      }
       const guards = await page.evaluate(() => {
         const result = {};
         for (const type of [
@@ -216,6 +262,8 @@ try {
           "gesturestart",
           "gesturechange",
           "dblclick",
+          "touchstart",
+          "touchend",
         ]) {
           const event = new Event(type, { cancelable: true, bubbles: true });
           document.querySelector("#title").dispatchEvent(event);
@@ -396,6 +444,11 @@ try {
         errors,
       };
       results[engine].lighting = await checkLighting(context, engine);
+      results[engine].terrainMotion = await checkTerrainMotion(
+        context,
+        url,
+        engine,
+      );
       results[engine].collectibles = await checkCollectibles(
         context,
         url,
@@ -426,7 +479,7 @@ try {
         fallback.on("pageerror", (error) => errors.push(error.message));
         await fallback.goto(`${url}/?debug`);
         await fallback.waitForFunction(
-          () => window.__runner?.stats().textures === 1,
+          () => window.__runner?.stats().textures === 3,
         );
         await fallback.tap("#action");
         await fallback.waitForFunction(

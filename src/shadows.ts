@@ -1,69 +1,88 @@
-import type { Scene, BufferGeometry } from "three";
-import type { Ground } from "./ground";
+import { Matrix4, Vector3 } from "three";
 import type { LightingRig } from "./lighting";
-import type { ObjectVisibility } from "./camera";
-import { InstancedObjectType } from "./object-renderer";
-import { ObjectKind } from "./world";
+import type { RenderPose } from "./render-pose";
+import type { Simulation } from "./simulation";
 
-/** Actual cactus silhouettes, no shadow map. Opaque ground resampling avoids
- * accumulated alpha on overlapping faces. Geometry/materials stay shared. */
-export class CactusShadows {
-  private readonly instances: InstancedObjectType;
-  constructor(
-    geometries: readonly BufferGeometry[],
-    ground: Ground,
-    scene: Scene,
+/** One 256² map at 8Hz/4Hz. Rebase its cached matrix between captures so
+ * shadows follow the world continuously rather than jumping at capture time. */
+export class CachedShadows {
+  updates = 0;
+  private valid = false;
+  private refresh = false;
+  private x = 0;
+  private distance = 0;
+  private time = -Infinity;
+  private seed = 0;
+  private revision = -1;
+  private source = "";
+  private worldRevision = -1;
+  private readonly matrix = new Matrix4();
+  private readonly translation = new Matrix4();
+  private readonly right = new Vector3();
+  private readonly up = new Vector3();
+  private readonly shift = new Vector3();
+  prepare(
+    game: Simulation,
+    pose: RenderPose,
+    light: LightingRig,
+    quality: number,
   ) {
-    this.instances = new InstancedObjectType(
-      ObjectKind.Cactus,
-      geometries,
-      ground.createShadowMaterial(),
-      scene,
-    );
-    for (const mesh of this.instances.meshes) mesh.renderOrder = 1;
+    const shadow = light.key.shadow;
+    this.refresh =
+      !this.valid ||
+      !shadow.map ||
+      game.seed !== this.seed ||
+      game.world.revision !== this.worldRevision ||
+      light.revision !== this.revision ||
+      light.source !== this.source ||
+      Math.abs(pose.x - this.x) > 8 ||
+      Math.abs(pose.distance - this.distance) > 8 ||
+      game.time < this.time ||
+      game.time - this.time >= (quality <= 0.55 ? 0.25 : 0.125);
+    shadow.needsUpdate = this.refresh;
+    if (this.refresh) {
+      this.x = pose.x;
+      this.distance = pose.distance;
+      this.time = game.time;
+      this.seed = game.seed;
+      this.worldRevision = game.world.revision;
+      this.revision = light.revision;
+      this.source = light.source;
+      const camera = shadow.camera;
+      camera.position.copy(light.key.position);
+      camera.lookAt(light.key.target.position);
+      camera.updateMatrixWorld();
+      this.right.setFromMatrixColumn(camera.matrixWorld, 0);
+      this.up.setFromMatrixColumn(camera.matrixWorld, 1);
+      const worldZ = -pose.distance - 12;
+      const rx = pose.x * this.right.x + worldZ * this.right.z;
+      const uy = pose.x * this.up.x + worldZ * this.up.z;
+      const tx = (camera.right - camera.left) / shadow.mapSize.x,
+        ty = (camera.top - camera.bottom) / shadow.mapSize.y;
+      this.shift
+        .copy(this.right)
+        .multiplyScalar(Math.round(rx / tx) * tx - rx)
+        .addScaledVector(this.up, Math.round(uy / ty) * ty - uy);
+    } else {
+      this.translation.makeTranslation(
+        pose.x - this.x,
+        0,
+        this.distance - pose.distance,
+      );
+      shadow.matrix.copy(this.matrix).multiply(this.translation);
+    }
+    light.key.position.add(this.shift);
+    light.key.target.position.add(this.shift);
+    return this.refresh;
   }
-  begin() {
-    this.instances.begin();
+  complete(light: LightingRig) {
+    if (this.refresh) {
+      this.matrix.copy(light.key.shadow.matrix);
+      this.valid = true;
+      this.updates++;
+    }
   }
-  place(
-    variant: number,
-    x: number,
-    forward: number,
-    angle: number,
-    halfX: number,
-    halfZ: number,
-    height: number,
-    baseY: number,
-    lighting: LightingRig,
-    visibility: ObjectVisibility,
-  ) {
-    if (lighting.shadowStrength <= 0.001) return;
-    const reach =
-      28 + 3 * (Math.max(0, baseY) + height + 0.015) + halfX + halfZ;
-    if (x * x + forward * forward > reach * reach) return;
-    const sx = lighting.shadowSlope.x,
-      sz = lighting.shadowSlope.y;
-    const middle = baseY + height / 2 + 0.015;
-    const cx = x - middle * sx,
-      cz = forward + middle * sz;
-    const hx = halfX + (Math.abs(sx) * height) / 2,
-      hz = halfZ + (Math.abs(sz) * height) / 2;
-    const closestX = Math.max(0, Math.abs(cx) - hx),
-      closestZ = Math.max(0, Math.abs(cz) - hz);
-    if (
-      closestX * closestX + closestZ * closestZ > 28 * 28 ||
-      !visibility.intersects(cx, cz, hx, hz, 0.01, -0.015)
-    )
-      return;
-    this.instances.place(variant, x, -forward, angle, baseY);
-  }
-  finish() {
-    this.instances.finish();
-  }
-  get visible() {
-    return this.instances.visible;
-  }
-  dispose() {
-    this.instances.dispose();
+  invalidate() {
+    this.valid = false;
   }
 }

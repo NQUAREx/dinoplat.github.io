@@ -8,6 +8,7 @@ export class InstancedObjectType {
   private readonly counts: Uint16Array;
   private readonly uploadRanges: { start: number; count: number }[];
   private readonly matrix = new THREE.Matrix4();
+  private lastAngle = NaN;
   constructor(
     readonly kind: ObjectKind,
     geometries: readonly THREE.BufferGeometry[],
@@ -31,7 +32,12 @@ export class InstancedObjectType {
   place(variant: number, x: number, z: number, angle: number, y = 0) {
     const mesh = this.meshes[variant];
     if (!mesh) return;
-    this.matrix.makeRotationY(angle);
+    // Shared pickup phase: compute its rotation once per bank/frame, not once
+    // per coin. The matrix's translation is still updated for every instance.
+    if (angle !== this.lastAngle) {
+      this.matrix.makeRotationY(angle);
+      this.lastAngle = angle;
+    }
     this.matrix.setPosition(x, y, z);
     mesh.setMatrixAt(this.counts[variant]++, this.matrix);
   }

@@ -16,11 +16,13 @@
   --coral: #ff704c;
   --cream: #fff2c3;
 }
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
   -webkit-tap-highlight-color: transparent;
 }
 html {
@@ -55,7 +57,13 @@ a {
   touch-action: manipulation;
 }
 button {
+  appearance: none;
+  -webkit-appearance: none;
   font: inherit;
+}
+::selection {
+  background: transparent;
+  color: inherit;
 }
 a {
   color: #285ca0;

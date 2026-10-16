@@ -216,6 +216,25 @@ test("viewport events coalesce, long-press defaults are blocked and lifecycle li
   env.doc.dispatchEvent(event);
   assert.equal(event.defaultPrevented, false);
 });
+test("native long-press touch defaults and selection ranges are cleared, native ranges remain exempt", (t) => {
+  const env = environment(t);
+  let cleared = 0;
+  Object.assign(env.win, {
+    getSelection: () => ({ rangeCount: 1, removeAllRanges: () => cleared++ }),
+  });
+  env.doc.dispatchEvent(new Event("selectionchange"));
+  assert.equal(cleared, 1);
+  for (const type of ["touchstart", "touchend"]) {
+    const event = new Event(type, { cancelable: true });
+    env.doc.dispatchEvent(event);
+    assert.equal(event.defaultPrevented, true);
+  }
+  const rangeTarget = Object.assign(env.root, { closest: () => env.root });
+  const event = new Event("touchstart", { cancelable: true });
+  Object.defineProperty(event, "target", { value: rangeTarget });
+  env.doc.dispatchEvent(event);
+  assert.equal(event.defaultPrevented, false);
+});
 test("static home-screen manifest and PNG icons resolve inside GitHub Pages subpath", async () => {
   const manifest = JSON.parse(
     await readFile(

@@ -19,7 +19,7 @@ export class CameraRig {
   readonly camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.2, CAMERA_FAR);
   private readonly current: CameraPose = {
     offsetX: 0,
-    height: 10,
+    height: 8.5,
     distance: 12,
     targetY: 1,
     targetZ: -5,
@@ -96,7 +96,7 @@ export class CameraRig {
     this.setPose(
       {
         offsetX: 0,
-        height: 10,
+        height: 8.5,
         distance: 12,
         targetY: 1,
         targetZ: -5,

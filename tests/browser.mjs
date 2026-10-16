@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { checkCollectibles } from "./collectibles-browser.mjs";
+import { checkTerrainMotion } from "./terrain-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -43,7 +44,7 @@ async function ready(page) {
       errors.push(message.text());
   });
   await page.goto(`${url}/?debug`);
-  await page.waitForFunction(() => window.__runner?.stats().textures === 1);
+  await page.waitForFunction(() => window.__runner?.stats().textures === 3);
 }
 try {
   for (let i = 0; i < 50; i++) {
@@ -69,6 +70,7 @@ try {
     url,
     "chromium-browser",
   );
+  report.terrainMotion = await checkTerrainMotion(context, url, "chromium");
   const page = await context.newPage();
   await page.addInitScript(() => {
     window.vibrationCalls = [];
@@ -100,7 +102,7 @@ try {
   assert.equal(report.initial.obstacleVariants, 6);
   assert.equal(report.initial.loadedPoses, 8);
   assert.equal(report.initial.terrainLayers, 97);
-  assert.equal(report.initial.terrainTileMetres, 5);
+  assert.equal(report.initial.terrainTileMetres, 2.5);
   assert.equal(report.initial.cameraFov, 50);
   assert.equal(report.initial.cameraFar, 96);
   assert.equal(report.initial.fogStart, 36);
@@ -122,8 +124,8 @@ try {
   });
   await page.waitForFunction(
     () =>
-      document.querySelector("#coins").textContent === "7" &&
-      document.querySelector("#diamonds").textContent === "2",
+      Number(document.querySelector("#coins").textContent) >= 7 &&
+      Number(document.querySelector("#diamonds").textContent) >= 2,
   );
   const cdp = await page.context().newCDPSession(page);
   const touch = (type, x = 330, y = 620) =>
@@ -142,10 +144,18 @@ try {
     /jump/,
   );
   await touch("touchEnd");
-  await page.waitForFunction(() => window.__runner.game.y > 2);
+  // Start the independent down-swipe fixture at a known airborne height. The
+  // preceding real up-swipe was already checked; do not race its brief apex
+  // against debug protocol round trips on a software GPU.
+  assert.equal(
+    await page.evaluate(() => window.__runner.game.phase),
+    "running",
+  );
   await page.evaluate(() => {
     const g = window.__runner.game,
       down = g.down.bind(g);
+    g.y = g.previousY = 2;
+    g.velocityY = 0;
     window.downSwipes = 0;
     g.down = () => {
       window.downSwipes++;
@@ -294,6 +304,14 @@ try {
       g.world.z[i] = g.distance + 4;
       g.world.baseY[i] = 0.5;
     }
+    r.render();
+  });
+  // Warm moon geometry before resource comparisons.
+  await page.evaluate(() => {
+    const r = window.__runner;
+    r.lighting.setTimeOfDay(0);
+    r.render();
+    r.lighting.setTimeOfDay(9, true);
     r.render();
   });
   // The visible cactus behind the old -4m cutoff is not discarded.
@@ -542,7 +560,7 @@ try {
     ...window.__runner.stats(),
   }));
   assert.equal(report.memoryBefore.geometries, report.memoryAfter.geometries);
-  assert.equal(report.memoryAfter.textures, 1);
+  assert.equal(report.memoryAfter.textures, 3);
   assert.ok(report.memoryAfter.heap - report.memoryBefore.heap < 2000000);
   report.performance = await page.evaluate(async () => {
     const samples = [];
@@ -574,8 +592,55 @@ try {
   });
   assert.equal(report.performance.failed, undefined);
   assert.equal(report.performance.lives, 3);
-  assert.ok(report.performance.calls <= 18);
+  assert.ok(report.performance.calls <= 19);
   await page.screenshot({ path: "test-results/animated-run.png" });
+  report.shadowsAfter170 = await page.evaluate(() => {
+    const r = window.__runner,
+      g = r.game;
+    g.phase = "paused";
+    g.x = g.previousX = 0;
+    g.distance = g.previousDistance = 220;
+    g.world.update(0, 220);
+    g.terrain.advance(220);
+    r.lighting.shadowsEnabled = true;
+    r.render();
+    const gl = document.querySelector("#game").getContext("webgl2");
+    const a = new Uint8Array(
+        gl.drawingBufferWidth * gl.drawingBufferHeight * 4,
+      ),
+      b = new Uint8Array(a.length);
+    gl.readPixels(
+      0,
+      0,
+      gl.drawingBufferWidth,
+      gl.drawingBufferHeight,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      a,
+    );
+    const stats = r.stats();
+    r.lighting.shadowsEnabled = false;
+    r.render();
+    gl.readPixels(
+      0,
+      0,
+      gl.drawingBufferWidth,
+      gl.drawingBufferHeight,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      b,
+    );
+    let darker = 0;
+    for (let i = 0; i < a.length; i += 4)
+      if (b[i] - a[i] > 8 || b[i + 1] - a[i + 1] > 8 || b[i + 2] - a[i + 2] > 8)
+        darker++;
+    r.lighting.shadowsEnabled = true;
+    r.render();
+    return { stats, darker, error: gl.getError() };
+  });
+  assert.ok(report.shadowsAfter170.stats.shadowStrength > 0.5);
+  assert.ok(report.shadowsAfter170.darker > 20);
+  assert.equal(report.shadowsAfter170.error, 0);
   await page.evaluate(() => {
     const gl = document.querySelector("#game").getContext("webgl2");
     window.testLoss = gl.getExtension("WEBGL_lose_context");

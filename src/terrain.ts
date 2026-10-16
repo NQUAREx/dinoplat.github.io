@@ -1,6 +1,6 @@
 /** Independent randomness, editable weights, no immediate repeats. */
 export const TERRAIN_LENGTH = 500;
-export const TERRAIN_TRANSITION = 10;
+export const TERRAIN_TRANSITION = 5;
 export class TerrainLayout {
   static readonly tileSize = 128;
   static readonly atlasColumns = 10;
@@ -9,7 +9,7 @@ export class TerrainLayout {
   static readonly stoneLayer = 64;
   static readonly transitionLayer = 65;
   static readonly exitTransitionLayer = 81;
-  static readonly worldTileSize = 5;
+  static readonly worldTileSize = 2.5;
 }
 export const TERRAIN_WEIGHTS = [
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,

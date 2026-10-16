@@ -11,7 +11,7 @@ export async function checkCollectibles(context, url, engine) {
   });
   try {
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures === 1);
+    await page.waitForFunction(() => window.__runner?.stats().textures === 3);
     await page.tap("#action");
     await page.evaluate(() => window.__runner.pause());
     await page.addStyleTag({
@@ -71,7 +71,7 @@ export async function checkCollectibles(context, url, engine) {
       JSON.stringify(initial),
     );
     assert.equal(initial.glError, 0);
-    assert.equal(initial.textures, 1);
+    assert.equal(initial.textures, 3);
     const animated = await page.evaluate(() => {
       const r = window.__runner;
       r.game.time = r.game.previousTime = 0.3;
@@ -137,8 +137,34 @@ export async function checkCollectibles(context, url, engine) {
     );
     await page.evaluate(() => window.__runner.pause());
     assert.deepEqual(errors, []);
-    return { initial, animated, collected, errors };
+    await page.evaluate(() => {
+      const r = window.__runner;
+      r.game.phase = "over";
+      r.start();
+      r.pause();
+    });
+    assert.equal(
+      await page.evaluate(() => window.__runner.game.wallet.coins),
+      1,
+    );
+    const saved = (await context.cookies()).find(
+      (c) => c.name === "dinoplat3d-wallet-v1",
+    );
+    assert.equal(saved?.value, "1.1.1");
+    assert.equal(saved?.sameSite, "Lax");
+    await page.reload();
+    await page.waitForFunction(() => window.__runner?.stats().textures === 3);
+    assert.equal(
+      await page.evaluate(() => window.__runner.game.wallet.coins),
+      1,
+    );
+    assert.equal(
+      await page.evaluate(() => window.__runner.game.wallet.diamonds),
+      1,
+    );
+    return { initial, animated, collected, persistent: true, errors };
   } finally {
     await page.close();
+    await context.clearCookies({ name: "dinoplat3d-wallet-v1" });
   }
 }

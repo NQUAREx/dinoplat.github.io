@@ -11,7 +11,7 @@ import type { Simulation } from "./simulation";
 import type { ModelLibrary } from "./models";
 import { LightingRig } from "./lighting";
 import { RenderPose } from "./render-pose";
-import { CactusShadows } from "./shadows";
+import { CachedShadows } from "./shadows";
 import { PickupMotion } from "./pickup-motion";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
@@ -21,7 +21,7 @@ export class View {
   readonly lighting = new LightingRig();
   private readonly pose = new RenderPose();
   private readonly pickupMotion = new PickupMotion();
-  private readonly shadows: CactusShadows;
+  private readonly shadows = new CachedShadows();
   private readonly scene = new THREE.Scene();
   private readonly ground: Ground;
   private readonly dinosaur: AnimatedDinosaur;
@@ -47,6 +47,7 @@ export class View {
   private cooldown = 0;
   private nearestRenderedForward = Infinity;
   private maximumRelativeX = 0;
+  private visibleCacti = 0;
   private worldFov = 0;
   private worldCameraX = 0;
   private viewportWidth = 0;
@@ -64,23 +65,26 @@ export class View {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     this.rig = new CameraRig(reducedMotion);
-    this.ground = new Ground(texture, this.lighting);
+    this.ground = new Ground(texture);
     this.dinosaur = new AnimatedDinosaur(models, game);
     this.dust = new FootDust(game, reducedMotion);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
       alpha: false,
-      stencil: true,
       powerPreference: "low-power",
     });
     this.renderer.setClearColor(Palette.sky);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    this.renderer.shadowMap.autoUpdate = false;
     this.scene.fog = new THREE.Fog(Palette.sky, FOG_START, FOG_END);
     this.scene.add(
-      this.lighting.sun,
-      this.lighting.sun.target,
+      this.lighting.key,
+      this.lighting.key.target,
       this.lighting.ambient,
+      this.lighting.moon,
     );
     const time = new URLSearchParams(location.search).get("time");
     if (time !== null && time.trim() !== "" && Number.isFinite(Number(time)))
@@ -106,9 +110,12 @@ export class View {
       this.pickupMaterial,
     );
     this.scene.add(this.ground.mesh, this.dinosaur.mesh, this.dust.mesh);
-    this.shadows = new CactusShadows(models.cacti, this.ground, this.scene);
-    for (const mesh of this.objectRenderers.get(ObjectKind.Cactus)!.meshes)
-      mesh.renderOrder = 2;
+    for (const mesh of this.objectRenderers.get(ObjectKind.Cactus)!.meshes) {
+      mesh.castShadow = true;
+      // Only the terrain needs reception today. Avoid a depth lookup on every
+      // cactus fragment; future low-poly props can opt into self-shadowing.
+      mesh.receiveShadow = false;
+    }
     this.off = [
       game.events.on(GameEvent.Hit, () => this.rig.impulse(0.075, 0.22)),
       game.events.on(GameEvent.Land, () => this.rig.impulse(0.015, 0.1)),
@@ -186,7 +193,6 @@ export class View {
   draw(alpha = 1, dt = 0) {
     const game = this.game;
     this.pose.update(game, alpha);
-    this.lighting.qualityShadows = this.quality > 0.55;
     this.lighting.update(game.time);
     this.renderer.setClearColor(this.lighting.fogColour);
     (this.scene.fog as THREE.Fog).color.copy(this.lighting.fogColour);
@@ -195,6 +201,10 @@ export class View {
     const moving = game.phase === "running" && !game.y && !game.velocityY;
     const activeDt = game.phase === "running" ? dt : 0;
     this.rig.update(this.pose.distance, 0, activeDt, moving);
+    if (this.lighting.moon.visible)
+      this.lighting.moon.position
+        .set(0.58, 0.65, 0.997)
+        .unproject(this.rig.camera);
     this.visibility.update(this.rig.camera);
     this.dust.update(
       game,
@@ -218,7 +228,7 @@ export class View {
       this.worldCameraX = camera.position.x;
     }
     this.objectRenderers.begin();
-    this.shadows.begin();
+    this.visibleCacti = 0;
     this.nearestRenderedForward = Infinity;
     this.maximumRelativeX = 0;
     const world = game.world;
@@ -234,33 +244,32 @@ export class View {
       const animated =
         world.registry.get(world.kinds[i])?.animation === "spin-bob";
       const y = world.baseY[i] + (animated ? this.pickupMotion.bob : 0);
+      const visible = this.visibility.intersects(
+        x,
+        forward,
+        world.halfX[i],
+        world.halfZ[i],
+        world.height[i],
+        y,
+      );
+      let caster = false;
       if (
-        this.lighting.shadowStrength > 0.001 &&
-        world.kinds[i] === ObjectKind.Cactus
-      )
-        this.shadows.place(
-          world.variants[i],
-          x,
-          forward,
-          world.angles[i],
-          world.halfX[i],
-          world.halfZ[i],
-          world.height[i],
-          world.baseY[i],
-          this.lighting,
-          this.visibility,
+        world.kinds[i] === ObjectKind.Cactus &&
+        x * x + forward * forward < 60 * 60
+      ) {
+        const sx = this.lighting.shadowSlope.x,
+          sz = this.lighting.shadowSlope.y;
+        const mid = world.baseY[i] + world.height[i] / 2;
+        caster = this.visibility.intersects(
+          x - mid * sx,
+          forward + mid * sz,
+          world.halfX[i] + (Math.abs(sx) * world.height[i]) / 2,
+          world.halfZ[i] + (Math.abs(sz) * world.height[i]) / 2,
+          0.02,
+          0,
         );
-      if (
-        !this.visibility.intersects(
-          x,
-          forward,
-          world.halfX[i],
-          world.halfZ[i],
-          world.height[i],
-          y,
-        )
-      )
-        continue;
+      }
+      if (!visible && !caster) continue;
       renderer.place(
         world.variants[i],
         x,
@@ -268,15 +277,24 @@ export class View {
         animated ? this.pickupMotion.angle : world.angles[i],
         y,
       );
-      this.nearestRenderedForward = Math.min(
-        this.nearestRenderedForward,
-        forward,
-      );
-      this.maximumRelativeX = Math.max(this.maximumRelativeX, Math.abs(x));
+      if (visible) {
+        if (world.kinds[i] === ObjectKind.Cactus) this.visibleCacti++;
+        this.nearestRenderedForward = Math.min(
+          this.nearestRenderedForward,
+          forward,
+        );
+        this.maximumRelativeX = Math.max(this.maximumRelativeX, Math.abs(x));
+      }
     }
     this.objectRenderers.finish();
-    this.shadows.finish();
+    this.renderer.shadowMap.needsUpdate = this.shadows.prepare(
+      game,
+      this.pose,
+      this.lighting,
+      this.quality,
+    );
     this.renderer.render(this.scene, this.rig.camera);
+    this.shadows.complete(this.lighting);
   }
   stats() {
     return {
@@ -310,7 +328,7 @@ export class View {
       visibleHearts: this.objectRenderers.get(ObjectKind.Heart)!.visible,
       pickupAngle: this.pickupMotion.angle,
       pickupBob: this.pickupMotion.bob,
-      visibleObstacles: this.objectRenderers.get(ObjectKind.Cactus)!.visible,
+      visibleObstacles: this.visibleCacti,
       visibleObjects: this.objectRenderers.visible,
       nearestRenderedForward: this.nearestRenderedForward,
       maximumRelativeX: this.maximumRelativeX,
@@ -320,10 +338,18 @@ export class View {
       loadedPoses: this.models.run.length,
       hours: this.lighting.cycle.hours,
       fogColour: this.lighting.fogColour.getHex(),
-      sunX: this.lighting.sun.position.x,
-      sunY: this.lighting.sun.position.y,
-      sunZ: this.lighting.sun.position.z,
-      shadows: this.shadows.visible,
+      sunX: this.lighting.key.position.x,
+      sunY: this.lighting.key.position.y,
+      sunZ: this.lighting.key.position.z,
+      lightSource: this.lighting.source,
+      moonVisible: this.lighting.moon.visible,
+      shadowUpdates: this.shadows.updates,
+      shadowMapSize: this.lighting.key.shadow.mapSize.x,
+      terrainTriangles: this.ground.surface.geometry.index!.count / 3,
+      shadows:
+        this.lighting.shadowStrength > 0
+          ? this.objectRenderers.get(ObjectKind.Cactus)!.visible
+          : 0,
       shadowStrength: this.lighting.shadowStrength,
       renderX: this.pose.x,
       renderDistance: this.pose.distance,
@@ -332,7 +358,6 @@ export class View {
   dispose() {
     for (const off of this.off) off();
     this.objectRenderers.dispose();
-    this.shadows.dispose();
     this.cactusMaterial.dispose();
     this.pickupMaterial.dispose();
     this.dinosaur.dispose();
@@ -341,5 +366,10 @@ export class View {
     this.models.dispose();
     this.lighting.dispose();
     this.renderer.dispose();
+  }
+  restoreContext() {
+    this.shadows.invalidate();
+    this.lighting.key.shadow.map?.dispose();
+    this.lighting.key.shadow.map = null;
   }
 }

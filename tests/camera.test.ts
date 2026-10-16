@@ -23,14 +23,14 @@ test("shake slider spans zero to three times original amplitude without altering
   rig.shakeMultiplier = 0;
   rig.impulse(0.075, 0.22);
   rig.update(1.1, 0, 0.016, true);
-  assert.equal(rig.camera.position.y, 10);
+  assert.equal(rig.camera.position.y, 8.5);
   assert.equal(rig.camera.position.x, 0);
   const normal = new CameraRig();
   normal.update(1.1, 0, 0.016, true);
   rig.shakeMultiplier = 3;
   rig.update(1.1, 0, 0.016, true);
   assert.ok(
-    Math.abs(rig.camera.position.y - 10 - (normal.camera.position.y - 10) * 3) <
+    Math.abs(rig.camera.position.y - 8.5 - (normal.camera.position.y - 8.5) * 3) <
       1e-10,
   );
   assert.equal(rig.camera.fov, 50);

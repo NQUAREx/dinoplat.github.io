@@ -43,7 +43,7 @@ test("all pickups use one bounded periodic motion clock, freeze in pause and res
   assert.equal(game.previousTime, 0);
 });
 
-test("collect coin/diamond exactly once, including during damage immunity; restart clears totals", () => {
+test("collect coin/diamond exactly once, including during damage immunity; restart retains balances", () => {
   const game = new Simulation(1);
   game.phase = "running";
   game.health.immunity = 2;
@@ -57,7 +57,7 @@ test("collect coin/diamond exactly once, including during damage immunity; resta
   assert.equal(game.wallet.diamonds, 1);
   assert.equal(game.health.lives, 3);
   game.reset(2);
-  assert.equal(game.wallet.coins + game.wallet.diamonds, 0);
+  assert.equal(game.wallet.coins + game.wallet.diamonds, 2);
 });
 
 test("hearts restore exactly one, never exceed three or revive dead; immunity is preserved", () => {

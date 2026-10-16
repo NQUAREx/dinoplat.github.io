@@ -60,7 +60,6 @@ export class Simulation {
     this.world.update(0, 0);
     this.terrain.reset(this.seed);
     this.health.reset();
-    this.wallet.reset();
     this.bonuses.reset();
     this.events.emit(GameEvent.Start);
   }

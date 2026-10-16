@@ -10,6 +10,7 @@ import { Haptics } from "./haptics";
 import { GameSettings } from "./settings";
 import { GameSound } from "./sound";
 import { MobileBrowser } from "./mobile-browser";
+import { CurrencyCookies } from "./currency-cookies";
 
 class GameApplication {
   readonly game = new Simulation(1979);
@@ -25,6 +26,7 @@ class GameApplication {
   private view?: View;
   private input?: Input;
   private mobile?: MobileBrowser;
+  private currency?: CurrencyCookies;
   private alive = true;
   private contextLost = false;
   private previous = 0;
@@ -45,6 +47,11 @@ class GameApplication {
       },
     );
     this.ui.loading();
+    this.currency = new CurrencyCookies(
+      this.game.wallet,
+      this.game.events,
+      new URL(import.meta.env.BASE_URL, location.href).pathname,
+    );
     try {
       if (!WebGL.isWebGL2Available())
         throw new Error("Для игры нужен мобильный браузер с WebGL 2.");
@@ -228,6 +235,7 @@ class GameApplication {
       "webglcontextrestored",
       () => {
         this.contextLost = false;
+        this.view?.restoreContext();
         if (this.game.phase === "ready") this.game.phase = "paused";
         this.ui.show(this.game);
         this.view?.resize();
@@ -290,6 +298,7 @@ class GameApplication {
     this.schedule();
   }
   pause() {
+    this.currency?.flush();
     this.input?.clear();
     this.haptics.stop();
     this.sound.suspend();
@@ -351,6 +360,7 @@ class GameApplication {
     this.stopFrames();
     this.abort.abort();
     this.mobile?.dispose();
+    this.currency?.dispose();
     this.input?.dispose();
     this.haptics.dispose();
     this.sound.dispose();

@@ -44,7 +44,44 @@ export class MobileBrowser {
       "gesturechange",
       "gestureend",
     ])
-      document.addEventListener(type, prevent, { ...options, passive: false });
+      document.addEventListener(type, prevent, {
+        ...options,
+        passive: false,
+        capture: true,
+      });
+    const clearSelection = () => {
+      const selection = window.getSelection?.();
+      if (selection?.rangeCount) selection.removeAllRanges();
+    };
+    document.addEventListener("selectionchange", clearSelection, options);
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (event.pointerType !== "touch") return;
+        clearSelection();
+        if (
+          event.target instanceof Element &&
+          !event.target.closest('input[type="range"], a[href]')
+        )
+          prevent(event);
+      },
+      { ...options, passive: false, capture: true },
+    );
+    // Cancel native touch long-press too; Pointer Events alone are insufficient.
+    for (const type of ["touchstart", "touchend"])
+      document.addEventListener(
+        type,
+        (event) => {
+          clearSelection();
+          if (
+            event.target instanceof Element &&
+            event.target.closest('input[type="range"], a[href]')
+          )
+            return;
+          prevent(event);
+        },
+        { ...options, passive: false, capture: true },
+      );
     document.addEventListener(
       "touchmove",
       (event) => {
