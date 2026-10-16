@@ -5,6 +5,7 @@ import { Rules } from "../src/config.ts";
 import { ObjectRegistry, ObjectKind, WorldSpawner } from "../src/world.ts";
 import { GameEvent, GameEvents } from "../src/events.ts";
 import { Currency, Wallet } from "../src/progression.ts";
+import { Surface } from "../src/landscape.ts";
 
 function emptyGame(distance = 0, x = 0) {
   const registry = new ObjectRegistry();
@@ -15,6 +16,7 @@ function emptyGame(distance = 0, x = 0) {
     colliders: [{ halfX: 0.45, halfZ: 0.4, height: 1.5 }],
   });
   const game = new Simulation(123, registry);
+  game.landscape.enabled = false;
   game.phase = "running";
   game.z = game.previousZ = game.distance = game.previousDistance = distance;
   game.x = game.previousX = x;
@@ -30,6 +32,38 @@ function obstacle(game: Simulation, x: number, forward: number, height = 1.5) {
   w.halfX[0] = 0.45;
   w.halfZ[0] = 0.4;
   w.height[0] = height;
+}
+
+function routeContext(game: Simulation, seed: number, step: number) {
+  const world = game.world;
+  const blockers = [];
+  for (let i = 0; i < world.active.length; i++) {
+    if (!world.active[i] || !world.registry.get(world.kinds[i])?.blocking) continue;
+    if (world.kinds[i] === ObjectKind.Bird && world.motion[i] !== 3) continue;
+    const x = world.collisionX(i), z = world.collisionZ(i);
+    const distance = Math.hypot(x - game.x, z - game.z);
+    if (distance > 20) continue;
+    blockers.push({
+      slot: i, type: ObjectKind[world.kinds[i]], variant: world.variants[i],
+      motion: world.motion[i], x, z, distance,
+      halfX: world.halfX[i], halfZ: world.halfZ[i],
+      baseY: world.baseY[i], height: world.height[i],
+    });
+  }
+  blockers.sort((a, b) => a.distance - b.distance);
+  return JSON.stringify({
+    seed, step, elapsed: step * STEP, phase: game.phase,
+    player: {
+      x: game.x, z: game.z, y: game.y, groundY: game.groundY,
+      previousX: game.previousX, previousZ: game.previousZ,
+      previousY: game.previousY, previousGroundY: game.previousGroundY,
+      heading: game.heading, speed: game.speed, crouch: game.crouch,
+      velocityY: game.velocityY, lives: game.health.lives, immunity: game.health.immunity,
+    },
+    surface: Surface[game.landscape.surfaceAt(game.x, game.z)],
+    fatalCause: Surface[game.fatalCause], falling: game.falling,
+    routeX: world.safeCenter(game.z), blockers: blockers.slice(0, 5),
+  });
 }
 
 test("continuous turns cover every heading; release preserves direction and running never stops", () => {
@@ -139,13 +173,30 @@ test("continuous safe routes have bounded slope across unbounded X", () => {
 test("100 seeds: safe route survives 5 minutes at max speed with 300ms reaction and all 3 lives", () => {
   for (let seed = 1; seed <= 100; seed++) {
     const game = new Simulation(seed);
-    let hits = 0;
-    game.events.on(GameEvent.Hit, () => hits++);
+    let hits = 0, step = 0, firstHit = "";
+    game.events.on(GameEvent.Hit, () => {
+      hits++;
+      // Hit is emitted before the swept contact pose is clamped. Preserve the
+      // whole attempted step so a generator failure can be reproduced exactly.
+      firstHit ||= routeContext(game, seed, step);
+    });
     game.phase = "running";
-    game.distance = 2000;
+    game.distance = game.previousDistance = 2000;
     game.z = game.previousZ = 2000;
     game.x = game.previousX = game.world.safeCenter(game.z);
+    game.groundY = game.previousGroundY = game.landscape.heightAt(game.x, game.z);
+    game.speed = Rules.maxSpeed;
+    game.world.update(game.x, game.z);
+    assert.equal(game.landscape.enabled, true, "route challenge uses terrain, hazards and dynamics");
     for (let n = 0; n < 300 / STEP; n++) {
+      step = n;
+      // Perceive dynamic hazards at 15 Hz; steering and physics remain 120 Hz.
+      if (n % 8 === 0) for (let i = 0; i < game.world.active.length; i++) {
+        if (!game.world.active[i] || game.world.motion[i] !== 3) continue;
+        const distanceSq = (game.world.x[i] - game.x) ** 2 + (game.world.z[i] - game.z) ** 2;
+        if (game.world.kinds[i] === ObjectKind.Bird && distanceSq < 20 ** 2) game.down();
+        if (game.world.kinds[i] === ObjectKind.Tumbleweed && distanceSq < 7 ** 2) game.jump();
+      }
       const delayedZ = game.z - 0.3 * Rules.maxSpeed;
       const slope =
         (game.world.safeCenter(delayedZ + 0.1) -
@@ -159,7 +210,7 @@ test("100 seeds: safe route survives 5 minutes at max speed with 300ms reaction 
         Math.abs(error) > Rules.turnSpeed * STEP * 0.5 ? -Math.sign(error) : 0,
       );
       game.step(STEP);
-      assert.equal(game.health.lives, 3, `seed ${seed}, step ${n}`);
+      assert.equal(game.health.lives, 3, firstHit || (game.health.lives !== 3 ? routeContext(game, seed, n) : `seed ${seed}, step ${n}`));
     }
     assert.equal(
       hits,

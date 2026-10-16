@@ -10,6 +10,9 @@ export async function checkInstanceMotion(context, url, engine) {
     const result = await page.evaluate(() => {
       const r = window.__runner,
         g = r.game;
+      r.pause();
+      g.landscape.enabled=false;
+      g.groundY=g.previousGroundY=0;
       g.phase = "paused";
       g.world.reset(1979);
       g.y = g.previousY = g.velocityY = 0;
@@ -30,7 +33,7 @@ export async function checkInstanceMotion(context, url, engine) {
         const program = this.getParameter(this.CURRENT_PROGRAM);
         const location = this.getAttribLocation(program, "instanceMatrix");
         if (
-          location >= 0 &&
+          location >= 0 && this.getAttribLocation(program,"instanceDetail")>=0 &&
           this.getParameter(this.FRAMEBUFFER_BINDING) === null
         ) {
           const previous = this.getParameter(this.ARRAY_BUFFER_BINDING);
@@ -90,7 +93,6 @@ export async function checkInstanceMotion(context, url, engine) {
           g.heading = g.previousHeading = (f * Math.PI) / 40;
           r.camera.update(g.distance, 0, 1 / 60, false, g.heading);
           g.world.update(g.x, g.distance);
-          g.terrain.advance(g.distance);
           r.render();
         }
       } finally {

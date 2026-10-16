@@ -6,7 +6,8 @@ import { Ground } from "./ground";
 import { AnimatedDinosaur, FootDust } from "./character";
 import { ObjectKind } from "./world";
 import { InstancedObjectType, ObjectRendererRegistry } from "./object-renderer";
-import { TerrainLayout } from "./terrain";
+import type { BiomeModels } from "./biome-models";
+import { Scenery } from "./scenery";
 import type { Simulation } from "./simulation";
 import type { ModelLibrary } from "./models";
 import { LightingRig } from "./lighting";
@@ -35,6 +36,12 @@ export class View {
   private readonly dinosaur: AnimatedDinosaur;
   private readonly cosmetics: DinosaurCosmetics;
   private readonly preview: MenuPreview;
+  private readonly scenery: Scenery;
+  private readonly wings: InstancedObjectType;
+  private readonly ownedGeometries: THREE.BufferGeometry[] = [];
+  private readonly environmentMaterial = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+  });
   private deathFirstPerson = false;
   private readonly dinosaurShadow = new DinosaurShadow();
   private readonly dust: FootDust;
@@ -72,7 +79,7 @@ export class View {
   constructor(
     canvas: HTMLCanvasElement,
     private readonly models: ModelLibrary,
-    texture: THREE.DataArrayTexture,
+    private readonly biomeModels: BiomeModels,
     private readonly game: Simulation,
     redraw: () => void = () => {},
   ) {
@@ -80,7 +87,7 @@ export class View {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     this.rig = new CameraRig(reducedMotion);
-    this.ground = new Ground(texture);
+    this.ground = new Ground(game.landscape);
     this.dinosaur = new AnimatedDinosaur(models, game);
     this.preview = new MenuPreview(models, redraw);
     this.cosmetics = new DinosaurCosmetics(models, this.dinosaur.mesh);
@@ -92,10 +99,6 @@ export class View {
       powerPreference: "default",
     });
     this.renderer.setClearColor(Palette.sky);
-    texture.anisotropy = Math.min(
-      2,
-      this.renderer.capabilities.getMaxAnisotropy(),
-    );
     this.cactusMaterial.onBeforeCompile = (shader) => {
       shader.vertexShader =
         "attribute float instanceDetail; varying float vDetail;\n" +
@@ -155,18 +158,75 @@ export class View {
       [models.heart],
       this.pickupMaterial,
     );
+    for (const [kind, prefix, count] of [
+      [ObjectKind.Tree, "tree", 3],
+      [ObjectKind.DeadTree, "dead-tree", 3],
+      [ObjectKind.Rock, "rock", 3],
+      [ObjectKind.Log, "log", 1],
+      [ObjectKind.Tumbleweed, "tumbleweed", 1],
+      [ObjectKind.Bird, "bird-body", 1],
+    ] as const) {
+      const names = Array.from({ length: count }, (_, i) =>
+        prefix === "bird-body" ? prefix : `${prefix}-${i}`,
+      );
+      const lod = kind === ObjectKind.Tree || kind === ObjectKind.DeadTree;
+      this.registerObjectType(
+        kind,
+        names.map((n) => {
+          const geometry = biomeModels.get(n);
+          if (kind !== ObjectKind.Tumbleweed) return geometry;
+          const centred = geometry.clone().translate(0, -0.45, 0);
+          this.ownedGeometries.push(centred);
+          return centred;
+        }),
+        lod ? this.cactusMaterial : this.environmentMaterial,
+        lod
+          ? Array.from({ length: count }, (_, i) =>
+              biomeModels.get(`${prefix}-lod-${i}`),
+            )
+          : undefined,
+      );
+    }
+    const wing = biomeModels.get("bird-wing"),
+      left = wing.clone();
+    left.scale(-1, 1, 1);
+    const index = left.index!;
+    for (let i = 0; i < index.count; i += 3) {
+      const b = index.getX(i + 1);
+      index.setX(i + 1, index.getX(i + 2));
+      index.setX(i + 2, b);
+    }
+    left.computeVertexNormals();
+    this.ownedGeometries.push(left);
+    this.wings = new InstancedObjectType(
+      ObjectKind.Bird,
+      [wing, left],
+      this.environmentMaterial,
+      this.scene,
+      undefined,
+      128,
+    );
+    this.scenery = new Scenery(game.landscape, biomeModels, this.scene);
     this.scene.add(
       this.ground.mesh,
+      ...this.ground.extraMeshes,
       this.dinosaurShadow.mesh,
       this.dinosaur.mesh,
       this.dust.mesh,
     );
-    for (const mesh of this.objectRenderers.get(ObjectKind.Cactus)!.meshes) {
-      mesh.castShadow = true;
-      // Only the terrain needs reception today. Avoid a depth lookup on every
-      // cactus fragment; future low-poly props can opt into self-shadowing.
-      mesh.receiveShadow = false;
-    }
+    for (const type of [
+      ObjectKind.Cactus,
+      ObjectKind.Tree,
+      ObjectKind.DeadTree,
+      ObjectKind.Rock,
+      ObjectKind.Log,
+    ])
+      for (const mesh of this.objectRenderers.get(type)!.meshes) {
+        mesh.castShadow = true;
+        // Only the terrain needs reception today. Avoid a depth lookup on every
+        // cactus fragment; future low-poly props can opt into self-shadowing.
+        mesh.receiveShadow = false;
+      }
     this.off = [
       game.events.on(GameEvent.Hit, () =>
         this.rig.impulse(Tuning.camera.hitShake, 0.22),
@@ -288,10 +348,22 @@ export class View {
       this.pose.heading,
       this.dinosaur.mesh.position.y,
       game.previousCrouch + (game.crouch - game.previousCrouch) * alpha,
+      game.previousGroundY + (game.groundY - game.previousGroundY) * alpha,
     );
     this.dinosaur.mesh.visible = this.rig.avatarVisible;
     if (!this.rig.avatarVisible) this.dinosaurShadow.mesh.visible = false;
     this.lighting.followView(this.rig.heading);
+    const groundY =
+      game.previousGroundY + (game.groundY - game.previousGroundY) * alpha;
+    this.lighting.key.position.y += groundY;
+    this.lighting.key.target.position.y += groundY;
+    const minCameraY =
+      game.landscape.heightAt(
+        this.pose.x + this.rig.camera.position.x,
+        this.pose.z - this.rig.camera.position.z,
+      ) + 1.2;
+    if (this.rig.camera.position.y < minCameraY)
+      this.rig.camera.position.y = minCameraY;
     this.feedbackAnchor
       .set(0, this.dinosaur.mesh.position.y + 1.95 - game.crouch * 0.55, 0)
       .project(this.rig.camera);
@@ -306,6 +378,7 @@ export class View {
         : (-this.feedbackAnchor.y * 0.5 + 0.5) * this.viewportHeight,
     );
     this.visibility.update(this.rig.camera);
+    this.scenery.update(this.pose, this.visibility);
     this.dust.update(
       game,
       game.hitStopRemaining ? 0 : activeDt,
@@ -328,6 +401,7 @@ export class View {
       this.worldCameraX = camera.position.x;
     }
     this.objectRenderers.begin();
+    this.wings.begin();
     this.visibleCacti = 0;
     this.nearestRenderedForward = Infinity;
     this.maximumRelativeX = 0;
@@ -337,6 +411,7 @@ export class View {
     );
     for (let i = 0; i < world.active.length; i++) {
       if (!world.active[i]) continue;
+      if (world.kinds[i] === ObjectKind.Bird && world.motion[i] !== 3) continue;
       const renderer = this.objectRenderers.get(world.kinds[i]);
       if (!renderer) continue;
       const x = world.x[i] - this.pose.x,
@@ -345,8 +420,8 @@ export class View {
         world.registry.get(world.kinds[i])?.animation === "spin-bob";
       const y = world.baseY[i] + (animated ? this.pickupMotion.bob : 0);
       const visible = this.visibility.intersects(
-        x,
-        forward,
+        world.collisionX(i) - this.pose.x,
+        world.collisionZ(i) - this.pose.z,
         world.halfX[i],
         world.halfZ[i],
         world.height[i],
@@ -354,7 +429,7 @@ export class View {
       );
       let caster = false;
       if (
-        world.kinds[i] === ObjectKind.Cactus &&
+        world.registry.get(world.kinds[i])?.blocking &&
         x * x + forward * forward < 60 * 60
       ) {
         // A map may live for .25s: retain a guard band exceeding max forward
@@ -378,10 +453,36 @@ export class View {
         x,
         -forward,
         animated ? this.pickupMotion.angle : world.angles[i],
-        y,
+        y + (world.kinds[i] === ObjectKind.Tumbleweed ? 0.45 : 0),
+        world.kinds[i] === ObjectKind.Tumbleweed
+          ? game.time * 3
+          : world.lean[i],
       );
+      if (world.kinds[i] === ObjectKind.Bird) {
+        const flap = Math.sin(game.time * 14) * 0.7;
+        const sx = 0.14 * Math.cos(world.angles[i]),
+          sz = -0.14 * Math.sin(world.angles[i]);
+        this.wings.place(
+          0,
+          x + sx,
+          -forward + sz,
+          world.angles[i],
+          y + 0.16,
+          0,
+          flap,
+        );
+        this.wings.place(
+          1,
+          x - sx,
+          -forward - sz,
+          world.angles[i],
+          y + 0.16,
+          0,
+          -flap,
+        );
+      }
       if (visible) {
-        if (world.kinds[i] === ObjectKind.Cactus) this.visibleCacti++;
+        if (world.registry.get(world.kinds[i])?.blocking) this.visibleCacti++;
         this.nearestRenderedForward = Math.min(
           this.nearestRenderedForward,
           forward,
@@ -390,6 +491,7 @@ export class View {
       }
     }
     this.objectRenderers.finish();
+    this.wings.finish();
     this.pickupEffects.update(
       game.previousFeedbackTime +
         (game.feedbackTime - game.previousFeedbackTime) * alpha,
@@ -469,10 +571,21 @@ export class View {
       cameraX: this.rig.camera.position.x,
       cameraY: this.rig.camera.position.y,
       cameraZ: this.rig.camera.position.z,
-      terrainLayers: TerrainLayout.layers,
-      terrainTileMetres: Tuning.terrain.tileMetres,
-      lodNear:Rules.lodNear,
-      lodFar:Rules.lodFar,
+      terrainLayers: 0,
+      terrainTileMetres: 4,
+      groundY: this.game.groundY,
+      biome: this.game.landscape.biomeAt(this.pose.x, this.pose.z),
+      surface: this.game.landscape.surfaceAt(this.pose.x, this.pose.z),
+      visibleDecorations: this.scenery.visible,
+      visibleTrees: this.objectRenderers.get(ObjectKind.Tree)!.visible,
+      visibleDeadTrees: this.objectRenderers.get(ObjectKind.DeadTree)!.visible,
+      visibleRocks: this.objectRenderers.get(ObjectKind.Rock)!.visible,
+      visibleBirds: this.objectRenderers.get(ObjectKind.Bird)!.visible,
+      visibleTumbleweed: this.objectRenderers.get(ObjectKind.Tumbleweed)!
+        .visible,
+      groundMeshes: 1 + this.ground.extraMeshes.length,
+      lodNear: Rules.lodNear,
+      lodFar: Rules.lodFar,
       boundaryCount: 0,
       obstacleVariants: this.models.cacti.length,
       obstacleCapacity: Rules.poolSize,
@@ -503,7 +616,7 @@ export class View {
       moonVisible: false,
       shadowUpdates: this.shadows.updates,
       shadowMapSize: this.lighting.key.shadow.mapSize.x,
-      terrainTriangles: this.ground.surface.geometry.index!.count / 3,
+      terrainTriangles: this.ground.surface.geometry.drawRange.count / 3,
       shadows:
         this.lighting.shadowStrength > 0
           ? this.objectRenderers.get(ObjectKind.Cactus)!.visible
@@ -511,8 +624,8 @@ export class View {
       shadowStrength: this.lighting.shadowStrength,
       feedbackCount: this.feedback.active,
       pickupEffectCount: this.pickupEffects.count,
-      pickupEffectAlpha:this.pickupEffects.firstAlpha,
-      pickupEffectY:this.pickupEffects.firstY,
+      pickupEffectAlpha: this.pickupEffects.firstAlpha,
+      pickupEffectY: this.pickupEffects.firstY,
       dinosaurShadowX: this.dinosaurShadow.mesh.position.x,
       dinosaurShadowZ: this.dinosaurShadow.mesh.position.z,
       dinosaurShadowWidth: this.dinosaurShadow.mesh.scale.x,
@@ -525,6 +638,10 @@ export class View {
   dispose() {
     for (const off of this.off) off();
     this.objectRenderers.dispose();
+    this.wings.dispose();
+    for (const g of this.ownedGeometries) g.dispose();
+    this.scenery.dispose();
+    this.environmentMaterial.dispose();
     this.cactusMaterial.dispose();
     this.pickupMaterial.dispose();
     this.dinosaur.dispose();
@@ -535,6 +652,7 @@ export class View {
     this.pickupEffects.dispose();
     this.ground.dispose();
     this.models.dispose();
+    this.biomeModels.dispose();
     this.lighting.dispose();
     this.renderer.dispose();
   }

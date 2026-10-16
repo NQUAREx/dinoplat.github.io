@@ -392,7 +392,10 @@ export class LowPolyDinosaur {
           weights.push(255 - ring * 85, ring * 85, 0, 0);
           if (ring < 3) {
             const v = ring * 3 + i, next = ring * 3 + (i + 1) % 3;
-            faces.push(next, v, v + 3, next, v + 3, next + 3);
+            // Follow the REMOVED face's directed boundary. Its surviving
+            // neighbour runs the other way; reversing this strip makes both
+            // incident faces run the same way and exposes culled torso facets.
+            faces.push(v, next, v + 3, next, next + 3, v + 3);
           }
         }
       }

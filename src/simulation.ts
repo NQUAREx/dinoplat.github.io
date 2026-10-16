@@ -2,9 +2,9 @@ import { Rules } from "./config";
 import { GameEvent, GameEvents } from "./events";
 import { Currency, Health, Wallet } from "./progression";
 import { ObjectKind, ObjectRegistry, WorldSpawner } from "./world";
-import { Terrain } from "./terrain";
 import { PickupMotion } from "./pickup-motion";
 import { Tuning } from "./tuning";
+import { LandscapeField, Surface } from "./landscape";
 
 export type Phase = "ready" | "running" | "dying" | "paused" | "over";
 export const STEP = Rules.step;
@@ -13,7 +13,7 @@ export const STEP = Rules.step;
  * a moving player-centred origin before uploading any Float32 GPU positions. */
 export class Simulation {
   readonly events = new GameEvents();
-  readonly terrain = new Terrain();
+  readonly landscape = new LandscapeField();
   readonly wallet = new Wallet(this.events);
   readonly health = new Health(this.events);
   readonly pickupMotion = new PickupMotion();
@@ -26,6 +26,10 @@ export class Simulation {
   previousZ = 0;
   y = 0;
   previousY = 0;
+  groundY = 0;
+  previousGroundY = 0;
+  falling = false;
+  fatalCause: Surface = Surface.Land;
   heading = 0;
   previousHeading = 0;
   movingX = 0;
@@ -49,7 +53,7 @@ export class Simulation {
   private previousBob = 0;
   private nextStep = 0;
   constructor(seed = 1, registry = ObjectRegistry.defaults()) {
-    this.world = new WorldSpawner(registry);
+    this.world = new WorldSpawner(registry, undefined, this.landscape);
     this.reset(seed);
   }
   reset(seed: number) {
@@ -63,6 +67,10 @@ export class Simulation {
     this.feedbackTime = this.previousFeedbackTime = this.hitStopRemaining = 0;
     this.deathTime = this.previousDeathTime = 0;
     this.nextFoot = 0;
+    this.landscape.reset(this.seed);
+    this.groundY = this.previousGroundY = this.landscape.heightAt(0, 0);
+    this.falling = false;
+    this.fatalCause = Surface.Land;
     this.pickupMotion.update(0);
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
@@ -70,7 +78,6 @@ export class Simulation {
     this.nextStep = Rules.stepStride;
     this.world.reset(this.seed);
     this.world.update(0, 0);
-    this.terrain.reset(this.seed);
     this.health.reset();
     this.events.emit(GameEvent.Start);
   }
@@ -81,7 +88,12 @@ export class Simulation {
         : 0;
   }
   jump() {
-    if (this.phase !== "running" || this.hitStopRemaining || this.y !== 0)
+    if (
+      this.phase !== "running" ||
+      this.hitStopRemaining ||
+      this.y !== 0 ||
+      this.falling
+    )
       return;
     this.velocityY = Rules.jumpSpeed;
     this.diving = false;
@@ -120,6 +132,7 @@ export class Simulation {
     this.previousX = this.x;
     this.previousZ = this.z;
     this.previousY = this.y;
+    this.previousGroundY = this.groundY;
     this.previousCrouch = this.crouch;
     this.previousHeading = this.heading;
     this.previousDistance = this.distance;
@@ -147,18 +160,12 @@ export class Simulation {
     // Unwrapped heading: releasing input preserves the new running direction.
     this.heading -= this.steering * Rules.turnSpeed * dt;
     this.movingX = -Math.sin(this.heading);
-    const airborne = this.y > 0 || this.velocityY > 0 || this.diving;
+    const airborne =
+      this.y > 0 || this.velocityY > 0 || this.diving || this.falling;
+    let feet = this.groundY + this.y;
     if (airborne) {
-      this.y = Math.max(
-        0,
-        this.y + this.velocityY * dt - (Rules.gravity * dt * dt) / 2,
-      );
+      feet += this.velocityY * dt - (Rules.gravity * dt * dt) / 2;
       this.velocityY -= Rules.gravity * dt;
-      if (!this.y) {
-        this.velocityY = 0;
-        this.diving = false;
-        this.events.emit(GameEvent.Land);
-      }
     }
     this.speed =
       this.health.immunity > 0
@@ -171,8 +178,31 @@ export class Simulation {
     const midHeading = (this.heading + this.previousHeading) * 0.5;
     this.x -= Math.sin(midHeading) * this.speed * dt;
     this.z += Math.cos(midHeading) * this.speed * dt;
+    const ground = this.landscape.heightAt(this.x, this.z),
+      surface = this.landscape.surfaceAt(this.x, this.z);
+    const support = surface === Surface.Land || surface === Surface.Bridge;
+    if (!this.falling) this.groundY = ground;
+    if (!airborne && support) {
+      this.y = 0;
+    } else {
+      this.y = feet - this.groundY;
+      if (support && this.y <= 0 && !this.falling) {
+        this.y = 0;
+        this.velocityY = 0;
+        this.diving = false;
+        this.events.emit(GameEvent.Land);
+      }
+      if (!support && this.y <= 0) this.falling = true;
+    }
+    if (this.falling && this.y < -0.8) {
+      this.fatalCause = surface;
+      this.health.kill();
+      this.phase = "dying";
+      this.move(0);
+      return;
+    }
     this.world.update(this.x, this.z);
-    this.terrain.advance(this.distance);
+    this.world.step(this.time, dt, this.x, this.z, this.heading);
     this.collisions();
     if (!this.hitStopRemaining && this.distance >= this.nextStep) {
       this.nextStep += Rules.stepStride;
@@ -190,49 +220,50 @@ export class Simulation {
       maxZ = Math.max(this.previousZ, this.z);
     for (let i = 0; i < pool.active.length; i++) {
       if (!pool.active[i]) continue;
+      if (pool.kinds[i] === ObjectKind.Bird && pool.motion[i] !== 3) continue;
+      const obstacleX = pool.collisionX(i),
+        obstacleZ = pool.collisionZ(i);
       // Broad phase uses full render bounds before any registry lookup. The
       // forgiving blocking box below is a subset, never a culling replacement.
       const broadZ = pool.halfZ[i] + Rules.playerRadius;
-      if (pool.z[i] < minZ - broadZ || pool.z[i] > maxZ + broadZ) continue;
+      if (obstacleZ < minZ - broadZ || obstacleZ > maxZ + broadZ) continue;
       const definition = pool.registry.get(pool.kinds[i]);
-      if (
-        !definition ||
-        (definition.blocking && this.health.immunity > 0)
-      )
+      if (!definition || (definition.blocking && this.health.immunity > 0))
         continue;
       const blocking = definition.blocking;
-      const scale =
-        pool.kinds[i] === ObjectKind.Cactus ? Rules.cactusHitScale : 1;
+      const scale = definition.blocking ? Rules.cactusHitScale : 1;
       const radius = blocking ? Rules.blockingRadius : Rules.playerRadius;
       const extentX = pool.halfX[i] * scale + radius,
         extentZ = pool.halfZ[i] * scale + radius;
-      if (pool.z[i] < minZ - extentZ || pool.z[i] > maxZ + extentZ) continue;
+      if (obstacleZ < minZ - extentZ || obstacleZ > maxZ + extentZ) continue;
       let enter = 0,
         leave = 1;
       if (Math.abs(dz) < 1e-9) {
-        if (Math.abs(this.previousZ - pool.z[i]) >= extentZ) continue;
+        if (Math.abs(this.previousZ - obstacleZ) >= extentZ) continue;
       } else {
-        const a = (pool.z[i] - extentZ - this.previousZ) / dz;
-        const b = (pool.z[i] + extentZ - this.previousZ) / dz;
+        const a = (obstacleZ - extentZ - this.previousZ) / dz;
+        const b = (obstacleZ + extentZ - this.previousZ) / dz;
         enter = Math.max(enter, Math.min(a, b));
         leave = Math.min(leave, Math.max(a, b));
       }
       if (Math.abs(dx) < 1e-9) {
-        if (Math.abs(this.previousX - pool.x[i]) >= extentX) continue;
+        if (Math.abs(this.previousX - obstacleX) >= extentX) continue;
       } else {
-        const a = (pool.x[i] - extentX - this.previousX) / dx,
-          b = (pool.x[i] + extentX - this.previousX) / dx;
+        const a = (obstacleX - extentX - this.previousX) / dx,
+          b = (obstacleX + extentX - this.previousX) / dx;
         enter = Math.max(enter, Math.min(a, b));
         leave = Math.min(leave, Math.max(a, b));
       }
       if (enter > leave) continue;
-      const yEnter = this.previousY + (this.y - this.previousY) * enter;
-      const yLeave = this.previousY + (this.y - this.previousY) * leave;
+      const oldFeet = this.previousGroundY + this.previousY,
+        newFeet = this.groundY + this.y;
+      const yEnter = oldFeet + (newFeet - oldFeet) * enter;
+      const yLeave = oldFeet + (newFeet - oldFeet) * leave;
       const previousTop =
-        this.previousY +
+        oldFeet +
         Rules.playerBodyHeight +
         (Rules.duckBodyHeight - Rules.playerBodyHeight) * this.previousCrouch;
-      const top = this.y + this.bodyHeight;
+      const top = newFeet + this.bodyHeight;
       const topEnter = previousTop + (top - previousTop) * enter;
       const topLeave = previousTop + (top - previousTop) * leave;
       const animated = definition.animation === "spin-bob";
@@ -262,6 +293,10 @@ export class Simulation {
           this.previousZ = this.z;
           this.previousDistance = this.distance;
           this.previousY = this.y;
+          this.groundY =
+            this.previousGroundY +
+            (this.groundY - this.previousGroundY) * enter;
+          this.previousGroundY = this.groundY;
           this.hitStopRemaining = Rules.hitStopSeconds;
           this.move(0);
           return;

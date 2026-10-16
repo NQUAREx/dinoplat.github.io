@@ -53,7 +53,7 @@ export const Tuning = {
     shadowNormalBias: 0.035,
   },
   audio: { master: 0.8, music: 0.2, effects: 1 },
-  terrain: { tileMetres: 2.5, regionMetres: 500 },
+  landscape: { heightScale: 1, biomeSize: 72, fallChance: .16, birdChance: .06 },
 };
 export const TUNING_DEFAULTS = JSON.parse(
   JSON.stringify(Tuning),

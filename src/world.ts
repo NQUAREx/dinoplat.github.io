@@ -1,6 +1,7 @@
 import { Rules, GridMath } from "./config";
 import colliders from "./assets/model-colliders.json";
 import { Tuning } from "./tuning";
+import { LandscapeField, Biome } from "./landscape";
 
 export enum ObjectKind {
   Cactus,
@@ -8,6 +9,12 @@ export enum ObjectKind {
   Diamond,
   Enemy = 4,
   Heart,
+  Tree,
+  DeadTree,
+  Rock,
+  Log,
+  Bird,
+  Tumbleweed,
 }
 export interface ColliderDefinition {
   readonly baseY?: number;
@@ -146,6 +153,24 @@ export class ObjectRegistry {
       blocking: true,
       colliders: pickup,
     });
+    for (const [kind, height, radius, count] of [
+      [ObjectKind.Tree, 3.4, 0.58, 3],
+      [ObjectKind.DeadTree, 3.1, 0.44, 3],
+      [ObjectKind.Rock, 1.1, 0.7, 3],
+      [ObjectKind.Log, 0.65, 1.0, 1],
+      [ObjectKind.Bird, 0.38, 0.48, 1],
+      [ObjectKind.Tumbleweed, 0.9, 0.45, 1],
+    ])
+      registry.register({
+        kind,
+        weight: 0,
+        blocking: true,
+        colliders: Array.from({ length: count }, () => ({
+          halfX: radius,
+          halfZ: radius,
+          height,
+        })),
+      });
     return registry;
   }
 }
@@ -165,6 +190,17 @@ export class WorldSpawner {
   readonly halfZ = new Float32Array(Rules.poolSize);
   readonly height = new Float32Array(Rules.poolSize);
   readonly baseY = new Float32Array(Rules.poolSize);
+  readonly lean = new Float32Array(Rules.poolSize);
+  readonly fallStart = new Float64Array(Rules.poolSize).fill(-1);
+  readonly motion = new Uint8Array(Rules.poolSize);
+  private readonly velocityX = new Float32Array(Rules.poolSize);
+  private readonly velocityZ = new Float32Array(Rules.poolSize);
+  private readonly originalX = new Float32Array(Rules.poolSize);
+  private readonly originalZ = new Float32Array(Rules.poolSize);
+  private readonly originalHeight = new Float32Array(Rules.poolSize);
+  private readonly dynamic = new Uint16Array(Rules.poolSize);
+  private dynamicCount = 0;
+  private nextMovingTime = 0;
   radius = (Rules.maxColumns - 1) / 2;
   generated = 0;
   revision = 0;
@@ -174,10 +210,16 @@ export class WorldSpawner {
   constructor(
     readonly registry = ObjectRegistry.defaults(),
     readonly pickupRate?: number,
+    readonly landscape?: LandscapeField,
   ) {}
   reset(seed: number) {
     this.seed = seed >>> 0 || 1;
     this.active.fill(0);
+    this.motion.fill(0);
+    this.lean.fill(0);
+    this.fallStart.fill(-1);
+    this.dynamicCount = 0;
+    this.nextMovingTime = 0;
     this.columns.fill(Infinity);
     this.rows.fill(Infinity);
     this.centerX = this.centerZ = Infinity;
@@ -259,6 +301,15 @@ export class WorldSpawner {
         for (let candidate = 0; candidate < Rules.slotsPerChunk; candidate++)
           this.populate(first + candidate, column, row, candidate);
       }
+    this.dynamicCount = 0;
+    for (let i = 0; i < this.active.length; i++)
+      if (
+        this.active[i] &&
+        (this.motion[i] === 1 ||
+          this.kinds[i] === ObjectKind.Bird ||
+          this.kinds[i] === ObjectKind.Tumbleweed)
+      )
+        this.dynamic[this.dynamicCount++] = i;
     this.revision++;
   }
   private populate(
@@ -270,6 +321,9 @@ export class WorldSpawner {
     this.columns[slot] = column;
     this.rows[slot] = row;
     this.active[slot] = 0;
+    this.motion[slot] = 0;
+    this.lean[slot] = 0;
+    this.fallStart[slot] = -1;
     this.generated++;
     const pickup = candidate >= Rules.candidatesPerChunk;
     if (
@@ -296,11 +350,33 @@ export class WorldSpawner {
           (speed - Rules.startSpeed) * Tuning.generation.speedPenalty
     )
       return;
-    const definition = this.registry.pick(
+    let definition = this.registry.pick(
       this.random(column, row, candidate, 0x8db3),
       pickup,
     );
     if (!definition) return;
+    if (this.landscape?.enabled) {
+      if (!this.landscape.supportAt(x, z)) return;
+      if (definition.kind === ObjectKind.Cactus) {
+        const biome = this.landscape.biomeAt(x, z),
+          r = this.random(column, row, candidate, 0xa12c);
+        const kind =
+          r < Tuning.landscape.birdChance
+            ? ObjectKind.Bird
+            : r < 0.12 && biome === Biome.Desert
+              ? ObjectKind.Tumbleweed
+              : r < 0.22
+                ? ObjectKind.Log
+                : r < 0.4
+                  ? ObjectKind.Rock
+                  : biome === Biome.Meadow
+                    ? ObjectKind.Tree
+                    : biome === Biome.Lava
+                      ? ObjectKind.DeadTree
+                      : ObjectKind.Cactus;
+        definition = this.registry.get(kind) ?? definition;
+      }
+    }
     const variant = Math.floor(
       this.random(column, row, candidate, 0x51ac) * definition.colliders.length,
     );
@@ -325,7 +401,29 @@ export class WorldSpawner {
       this.halfZ[slot] = bounds.halfZ * cos + bounds.halfX * sin;
     }
     this.height[slot] = bounds.height;
-    this.baseY[slot] = bounds.baseY ?? 0;
+    this.baseY[slot] =
+      (bounds.baseY ?? 0) +
+      (this.landscape?.heightAt(x, z) ?? 0) +
+      (definition.kind === ObjectKind.Bird ? 1.05 : 0);
+    this.originalX[slot] = this.halfX[slot];
+    this.originalZ[slot] = this.halfZ[slot];
+    this.originalHeight[slot] = this.height[slot];
+    if (
+      this.landscape?.enabled &&
+      (definition.kind === ObjectKind.Cactus ||
+        definition.kind === ObjectKind.Tree ||
+        definition.kind === ObjectKind.DeadTree) &&
+      this.random(column, row, candidate, 0x8194) < Tuning.landscape.fallChance
+    ) {
+      this.motion[slot] =
+        this.random(column, row, candidate, 0x6134) < 0.45 ? 2 : 1;
+      if (this.isRouteClear(x, z, this.height[slot] + 1, this.height[slot] + 1))
+        return;
+      if (this.motion[slot] === 2) {
+        this.lean[slot] = Math.PI / 2;
+        this.updateFallBounds(slot);
+      }
+    }
     // Pickups must never be hidden inside a cactus. Check the deterministic
     // candidate field, not active slots (which depend on window/reentry order).
     // Conservative padding also excludes a few thinned/non-spawned candidates.
@@ -369,6 +467,82 @@ export class WorldSpawner {
           }
     }
     this.active[slot] = 1;
+  }
+  collisionX(i: number) {
+    return (
+      this.x[i] +
+      Math.sin(this.angles[i]) *
+        Math.sin(this.lean[i]) *
+        this.originalHeight[i] *
+        0.5
+    );
+  }
+  collisionZ(i: number) {
+    return (
+      this.z[i] -
+      Math.cos(this.angles[i]) *
+        Math.sin(this.lean[i]) *
+        this.originalHeight[i] *
+        0.5
+    );
+  }
+  private updateFallBounds(i: number) {
+    const reach =
+      this.originalHeight[i] * Math.abs(Math.sin(this.lean[i])) * 0.5;
+    this.halfX[i] =
+      this.originalX[i] + Math.abs(Math.sin(this.angles[i])) * reach;
+    this.halfZ[i] =
+      this.originalZ[i] + Math.abs(Math.cos(this.angles[i])) * reach;
+    this.height[i] = Math.max(
+      0.5,
+      this.originalHeight[i] * Math.cos(this.lean[i]),
+    );
+  }
+  step(time: number, dt: number, px: number, pz: number, heading: number) {
+    if (!this.landscape?.enabled) return;
+    const sin = -Math.sin(heading),
+      cos = Math.cos(heading);
+    for (let n = 0; n < this.dynamicCount; n++) {
+      const i = this.dynamic[n];
+      if (!this.active[i]) continue;
+      const dx = this.x[i] - px,
+        dz = this.z[i] - pz,
+        d2 = dx * dx + dz * dz;
+      if (this.motion[i] === 1 && d2 < 24 * 24) {
+        if (this.fallStart[i] < 0) this.fallStart[i] = time;
+        const age = time - this.fallStart[i];
+        this.lean[i] =
+          age < 1.1
+            ? 0.04 * Math.sin(age * 22)
+            : Math.min(Math.PI / 2, (((age - 1.1) / 1.2) ** 2 * Math.PI) / 2);
+        this.updateFallBounds(i);
+      }
+      if (
+        this.kinds[i] !== ObjectKind.Bird &&
+        this.kinds[i] !== ObjectKind.Tumbleweed
+      )
+        continue;
+      if (this.motion[i] === 0) {
+        if (time < this.nextMovingTime) continue;
+        if (d2 > 48 * 48 || d2 < 28 * 28 || dx * sin + dz * cos < 24) continue;
+        const inv = 1 / Math.sqrt(d2),
+          bird = this.kinds[i] === ObjectKind.Bird;
+        this.velocityX[i] = bird ? -dx * inv * 9 : cos * 2.5;
+        this.velocityZ[i] = bird ? -dz * inv * 9 : -sin * 2.5;
+        this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);
+        this.motion[i] = 3;
+        this.fallStart[i] = time;
+        this.nextMovingTime = time + 5;
+      }
+      if (this.motion[i] === 3) {
+        this.x[i] += this.velocityX[i] * dt;
+        this.z[i] += this.velocityZ[i] * dt;
+        this.baseY[i] =
+          this.landscape.heightAt(this.x[i], this.z[i]) +
+          (this.kinds[i] === ObjectKind.Bird ? 1.05 : 0);
+        if (time - this.fallStart[i] > 9 || d2 > 75 * 75) this.active[i] = 0;
+      }
+    }
   }
   consume(slot: number) {
     this.active[slot] = 0;

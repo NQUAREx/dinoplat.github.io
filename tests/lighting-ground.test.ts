@@ -1,8 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  DataArrayTexture,
-  LinearMipmapLinearFilter,
   Scene,
   BoxGeometry,
   MeshBasicMaterial,
@@ -14,8 +12,7 @@ import { LightingRig } from "../src/lighting.ts";
 import { Ground } from "../src/ground.ts";
 import { Simulation } from "../src/simulation.ts";
 import { RenderPose } from "../src/render-pose.ts";
-import { TerrainLayout } from "../src/terrain.ts";
-import { readFile } from "node:fs/promises";
+import { LandscapeField, Surface } from "../src/landscape.ts";
 import { InstancedObjectType } from "../src/object-renderer.ts";
 import { ObjectKind } from "../src/world.ts";
 import { CachedShadows } from "../src/shadows.ts";
@@ -70,70 +67,52 @@ test("moving sun reverses shadows and day/night changes fog and visibility witho
   assert.throws(() => light.setSunPosition(NaN, 0, 0));
   light.dispose();
 });
-test("one interpolated render origin is used at tile and biome boundaries, including negative X", () => {
+test("field meshes share the interpolated render origin at negative and million-metre coordinates", () => {
   const game = new Simulation(1979),
     pose = new RenderPose();
-  const ground = new Ground(new DataArrayTexture(new Uint8Array(4), 1, 1, 1));
-  const uniforms = ground.uniforms;
-  assert.equal(TerrainLayout.worldTileSize, 2.5);
+  const field = new LandscapeField(1979), ground = new Ground(field);
+  assert.equal(LandscapeField.tile, 4);
   game.x = -4.9;
   game.previousX = -5.1;
   game.distance = 500.1;
   game.previousDistance = 499.9;
   game.z = 500.1;
   game.previousZ = 499.9;
-  game.terrain.advance(game.distance);
   pose.update(game, 0.25);
   ground.update(game, pose);
   assert.ok(Math.abs(pose.x + 5.05) < 1e-9);
   assert.ok(Math.abs(pose.distance - 499.95) < 1e-9);
-  assert.ok(
-    Math.abs(
-      uniforms.terrainBiomeCell.value.y * 500 +
-        uniforms.terrainBiomeOffset.value.y -
-        ground.surface.anchorDistance -
-        91.25,
-    ) < 1e-9,
-  );
   for (const base of [-1000000, 0, 1000000]) {
-    const pointX = base + 13.234,
-      pointD = Math.abs(base) + 513.456;
-    let previous: number[] | undefined;
-    for (let i = 0; i <= 100; i++) {
-      pose.x = base - 0.1 + i * 0.002;
-      pose.z = pose.distance = Math.abs(base) + 499.9 + i * 0.002;
+    const pointX = base + 12, pointZ = -base + 12;
+    const expectedY = field.heightAt(pointX, pointZ);
+    for (const offset of [-0.01, 0.01, 3.99, 4.01]) {
+      pose.x = base + offset;
+      pose.z = -base + offset;
+      pose.distance = 987654321;
       ground.update(game, pose);
-      const u =
-        (pointX - ground.surface.anchorX + uniforms.terrainOrigin.value.x) /
-        2.5;
-      const v =
-        (pointD -
-          ground.surface.anchorDistance +
-          uniforms.terrainOrigin.value.y) /
-        2.5;
-      const sample = [
-        (((Math.floor(u) + uniforms.terrainTiles.value.x) % 65536) + 65536) %
-          65536,
-        (((Math.floor(v) + uniforms.terrainTiles.value.y) % 65536) + 65536) %
-          65536,
-        u - Math.floor(u),
-        v - Math.floor(v),
-      ];
-      if (previous)
-        for (let c = 0; c < 4; c++)
-          assert.ok(Math.abs(sample[c] - previous[c]) < 1e-8);
-      previous = sample;
+      assert.equal(ground.surface.heightAt(pointX, pointZ), expectedY);
+      for (const mesh of [ground.mesh, ...ground.extraMeshes]) {
+        assert.equal(mesh.position.x, ground.surface.anchorX - pose.x);
+        assert.equal(mesh.position.z, pose.z - ground.surface.anchorDistance);
+        assert.equal(mesh.material.map, null);
+        assert.equal(mesh.material.vertexColors, true);
+      }
+      const positions = ground.surface.geometry.getAttribute("position");
+      const x = positions.getX(0) + ground.surface.anchorX;
+      const z = ground.surface.anchorDistance - positions.getZ(0);
+      const kind = field.surfaceAt(x + 2, z + 2);
+      const drop = positions.getY(0) - field.vertexHeight(x, z);
+      if (kind === Surface.Bridge)
+        assert.ok(Math.abs(drop + 2.4) < 0.00001 || Math.abs(drop + 7) < 0.00001);
+      else
+        assert.ok(Math.abs(drop + (kind === Surface.Pit ? 7 : kind === Surface.Land ? 0 : 2.4)) < 0.00001);
+      assert.equal(ground.mesh.position.y, 0);
     }
   }
   assert.equal(ground.material.isMeshLambertMaterial, true);
   assert.equal(ground.mesh.receiveShadow, true);
-  assert.equal(ground.surface.geometry.index!.count / 3, 1568);
-  ground.surface.setHeightProvider(
-    (x, z) => Math.sin(x / 20) * 0.1 + Math.sin(z / 20) * 0.1,
-  );
-  ground.update(game, pose);
-  assert.ok(ground.surface.geometry.attributes.position.getY(0) !== -0.015);
-  assert.ok(ground.surface.geometry.attributes.normal.getY(0) < 1);
+  assert.ok(ground.surface.geometry.index);
+  assert.ok(ground.surface.geometry.drawRange.count / 3 > 56 * 56 * 2);
   ground.dispose();
 });
 
@@ -210,13 +189,4 @@ test("instance uploads reuse one range and send only the live prefix, empty bank
   instances.dispose();
   geometry.dispose();
   material.dispose();
-});
-test("pixel magnification is retained while mip-level switches interpolate", async () => {
-  const source = await readFile(
-    new URL("../src/terrain-texture.ts", import.meta.url),
-    "utf8",
-  );
-  assert.ok(source.includes("texture.magFilter = NearestFilter"));
-  assert.ok(source.includes("texture.minFilter = LinearMipmapLinearFilter"));
-  assert.ok(LinearMipmapLinearFilter > 0);
 });

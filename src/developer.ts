@@ -114,8 +114,10 @@ const LIMITS: Record<string, [number, number, number]> = {
   "audio.master": [0, 1, 0.01],
   "audio.music": [0, 1, 0.01],
   "audio.effects": [0, 1.5, 0.01],
-  "terrain.tileMetres": [0.5, 10, 0.1],
-  "terrain.regionMetres": [64, 1500, 1],
+  "landscape.heightScale": [0.2, 2, 0.1],
+  "landscape.biomeSize": [32, 200, 1],
+  "landscape.fallChance": [0, .3, .01],
+  "landscape.birdChance": [0, .15, .01],
 };
 
 /** Validated live bindings: no frame-loop reflection and no saved tuning values. */
@@ -160,7 +162,7 @@ export class DeveloperPanel {
             effects: "Эффекты",
             rendering: "Рендеринг",
             audio: "Аудио",
-            terrain: "Поверхность",
+            landscape: "Ландшафт",
           }[group]!,
           () => record[key],
           (v) => {
@@ -337,6 +339,7 @@ export class DeveloperPanel {
   private apply(id: string) {
     if (
       id.startsWith("generation.") ||
+      id.startsWith("landscape.") ||
       id.startsWith("rules.pickup") ||
       id === "rules.firstRow"
     ) {

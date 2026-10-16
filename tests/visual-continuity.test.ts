@@ -72,7 +72,7 @@ test("dinosaur contact shadow follows interpolated jump, yaw, duck and night", (
   const dinosaur = { mesh } as unknown as AnimatedDinosaur;
   shadow.update(dinosaur, light, 0);
   const grounded = shadow.mesh.material.opacity;
-  assert.equal(shadow.mesh.position.y, -0.009);
+  assert.equal(shadow.mesh.position.y, 0.025);
   mesh.position.y = 3;
   mesh.rotation.y = Math.PI / 4;
   shadow.update(dinosaur, light, 0);
@@ -84,6 +84,14 @@ test("dinosaur contact shadow follows interpolated jump, yaw, duck and night", (
   mesh.scale.set(1.12, 0.45, 1.12);
   shadow.update(dinosaur, light, 0);
   assert.ok(shadow.mesh.scale.x > width);
+  for (const groundY of [-3.5, 2.25]) {
+    mesh.position.y = groundY + 3;
+    shadow.update(dinosaur, light, groundY);
+    assert.equal(shadow.mesh.position.y, groundY + 0.025);
+    assert.equal(shadow.mesh.position.x, -3 * light.shadowSlope.x);
+    assert.equal(shadow.mesh.position.z, -3 * light.shadowSlope.y);
+  }
+  mesh.position.y = 3;
   light.setTimeOfDay(0);
   light.update(0);
   shadow.update(dinosaur, light, 0);

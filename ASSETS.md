@@ -2,6 +2,13 @@
 
 All runtime assets are local static files, with no third-party CDN requests.
 
+## Current volumetric world (2026-10-16)
+
+- `tools/build-biome-models.mjs` authors26 original indexed, packed-vertex-colour models into `src/assets/biome-models.glb` (181468bytes): three living trees, three dead trees, matching simplified LODs, three rocks, three grass clumps, shrub, reeds, flowers, stump, log, tumbleweed, bird body/wing. Trees≤248triangles, other models≤192; no texture maps or external decoders.
+- Shape references: owner-supplied tile/tree/rock images, [Kenney Nature Kit](https://kenney.nl/assets/nature-kit) and [Quaternius Ultimate Stylized Nature](https://quaternius.com/packs/ultimatestylizednature.html). Both public reference pages were inspected; no external meshes, textures or source were copied. Project-generated geometry remains GPL-3.0-only.
+- `LandscapeField` and `TerrainSurface` now generate real vertex-coloured terrain geometry: three irregular biomes, nine covers, hills, banks, pit beds/walls and wooden crossings. The old97-layer floor atlas, runtime shader/loader and preparation command were removed. Earlier terrain art remains under `art/` for history, not in the production bundle.
+- Dinosaur bridge winding corrected on all14 joints: shared directed edges now oppose one another. Runtime body is opaque except immunity blinking. All24 skin thumbnails rebuilt. The1182-triangle/11-bone/five-clip budget and1069064-byte GLB remain unchanged.
+
 ## Current expanded wardrobe (2026-10-16)
 
 - `src/assets/wardrobe-catalog.json` adds100 original items:20 skins,20 hats,20 boots,20 watches and20 gloves. Existing10 IDs remain. `tools/low-poly-cosmetics.mjs` authors their geometry offline; skin variants share base attributes/rig and differ in packed vertex colours. Watch/glove attachment geometry follows the dinosaur arm bones. No external cosmetic assets or runtime modelling library.

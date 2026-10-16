@@ -10,7 +10,7 @@ import { Tuning } from "./tuning";
 export class AnimatedDinosaur {
   private readonly material = new THREE.MeshLambertMaterial({
     vertexColors: true,
-    transparent: true,
+    transparent: false,
     depthWrite: true,
   });
   readonly mesh: THREE.SkinnedMesh;
@@ -113,7 +113,11 @@ export class AnimatedDinosaur {
     if (animate && !dying) this.mixer.update(0);
     this.mesh.position.set(
       0,
-      THREE.MathUtils.lerp(game.previousY, game.y, alpha) + this.groundLift,
+      THREE.MathUtils.lerp(
+        game.previousGroundY + game.previousY,
+        game.groundY + game.y,
+        alpha,
+      ) + this.groundLift,
       0,
     );
     this.mesh.rotation.set(
@@ -149,12 +153,17 @@ export class AnimatedDinosaur {
         game.previousDeathTime +
           (game.deathTime - game.previousDeathTime) * alpha,
         game.heading,
-        game.y + this.groundLift,
+        game.groundY + game.y + this.groundLift,
       );
       this.mesh.position.set(this.death.x, this.death.y, this.death.z);
       this.mesh.rotation.set(0, game.heading, this.death.roll);
       this.mesh.scale.setScalar(1);
       this.material.opacity = 1;
+      if (game.falling) this.mesh.position.y -= game.deathTime * 5;
+    }
+    if (this.material.transparent !== this.material.opacity < 1) {
+      this.material.transparent = this.material.opacity < 1;
+      this.material.needsUpdate = true;
     }
   }
   sampleContact(game: Simulation, side: number, out: THREE.Vector3) {
@@ -182,6 +191,7 @@ export class FootDust {
   private readonly life = new Float32Array(256);
   private readonly worldX = new Float64Array(256);
   private readonly worldZ = new Float64Array(256);
+  private readonly worldY = new Float32Array(256);
   private readonly driftX = new Float32Array(256);
   private readonly driftZ = new Float32Array(256);
   private readonly lift = new Float32Array(256);
@@ -236,6 +246,7 @@ export class FootDust {
       this.life[i] = Tuning.effects.dustLife;
       this.worldX[i] = originX + spread * cos * 0.1;
       this.worldZ[i] = originZ + spread * sin * 0.1 + (variation - 0.5) * 0.1;
+      this.worldY[i] = Math.max(game.groundY + 0.04, this.foot.y);
       this.lift[i] = 0.35 + variation * 0.9;
       this.driftX[i] = (sign * 0.45 + spread * 0.35) * cos + sin * 0.4;
       this.driftZ[i] = (sign * 0.45 + spread * 0.35) * sin - cos * 0.4;
@@ -258,7 +269,7 @@ export class FootDust {
           Tuning.effects.dustLife;
       const x = this.worldX[i] - renderX + this.driftX[i] * age;
       const z = renderDistance - this.worldZ[i] - this.driftZ[i] * age;
-      const y = 0.04 + age * this.lift[i];
+      const y = this.worldY[i] + age * this.lift[i];
       if (
         !visibility.intersects(x, -z, size / 2, size / 2, size, y - size / 2)
       ) {

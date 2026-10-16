@@ -15,9 +15,8 @@
     "audio:build": "node tools/prepare-audio.mjs",
     "icons:build": "node tools/prepare-icons.mjs",
     "app-icons:build": "node tools/build-app-icons.mjs",
-    "terrain:build": "node tools/prepare_terrains.mjs",
-    "test:browser": "node tests/browser.mjs",
-    "test:mobile": "node tests/mobile.mjs"
+    "test:browser": "node tests/landscape-browser.mjs",
+    "test:mobile": "node tests/landscape-browser.mjs --mobile"
   },
   "dependencies": {
     "three": "0.186.1"

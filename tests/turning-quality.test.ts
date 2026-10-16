@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { RenderQuality } from "../src/render-quality.ts";
 import { CameraRig, ObjectVisibility } from "../src/camera.ts";
-import { TerrainField } from "../src/terrain-field.ts";
+import { LandscapeField } from "../src/landscape.ts";
 import { WorldSpawner } from "../src/world.ts";
 import { Simulation, STEP } from "../src/simulation.ts";
 import { LightingRig } from "../src/lighting.ts";
@@ -86,24 +86,13 @@ test("swept collisions work facing west, east, south and north, including zero Z
   }
 });
 
-test("2D biomes are deterministic, evenly distributed, reversible and neighbour-distinct", () => {
-  const count = new Uint32Array(16);
-  for (let x = -64; x < 64; x++)
-    for (let z = -64; z < 64; z++) {
-      const type = TerrainField.materialAt(x, z, 1979);
-      count[type]++;
-      assert.notEqual(type, TerrainField.materialAt(x + 1, z, 1979));
-      assert.notEqual(type, TerrainField.materialAt(x, z + 1, 1979));
-      assert.equal(
-        type,
-        TerrainField.at(
-          x * 500 + 1 - TerrainField.originX,
-          z * 500 + 1 - TerrainField.originZ,
-          1979,
-        ),
-      );
-    }
-  assert.ok([...count].every((n) => n > 850 && n < 1200));
+test("2D biome patches are reversible at negative and million-metre coordinates", () => {
+  const field=new LandscapeField(1979);
+  for(const base of[-1e6,0,1e6])for(let n=0;n<100;n++){
+    const x=base+n*13.5,z=base-n*17.3,type=field.biomeAt(x,z);
+    field.biomeAt(x+500,z-300);assert.equal(field.biomeAt(x,z),type);
+    assert.ok(Number.isFinite(field.heightAt(x,z)));
+  }
 });
 
 test("shadow focus follows the delayed view without rotating or duplicating the sun", () => {

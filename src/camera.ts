@@ -109,6 +109,7 @@ export class CameraRig {
     heading = 0,
     playerY = 0,
     crouch = 0,
+    groundY = 0,
   ) {
     this.heading +=
       (heading - this.heading) *
@@ -181,12 +182,12 @@ export class CameraRig {
     this.frontRotation.setFromRotationMatrix(this.rotationMatrix);
     this.rearPosition.set(
       (x + (bob * 0.25 + shake) * rearFactor) * cos + p.distance * sin,
-      p.height + bob * rearFactor,
+      p.height + groundY + bob * rearFactor,
       p.distance * cos - (x + (bob * 0.25 + shake) * rearFactor) * sin,
     );
     this.look.set(
       x * cos + p.targetZ * sin,
-      p.targetY,
+      p.targetY + groundY,
       p.targetZ * cos - x * sin,
     );
     this.rotationMatrix.lookAt(this.rearPosition, this.look, this.camera.up);

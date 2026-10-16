@@ -9,6 +9,9 @@ export class InstancedObjectType {
   private readonly uploadRanges: { start: number; count: number }[];
   private readonly matrix = new THREE.Matrix4();
   private lastAngle = NaN;
+  private lastPitch = NaN;
+  private lastRoll = NaN;
+  private readonly rotation = new THREE.Euler(0,0,0,"YXZ");
   private readonly details: THREE.InstancedBufferAttribute[];
   private readonly detailRanges: { start: number; count: number }[];
   private readonly variantCount: number;
@@ -18,13 +21,14 @@ export class InstancedObjectType {
     material: THREE.Material,
     scene: THREE.Scene,
     lodGeometries?: readonly THREE.BufferGeometry[],
+    capacity = Rules.poolSize,
   ) {
     this.variantCount = geometries.length;
     if (lodGeometries) geometries = [...geometries, ...lodGeometries];
     this.details = lodGeometries
       ? geometries.map((geometry) => {
           const detail = new THREE.InstancedBufferAttribute(
-            new Float32Array(Rules.poolSize),
+            new Float32Array(capacity),
             1,
           );
           detail.setUsage(THREE.DynamicDrawUsage);
@@ -35,8 +39,9 @@ export class InstancedObjectType {
     this.detailRanges = this.details.map(() => ({ start: 0, count: 0 }));
     this.counts = new Uint16Array(geometries.length);
     this.uploadRanges = geometries.map(() => ({ start: 0, count: 0 }));
-    this.meshes = geometries.map((geometry) => {
-      const mesh = new THREE.InstancedMesh(geometry, material, Rules.poolSize);
+    this.meshes = geometries.map((geometry,variant) => {
+      const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+      mesh.name=`world-${kind}-${variant}`;
       mesh.frustumCulled = false;
       mesh.count = 0;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -47,7 +52,7 @@ export class InstancedObjectType {
   begin() {
     this.counts.fill(0);
   }
-  place(variant: number, x: number, z: number, angle: number, y = 0) {
+  place(variant: number, x: number, z: number, angle: number, y = 0, pitch=0,roll=0) {
     if (this.meshes.length > this.variantCount) {
       const d2 = x * x + z * z;
       const high =
@@ -56,10 +61,10 @@ export class InstancedObjectType {
           : d2 >= Rules.lodFar ** 2
             ? 0
             : (Rules.lodFar - Math.sqrt(d2)) / (Rules.lodFar - Rules.lodNear);
-      if (high > 0) this.write(variant, x, z, angle, y, high);
+      if (high > 0) this.write(variant, x, z, angle, y, high,pitch,roll);
       if (high < 1)
-        this.write(variant + this.variantCount, x, z, angle, y, -1 - high);
-    } else this.write(variant, x, z, angle, y, 1);
+        this.write(variant + this.variantCount, x, z, angle, y, -1 - high,pitch,roll);
+    } else this.write(variant, x, z, angle, y, 1,pitch,roll);
   }
   private write(
     variant: number,
@@ -68,14 +73,19 @@ export class InstancedObjectType {
     angle: number,
     y: number,
     detail: number,
+    pitch: number,
+    roll:number,
   ) {
     const mesh = this.meshes[variant];
     if (!mesh) return;
     // Shared pickup phase: compute its rotation once per bank/frame, not once
     // per coin. The matrix's translation is still updated for every instance.
-    if (angle !== this.lastAngle) {
-      this.matrix.makeRotationY(angle);
+    if (angle !== this.lastAngle || pitch!==this.lastPitch || roll!==this.lastRoll) {
+      this.rotation.set(pitch,angle,roll);
+      this.matrix.makeRotationFromEuler(this.rotation);
       this.lastAngle = angle;
+      this.lastPitch = pitch;
+      this.lastRoll = roll;
     }
     this.matrix.setPosition(x, y, z);
     const index = this.counts[variant]++;

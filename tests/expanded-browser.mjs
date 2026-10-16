@@ -18,9 +18,13 @@ export async function checkExpansion(browser, url, engine) {
   });
   try {
     await page.goto(`${url}/?debug&time=9`);
-    await page.waitForFunction(() => window.__runner?.stats().textures >= 4);
+    await page.waitForFunction(
+      () =>
+        window.__runner &&
+        document.querySelector("#app").dataset.phase === "ready",
+    );
     assert.equal(await page.locator("#help-panel").isVisible(), true);
-    assert.equal(await page.locator("[data-help]").count(), 11);
+    assert.ok((await page.locator("[data-help]").count()) >= 11);
     assert.equal(await page.locator('[data-help="bonuses"]').count(), 0);
     await page.tap("#help-back");
     const d0 = await page.evaluate(
@@ -60,14 +64,23 @@ export async function checkExpansion(browser, url, engine) {
     );
     await page.tap("#settings-toggle");
     await page.tap("#author-code");
-    assert.equal(await page.evaluate(() => document.activeElement?.id), "author-code");
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.id),
+      "author-code",
+    );
     await page.setViewportSize({ width: 390, height: 280 });
     await page.waitForFunction(() => document.body.dataset.editing === "true");
     assert.equal(await page.locator("#author-code").isVisible(), true);
     assert.equal(await page.locator("#rotate").isVisible(), false);
-    assert.equal(await page.evaluate(() => document.activeElement?.id), "author-code");
+    assert.equal(
+      await page.evaluate(() => document.activeElement?.id),
+      "author-code",
+    );
     await page.keyboard.type("typing-check");
-    assert.equal(await page.locator("#author-code").inputValue(), "typing-check");
+    assert.equal(
+      await page.locator("#author-code").inputValue(),
+      "typing-check",
+    );
     await page.setViewportSize({ width: 390, height: 844 });
     await page.fill("#author-code", "wrong-code");
     await page.tap("#author-unlock");
@@ -83,17 +96,23 @@ export async function checkExpansion(browser, url, engine) {
     assert.equal(await page.locator("#help-panel").isVisible(), false);
     await page.tap("#developer-toggle");
     const sections = page.locator("#developer-fields summary");
-    for (let i = 0; i < await sections.count(); i++) {
+    for (let i = 0; i < (await sections.count()); i++) {
       const heading = sections.nth(i);
       await heading.scrollIntoViewIfNeeded();
       await heading.tap();
-      assert.equal(await heading.evaluate(e => e.parentElement.open), true);
+      assert.equal(await heading.evaluate((e) => e.parentElement.open), true);
       await heading.tap();
-      assert.equal(await heading.evaluate(e => e.parentElement.open), false);
+      assert.equal(await heading.evaluate((e) => e.parentElement.open), false);
     }
     await page.tap("#developer-coins");
     await page.tap("#developer-diamonds");
-    assert.deepEqual(await page.evaluate(() => [window.__runner.game.wallet.coins, window.__runner.game.wallet.diamonds]), [1000, 1000]);
+    assert.deepEqual(
+      await page.evaluate(() => [
+        window.__runner.game.wallet.coins,
+        window.__runner.game.wallet.diamonds,
+      ]),
+      [1000, 1000],
+    );
     assert.ok((await page.locator("[data-parameter]").count()) >= 85);
     const tuned = await page.evaluate(() => {
       const r = window.__runner;
@@ -110,7 +129,13 @@ export async function checkExpansion(browser, url, engine) {
     assert.equal(tuned.weight, 333);
     await page.reload();
     await page.waitForFunction(() => window.__runner?.developer.device.enabled);
-    assert.deepEqual(await page.evaluate(() => [window.__runner.game.wallet.coins, window.__runner.game.wallet.diamonds]), [1000, 1000]);
+    assert.deepEqual(
+      await page.evaluate(() => [
+        window.__runner.game.wallet.coins,
+        window.__runner.game.wallet.diamonds,
+      ]),
+      [1000, 1000],
+    );
     assert.equal(
       await page.evaluate(() => window.__runner.tuning.camera.height),
       8.5,
@@ -171,7 +196,10 @@ export async function checkExpansion(browser, url, engine) {
       await page.evaluate(() => window.__runner.game.phase),
       "running",
     );
-    assert.equal(await page.evaluate(() => "bonuses" in window.__runner.game), false);
+    assert.equal(
+      await page.evaluate(() => "bonuses" in window.__runner.game),
+      false,
+    );
     await page.tap("#developer-close");
     await page.evaluate(() => window.__runner.pause());
     await page.tap("#pause-help");

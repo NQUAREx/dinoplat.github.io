@@ -21,7 +21,7 @@ The Help tab contains the full icon-based manual and opens automatically on the 
 ## iPhone / Android rendering
 
 - Fixed the old whole-canvas `image-rendering:pixelated` enlargement and aggressive resolution reduction that treated a healthy 30Hz Safari cadence as overload.
-- Rendering now requests native antialiasing, uses normal canvas compositing, caps DPR at 2 and physical pixels at 1.3M, and does not reduce ordinary phone buffers below one CSS pixel per pixel. Icons/fonts and terrain magnification retain pixel-art filtering. Terrain mipmaps and at most 2× anisotropy reduce distant shimmer.
+- Rendering requests native antialiasing, uses normal canvas compositing, caps DPR at2 and physical pixels at1.3M, and does not reduce ordinary phone buffers below one CSS pixel per pixel. Icons/fonts retain pixel-art filtering; the environment is texture-free low-poly geometry.
 - Sustained frame intervals above40ms can reduce resolution with6s hysteresis; recovery requires12s healthy cadence. Stable30Hz does not progressively lower quality. This trades some extra fill cost for clarity; it is not proof of higher FPS on every device.
 - The owner's screenshot shows a yellow battery/Low Power Mode. [WebKit documents a 30fps requestAnimationFrame throttle in Low Power Mode](https://bugs.webkit.org/show_bug.cgi?id=168837). Turn it off when comparing smoothness. Web code cannot override OS refresh/power/thermal limits, and cloud tests cannot guarantee Brawl Stars/native-game performance.
 - Android/compatible browsers request fullscreen on Play/Resume user activation and fall back safely on denial. Normal iPhone Safari tabs cannot be forced fullscreen: Share → Add to Home Screen, then launch the installed icon. The local manifest/icons support standalone/fullscreen display; offline play is not implemented.
@@ -47,8 +47,10 @@ The panel exposes88 gameplay, generation, camera, terrain, lighting, audio, effe
 - One cached local `src/assets/game-models.glb`:127 meshes /1069064 bytes, no texture maps or external decoders. Editable original generators: `tools/low-poly-dinosaur.mjs`, `tools/low-poly-cacti.mjs` and `tools/low-poly-cosmetics.mjs`. Coin/diamond/heart are original volumetric low-poly models (192/48/84 triangles), matching HUD palettes; source tools/low-poly-collectibles.mjs. Imported GPL VOX art is archival only, not runtime dinosaur/cactus geometry.
 - World positions are continuous Float64 X/Z with a bounded symmetric15×15 chunk ring:2250 numeric slots, not2250 rendered objects. Actual instances are full-volume camera culled, with a small shadow-caster guard. Deterministic candidates in a numerical neighbourhood allow turns/revisits without near-camera spawning or an ever-growing scene.
 - Cacti use forgiving simple swept collision (.65× cactus half extents plus .22m body radius), separate from full visual/culling bounds, and and hard-core spacing. Separate pickup RNG preserves cactus distribution; coin:diamond:heart weights250:10:1, with10% fewer pickup candidates via an independent deterministic gate. Safe continuous corridors remain reserved and tested with a delayed heading-steering pilot at maximum speed.
-- Ground is a world-anchored lit224m low-poly mesh (1568 triangles), 2.5m pixel tiles and original painted material↔stone transitions. Seeded500×500m regions extend in both axes and remain fixed on revisits; terrain cannot use the odometer as Z anymore. Every adjacent region differs, all16 types equally likely. Existing odometer milestone metadata is independent.
-- One shared 97-layer128² terrain array (~8.1MiB RGBA/mips), no overlapping floor planes. Origin rebases preserve UV/tile identity, including negative and huge coordinates, and do not re-upload flat geometry.
+- The world now has three coordinate-seeded, warped biome patches: desert (three sand colours), lava valley (three volcanic covers, dead trees/basalt), meadow (three soil/grass covers, living trees). No500m biome timer. Hills/mountains, islands and irregular shores remain fixed through turns/revisits.
+- A224m bounded reusable terrain mesh has real top facets, banks, pit walls and bridge thickness. Geometry is vertex-coloured Lambert shading: no floor atlas, textures or downloaded world engine. CPU support height uses exactly the same triangle interpolation as the rendered surface. Descending slopes does not reset jump physics; the camera follows ground elevation.
+- Rivers, ponds, lava pools, pits and ravines are fatal if fallen into, including during hit immunity. Narrow gaps can be jumped; wooden crossings preserve connected safe corridors. Birds approach from ahead and require a downward-swipe crouch. Tumbleweeds roll across the path. Some cacti/trees wobble before falling; other logs/obstacles start fallen. Their collision bounds follow the visible pose.
+- Twenty-six new original offline models include three trees and three dead trees with matching LODs, three rocks, grass/shrubs/reeds/flowers/stumps/logs, tumbleweed and a flapping bird. New181468B GLB, cached geometry and instanced banks; numeric chunk ring remains2250 slots. Only camera-visible instances plus bounded shadow guards are submitted. No growing chunk-history cache or runtime mesh creation.
 - 256 pooled8-triangle dust puffs, one draw,42 per step/72 on landing with varied lift and .85s lifetime. Heading-relative world-anchored trails; stronger running bob (+50% versus the previous build) and landing impulse respect fixed290% shake/reduced motion.
 - One360s day/night cycle, smooth fog/ambient and opposite-side virtual moonlight; no visible moon or second sun/map. Cached256² shadows stay enabled at low quality; their focus follows the delayed view without rotating celestial direction. Dinosaur uses a separate small jump/duck-aware contact shadow.
 
@@ -71,7 +73,7 @@ npm run model:build          # offline characters/accessories/cacti/pickups → 
 npm run shop:build           # ten actual-model WebP thumbnails (Chromium + ffmpeg)
 npm run audio:build          # local CC0 clips + original music → MP3 (ffmpeg)
 npm run collectibles:build   # requires ImageMagick, rebuilds pickups + GLB
-npm run terrain:build        # requires ImageMagick; preserves authored connectors
+node tools/build-biome-models.mjs # offline original environment GLB
 npm test
 npm run test:browser         # Playwright Chromium
 npm run test:mobile          # Playwright Chromium + WebKit
@@ -94,7 +96,7 @@ Vite uses relative asset paths so the `/DinoPlat3d/` subpath works on static hos
 
 - `Simulation`, `WorldSpawner`, `ObjectRegistry`, wallet/health/events: numeric gameplay, fixed pools and extension contracts. Bonuses are not implemented; enemies/destruction remain inactive extension metadata.
 - `RenderPose`, `CameraRig`, `View`, instanced renderers and `RenderQuality`: one floating origin, delayed camera, LOD/culling and bounded adaptive rendering.
-- `TerrainSurface`, `TerrainField`, `Ground`, `LightingRig`, `CachedShadows`: world-fixed biomes and lit terrain, one cached map with moving focus. The Three r186 upload-epoch fix must remain: actual GPU-matrix readback tests cover rotating cameras/shadow captures.
+- `LandscapeField`, `TerrainSurface`, `Ground`, `Scenery`, `LightingRig`, `CachedShadows`: stateless coordinate biomes/support/hazards, bounded volumetric terrain/decoration, one cached shadow map. Preserve the Three r186 instance-upload epoch fix.
 - `ModelLibrary`, `AnimatedDinosaur`, `FootDust`, `FloatingFeedback`: explicit GPU/animation/DOM ownership, no runtime model generation or per-pickup node creation.
 - `MobileBrowser`, `GestureRecognizer`, `GameUI`, `CurrencyCookies`, sound/haptics/settings: mobile lifecycle/gesture/UI/persistence, user-activated optional browser features.
 

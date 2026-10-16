@@ -3,7 +3,7 @@ import WebGL from "three/addons/capabilities/WebGL.js";
 import { Simulation, STEP } from "./simulation";
 import { Input } from "./input";
 import { ModelLibrary } from "./models";
-import { TerrainTexture } from "./terrain-texture";
+import { BiomeModels } from "./biome-models";
 import { View } from "./view";
 import { GameUI } from "./ui";
 import { Haptics } from "./haptics";
@@ -102,7 +102,7 @@ class GameApplication {
         throw new Error("Для игры нужен мобильный браузер с WebGL 2.");
       const [model, ground] = await Promise.allSettled([
         ModelLibrary.load(),
-        TerrainTexture.load(),
+        BiomeModels.load(),
       ]);
       if (
         model.status === "rejected" ||
@@ -198,9 +198,6 @@ class GameApplication {
               coins: this.game.wallet.coins,
               diamonds: this.game.wallet.diamonds,
               orientationBlocked: this.landscape.matches,
-              terrainSegment: this.game.terrain.segment,
-              terrainCurrent: this.game.terrain.current,
-              terrainNext: this.game.terrain.next,
               ...this.view!.stats(),
             }),
           },

@@ -20,7 +20,7 @@ export class DinosaurShadow {
     const avatar = dinosaur.mesh, height = Math.max(0, avatar.position.y - groundY);
     const spread = 1 + height * 0.09;
     this.mesh.position.set(-height * light.shadowSlope.x,
-      groundY - 0.009, -height * light.shadowSlope.y);
+      groundY + 0.025, -height * light.shadowSlope.y);
     this.mesh.rotation.y = avatar.rotation.y;
     // Ducking widens the footprint; jumping separates it from the feet and
     // softens it without disappearing. Immunity blinking affects the shadow too.
