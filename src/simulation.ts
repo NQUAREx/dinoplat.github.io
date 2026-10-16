@@ -4,6 +4,7 @@ import { BonusSystem, Currency, Health, Wallet } from "./progression";
 import { ObjectKind, ObjectRegistry, WorldSpawner } from "./world";
 import { Terrain } from "./terrain";
 import { PickupMotion } from "./pickup-motion";
+import { Tuning } from "./tuning";
 
 export type Phase = "ready" | "running" | "dying" | "paused" | "over";
 export const STEP = Rules.step;
@@ -168,7 +169,7 @@ export class Simulation {
         ? Rules.startSpeed
         : Math.min(
             Rules.maxSpeed,
-            (Rules.startSpeed + this.distance * 0.008) *
+            (Rules.startSpeed + this.distance * Tuning.generation.speedGrowth) *
               this.bonuses.speedFactor,
           );
     this.distance += this.speed * dt;
@@ -286,6 +287,7 @@ export class Simulation {
           definition.bonusId !== undefined
         )
           this.bonuses.activate(definition.bonusId);
+        this.events.emit(GameEvent.CollectedVisual, i);
         pool.consume(i);
         this.events.emit(GameEvent.Collected, definition.kind, amount);
       }

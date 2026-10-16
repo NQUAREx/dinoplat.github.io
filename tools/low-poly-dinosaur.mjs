@@ -3,6 +3,7 @@ import {
   AnimationClip,
   Bone,
   Color,
+  BufferAttribute,
   ConeGeometry,
   CylinderGeometry,
   Euler,
@@ -27,6 +28,7 @@ import {
 export class LowPolyDinosaur {
   parts = [];
   bones = [];
+  roundable = [];
   bone(name, parent, x, y, z) {
     const bone = new Bone();
     bone.name = `dino-${name}`;
@@ -103,6 +105,16 @@ export class LowPolyDinosaur {
     const geometry = source.index ? source : mergeVertices(source);
     if (geometry !== source) source.dispose();
     this.part(geometry, colour, joint, x, y, z, sx, sy, sz);
+    if (colour !== 0xfff9e8 && colour !== 0x24374d && colour !== 0xffffff)
+      this.roundable.push({
+        geometry: this.parts[this.parts.length - 1],
+        x,
+        y,
+        z,
+        sx,
+        sy,
+        sz,
+      });
   }
   build() {
     this.bone("root", -1, 0, 0, 0);
@@ -290,9 +302,12 @@ export class LowPolyDinosaur {
         y,
         z,
       );
+    this.roundSurfaces(197);
     const merged = mergeGeometries(this.parts);
     for (const part of this.parts) part.dispose();
+    merged.deleteAttribute("normal");
     const geometry = mergeVertices(merged);
+    geometry.computeVertexNormals();
     merged.dispose();
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
@@ -312,6 +327,94 @@ export class LowPolyDinosaur {
       "bones",
     );
     return { mesh, clips };
+  }
+  /** Split 197 visible body facets into curved fans: 788 + 197*2 =1182.
+   * A half-strength superellipsoid projection rounds real surfaces, not padding. */
+  roundSurfaces(budget) {
+    const ranked = [];
+    for (const part of this.roundable) {
+      const p = part.geometry.attributes.position,
+        index = part.geometry.index;
+      for (let f = 0; f < index.count / 3; f++) {
+        const a = index.getX(f * 3),
+          b = index.getX(f * 3 + 1),
+          c = index.getX(f * 3 + 2);
+        const ux = p.getX(b) - p.getX(a),
+          uy = p.getY(b) - p.getY(a),
+          uz = p.getZ(b) - p.getZ(a),
+          vx = p.getX(c) - p.getX(a),
+          vy = p.getY(c) - p.getY(a),
+          vz = p.getZ(c) - p.getZ(a);
+        ranked.push({
+          part,
+          f,
+          area: Math.hypot(
+            uy * vz - uz * vy,
+            uz * vx - ux * vz,
+            ux * vy - uy * vx,
+          ),
+        });
+      }
+    }
+    ranked.sort((a, b) => b.area - a.area);
+    if (ranked.length < budget) throw Error("Rounding facet budget");
+    for (const part of this.roundable) {
+      const selected = new Set(
+        ranked
+          .slice(0, budget)
+          .filter((r) => r.part === part)
+          .map((r) => r.f),
+      );
+      const old = part.geometry,
+        index = old.index,
+        vertices = [];
+      for (let f = 0; f < index.count / 3; f++) {
+        const ids = [
+          index.getX(f * 3),
+          index.getX(f * 3 + 1),
+          index.getX(f * 3 + 2),
+        ];
+        if (selected.has(f))
+          for (let n = 0; n < 3; n++)
+            vertices.push([ids[n]], [ids[(n + 1) % 3]], ids);
+        else for (const id of ids) vertices.push([id]);
+      }
+      for (const [name, attribute] of Object.entries(old.attributes)) {
+        const array = new attribute.array.constructor(
+          vertices.length * attribute.itemSize,
+        );
+        for (let v = 0; v < vertices.length; v++)
+          for (let k = 0; k < attribute.itemSize; k++) {
+            let value = 0;
+            for (const id of vertices[v])
+              value +=
+                attribute.array[id * attribute.itemSize + k] /
+                vertices[v].length;
+            array[v * attribute.itemSize + k] = value;
+          }
+        old.setAttribute(
+          name,
+          new BufferAttribute(array, attribute.itemSize, attribute.normalized),
+        );
+      }
+      old.setIndex(Array.from({ length: vertices.length }, (_, i) => i));
+      const p = old.attributes.position;
+      for (let v = 0; v < p.count; v++) {
+        const x = (p.getX(v) - part.x) / part.sx,
+          y = (p.getY(v) - part.y) / part.sy,
+          z = (p.getZ(v) - part.z) / part.sz;
+        const norm =
+          (Math.abs(x) ** 4 + Math.abs(y) ** 4 + Math.abs(z) ** 4) ** 0.25;
+        const factor = norm > 1e-6 ? 0.5 + 0.5 / norm : 1;
+        p.setXYZ(
+          v,
+          part.x + x * factor * part.sx,
+          part.y + y * factor * part.sy,
+          part.z + z * factor * part.sz,
+        );
+      }
+      old.computeVertexNormals();
+    }
   }
   animations() {
     const names = this.bones.map((b) => b.name),

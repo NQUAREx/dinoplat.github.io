@@ -28,7 +28,7 @@ export async function checkTurning(context, url, engine) {
         w.kinds[i] = 0;
         w.variants[i] = 2;
         w.x[i] = 0;
-        w.z[i] = 200 + [10, 26, 42][i];
+        w.z[i] = 200 + [10, 31, 42][i];
         w.angles[i] = 0;
         w.halfX[i] = 0.7;
         w.halfZ[i] = 0.4;

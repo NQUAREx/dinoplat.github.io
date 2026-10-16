@@ -114,6 +114,8 @@
                 />
               </svg>
             </button>
+            <button id="help-toggle" class="menu-tab" aria-label="Справка" aria-pressed="false"><span aria-hidden="true">?</span></button>
+            <button id="developer-toggle" class="menu-tab" aria-label="Разработчик" hidden><span aria-hidden="true">DEV</span></button>
           </nav>
           <div id="menu-content" class="menu-content">
             <section id="menu-panel" class="panel" aria-labelledby="title">
@@ -219,6 +221,10 @@
               <button id="settings-back" class="pixel-button settings-link">
                 ← НАЗАД
               </button>
+              <label class="author-label" for="author-code">КОД АВТОРА</label>
+              <input id="author-code" type="password" data-native-input autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="80" aria-label="Код автора" />
+              <button id="author-unlock" class="pixel-button settings-link">ОТКРЫТЬ</button>
+              <p id="author-message" role="status"></p>
               <button id="fullscreen" class="pixel-button settings-link" hidden>
                 НА ВЕСЬ ЭКРАН
               </button>
@@ -226,6 +232,11 @@
             </section>
           </div>
         </div>
+        <section id="help-panel" class="panel" aria-labelledby="help-title" hidden>
+          <h2 id="help-title">СПРАВКА</h2>
+          <button id="help-back" class="pixel-button settings-link">ПОНЯТНО · НАЗАД</button>
+          <div id="help-content"></div>
+        </section>
         <section
           id="pause-panel"
           class="panel pause-panel"
@@ -237,8 +248,16 @@
           <button id="pause-settings" class="pixel-button settings-link">
             НАСТРОЙКИ
           </button>
+          <button id="pause-help" class="pixel-button settings-link">СПРАВКА</button>
         </section>
       </main>
+      <section id="developer-panel" class="panel" aria-labelledby="developer-title" hidden>
+        <header><h2 id="developer-title">РАЗРАБОТЧИК</h2><button id="developer-close" class="pixel-button">ЗАКРЫТЬ</button></header>
+        <p>Изменения только на эту сессию. Экспериментальные значения могут нарушить баланс. Служебная структура пулов фиксирована.</p>
+        <div class="developer-actions"><button id="developer-reset" class="pixel-button">СБРОСИТЬ</button><button id="developer-pause" class="pixel-button">ПАУЗА / ПРОДОЛЖИТЬ</button><button id="developer-shield" class="pixel-button">ЩИТ</button><button id="developer-speed" class="pixel-button">УСКОРЕНИЕ</button><button id="developer-jump" class="pixel-button">ПРЫЖОК+</button><button id="developer-day" class="pixel-button">ЦИКЛ СУТОК</button></div>
+        <div id="developer-fields"></div>
+      </section>
+      <button id="developer-live-toggle" class="pixel-button developer-button" hidden>DEV</button>
       <footer class="bottom">
         <button
           id="pause"

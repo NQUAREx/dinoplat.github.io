@@ -13,6 +13,7 @@ import { checkDinoRun } from "./dino-run-browser.mjs";
 import { checkShop } from "./shop-browser.mjs";
 import { checkPolish } from "./polish-browser.mjs";
 import { checkMenuWorld } from "./menu-world-browser.mjs";
+import {checkExpansion} from "./expanded-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -206,6 +207,7 @@ try {
         deviceScaleFactor: 1,
       };
       const context = await browser.newContext(options);
+      await context.addInitScript(()=>localStorage.setItem("dinorun-help-seen-v1","1"));
       const page = await context.newPage();
       const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));
@@ -537,6 +539,7 @@ try {
       results[engine].shop = await checkShop(context, url, engine);
       results[engine].polish = await checkPolish(context,url,engine);
       results[engine].menuWorld=await checkMenuWorld(context,url,engine);
+      results[engine].expansion=await checkExpansion(browser,url,engine);
       await context.close();
     } finally {
       await browser.close();

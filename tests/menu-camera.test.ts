@@ -72,9 +72,9 @@ test("shop purchase/equip is validated, charged once and survives reload; access
     },
   };
   const shop = new CosmeticInventory(wallet, storage);
-  assert.equal(COSMETICS.filter((i) => i.category === "dino").length, 4);
-  assert.equal(COSMETICS.filter((i) => i.category === "hat").length, 3);
-  assert.equal(COSMETICS.filter((i) => i.category === "boots").length, 3);
+  assert.equal(COSMETICS.filter((i) => i.category === "dino").length, 24);
+  assert.equal(COSMETICS.filter((i) => i.category === "hat").length, 23);
+  assert.equal(COSMETICS.filter((i) => i.category === "boots").length, 23);
   assert.equal(shop.equipped.dino, "dino-green");
   assert.equal(shop.choose("dino-white"), "funds");
   wallet.add(Currency.Coin, 2500);
@@ -119,6 +119,8 @@ test("malformed or blocked cosmetic storage cannot grant invalid equipment or st
     dino: "dino-green",
     hat: "",
     boots: "",
+    watch: "",
+    gloves: "",
   });
   assert.equal(inventory.choose("hat-cap"), "equipped");
 });

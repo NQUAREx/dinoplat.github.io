@@ -1,6 +1,14 @@
 import { Currency, type Wallet } from "./progression";
+import additions from "./assets/wardrobe-catalog.json";
 
-export type CosmeticCategory = "dino" | "hat" | "boots";
+export const COSMETIC_CATEGORIES = [
+  "dino",
+  "hat",
+  "boots",
+  "watch",
+  "gloves",
+] as const;
+export type CosmeticCategory = (typeof COSMETIC_CATEGORIES)[number];
 export interface CosmeticDefinition {
   readonly id: string;
   readonly category: CosmeticCategory;
@@ -79,6 +87,7 @@ export const COSMETICS: readonly CosmeticDefinition[] = Object.freeze([
     price: 60,
     currency: Currency.Diamond,
   },
+  ...(additions as CosmeticDefinition[]),
 ]);
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 /** Cosmetic-only inventory: never changes physics, speed or collider metadata. */
@@ -89,6 +98,8 @@ export class CosmeticInventory {
     dino: "dino-green",
     hat: "",
     boots: "",
+    watch: "",
+    gloves: "",
   };
   revision = 0;
   private storage?: StorageLike;
@@ -104,7 +115,7 @@ export class CosmeticInventory {
       if (saved?.version !== 1 || !Array.isArray(saved.owned)) return;
       for (const id of saved.owned)
         if (COSMETICS.some((item) => item.id === id)) this.owned.add(id);
-      for (const category of ["dino", "hat", "boots"] as const) {
+      for (const category of COSMETIC_CATEGORIES) {
         const id = saved.equipped?.[category];
         if (
           this.owned.has(id) &&

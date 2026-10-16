@@ -13,6 +13,10 @@ import { MobileBrowser } from "./mobile-browser";
 import { CurrencyCookies } from "./currency-cookies";
 import { GameEvent } from "./events";
 import { CosmeticInventory } from "./cosmetics";
+import { HelpUI } from "./help";
+import { panelScroll } from "./panel-scroll";
+import { DeveloperPanel } from "./developer";
+import { Tuning } from "./tuning";
 
 class GameApplication {
   readonly game = new Simulation(1979);
@@ -30,6 +34,8 @@ class GameApplication {
   private mobile?: MobileBrowser;
   private currency?: CurrencyCookies;
   private cosmetics?: CosmeticInventory;
+  private developer?: DeveloperPanel;
+  private menuTimer: ReturnType<typeof setTimeout> | undefined;
   private alive = true;
   private contextLost = false;
   private previous = 0;
@@ -58,6 +64,9 @@ class GameApplication {
       new URL(import.meta.env.BASE_URL, location.href).pathname,
     );
     this.cosmetics = new CosmeticInventory(this.game.wallet);
+    new HelpUI(document.getElementById("help-content")!);
+    for (const id of ["help-panel", "settings-panel"])
+      panelScroll(document.getElementById(id)!, this.abort.signal);
     this.ui.initializeShop(
       this.cosmetics,
       (id) => {
@@ -135,17 +144,41 @@ class GameApplication {
           if (!this.landscape.matches) this.game.down();
         },
       );
+      for (const bonus of [
+        { id: 301, duration: 30, shield: true },
+        { id: 302, duration: 15, speedFactor: 1.5 },
+        { id: 303, duration: 15, jumpFactor: 1.25 },
+      ])
+        this.game.bonuses.register(bonus);
+      this.developer = new DeveloperPanel(
+        this.game,
+        this.view,
+        () => {
+          this.applySettings();
+          this.input?.clear();
+          this.view?.draw();
+          this.schedule();
+        },
+        new URL(import.meta.env.BASE_URL, location.href).pathname,
+      );
       this.bind();
       this.game.events.on(GameEvent.Hit, () => this.input?.clear());
       this.applySettings();
       this.ui.show(this.game);
+      if (HelpUI.firstVisit()) {
+        this.ui.selectSection("help");
+        HelpUI.seen();
+      }
       this.schedule();
       if (this.debug)
         Object.assign(window, {
           __runner: {
             game: this.game,
             start: () => this.start(),
-            pause: () => this.pause(),
+            pause: () => {
+              this.pause();
+              this.stopFrames();
+            },
             stats: () => this.view!.stats(),
             render: () => this.view!.draw(),
             camera: this.view.rig,
@@ -153,6 +186,8 @@ class GameApplication {
             settings: this.settings,
             audio: () => this.sound.stats(),
             cosmetics: this.cosmetics,
+            developer: this.developer,
+            tuning: Tuning,
             mobile: () => this.mobile!.stats(),
             snapshot: () => ({
               phase: this.game.phase,
@@ -217,6 +252,7 @@ class GameApplication {
             this.view?.rig.transitioning
           )
             this.schedule();
+          else if (this.view?.previewAnimating) this.schedule(true);
         },
         options,
       );
@@ -246,6 +282,61 @@ class GameApplication {
     touchButton(
       document.getElementById("shop-toggle") as HTMLButtonElement,
       () => this.ui.selectSection("shop"),
+    );
+    for (const id of ["help-toggle", "pause-help"])
+      touchButton(document.getElementById(id) as HTMLButtonElement, () => {
+        this.ui.selectSection("help");
+        HelpUI.seen();
+      });
+    touchButton(
+      document.getElementById("help-back") as HTMLButtonElement,
+      () => {
+        HelpUI.seen();
+        this.ui.selectSection("home");
+      },
+    );
+    for (const id of ["developer-toggle", "developer-live-toggle"])
+      touchButton(document.getElementById(id) as HTMLButtonElement, () =>
+        this.developer?.open(),
+      );
+    touchButton(
+      document.getElementById("developer-close") as HTMLButtonElement,
+      () => this.developer?.close(),
+    );
+    touchButton(
+      document.getElementById("developer-reset") as HTMLButtonElement,
+      () => this.developer?.reset(),
+    );
+    touchButton(
+      document.getElementById("developer-pause") as HTMLButtonElement,
+      () =>
+        this.game.phase === "running"
+          ? this.pause()
+          : this.game.phase === "paused"
+            ? this.start()
+            : undefined,
+    );
+    for (const [name, id] of [
+      ["shield", 301],
+      ["speed", 302],
+      ["jump", 303],
+    ] as const)
+      touchButton(
+        document.getElementById(`developer-${name}`) as HTMLButtonElement,
+        () => {
+          this.game.bonuses.activate(id);
+        },
+      );
+    touchButton(
+      document.getElementById("developer-day") as HTMLButtonElement,
+      () =>
+        this.view?.lighting.setTimeOfDay(this.view.lighting.cycle.hours, true),
+    );
+    touchButton(
+      document.getElementById("author-unlock") as HTMLButtonElement,
+      () => {
+        void this.developer?.unlock();
+      },
     );
     touchButton(document.getElementById("resume") as HTMLButtonElement, () =>
       this.start(),
@@ -291,7 +382,15 @@ class GameApplication {
       () => this.mobile?.requestResize(),
       options,
     );
-    window.addEventListener("blur", () => this.pause(), options);
+    window.addEventListener(
+      "blur",
+      () => {
+        this.pause();
+        this.stopFrames();
+      },
+      options,
+    );
+    window.addEventListener("focus", () => this.schedule(), options);
     document.addEventListener(
       "visibilitychange",
       () => {
@@ -345,7 +444,7 @@ class GameApplication {
     this.haptics.enabled = this.settings.vibration;
     this.sound.configure(this.settings.sound, this.settings.music);
     if (!this.haptics.enabled) this.haptics.stop();
-    if (this.view) this.view.rig.shakeMultiplier = this.settings.shake;
+    if (this.view) this.view.rig.shakeMultiplier = Tuning.camera.shake;
     for (const key of ["vibration", "sound", "music"] as const) {
       const button = document.getElementById(key)!;
       button.setAttribute("aria-pressed", String(this.settings[key]));
@@ -388,10 +487,22 @@ class GameApplication {
     this.ui.show(this.game);
   }
   private stopFrames() {
+    clearTimeout(this.menuTimer);
+    this.menuTimer = undefined;
     cancelAnimationFrame(this.raf);
     this.raf = this.previous = this.accumulator = 0;
   }
-  private schedule() {
+  private schedule(menu = false) {
+    if (menu) {
+      if (!this.menuTimer)
+        this.menuTimer = setTimeout(() => {
+          this.menuTimer = undefined;
+          this.schedule();
+        }, 33);
+      return;
+    }
+    clearTimeout(this.menuTimer);
+    this.menuTimer = undefined;
     if (
       !this.raf &&
       this.alive &&
@@ -448,6 +559,7 @@ class GameApplication {
       this.view.rig.transitioning
     )
       this.schedule();
+    else if (this.view.previewAnimating) this.schedule(true);
   };
   dispose() {
     if (!this.alive) return;
@@ -459,6 +571,7 @@ class GameApplication {
     this.input?.dispose();
     this.haptics.dispose();
     this.sound.dispose();
+    this.developer?.dispose();
     this.ui.dispose();
     this.view?.dispose();
     this.view = undefined;

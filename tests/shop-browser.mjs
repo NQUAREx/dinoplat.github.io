@@ -27,11 +27,11 @@ export async function checkShop(context, url, engine) {
     );
     await page.screenshot({ path: `test-results/${engine}-main-menu.png` });
     await page.tap("#shop-toggle");
-    assert.equal(await page.locator(".shop-card").count(), 10);
+    assert.equal(await page.locator(".shop-card").count(), 110);
     for (const category of ["dino", "hat", "boots"])
       assert.equal(
         await page.locator(`[data-rail="${category}"] .shop-card`).count(),
-        category === "dino" ? 4 : 3,
+        category === "dino" ? 24 : 23,
       );
     await page.waitForFunction(() => window.__runner.audio().loaded);
     const choose = async (id) => {
@@ -70,6 +70,8 @@ export async function checkShop(context, url, engine) {
       dino: "dino-pink",
       hat: "hat-safari",
       boots: "boots-red",
+      watch: "",
+      gloves: "",
     });
     assert.equal(purchased.coins, 1120);
     assert.equal(purchased.diamonds, 1940);
@@ -259,7 +261,7 @@ export async function checkShop(context, url, engine) {
     // Pause is deliberately separate from Home and Shop.
     assert.equal(await page.locator("#pause-panel").isVisible(), true);
     assert.equal(await page.locator("#menu-shell").isVisible(), false);
-    assert.equal(await page.locator("#pause-panel button").count(), 2);
+    assert.equal(await page.locator("#pause-panel button").count(), 3);
     assert.equal(await page.locator("#shop-panel").isVisible(), false);
     await page.tap("#pause-settings");
     await page.tap("#sound");

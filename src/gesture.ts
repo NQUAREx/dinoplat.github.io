@@ -1,6 +1,6 @@
 /** Classifies before moving. Up-swipes never need positional rollback. */
 export class GestureRecognizer {
-  static readonly holdDelay = 36;
+  static holdDelay = 36;
   private active = false;
   private state: "pending" | "hold" | "vertical" = "pending";
   private startX = 0;

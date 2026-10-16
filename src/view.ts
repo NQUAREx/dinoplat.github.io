@@ -19,6 +19,8 @@ import { RenderQuality } from "./render-quality";
 import type { CosmeticInventory } from "./cosmetics";
 import { DinosaurCosmetics } from "./dinosaur-cosmetics";
 import { MenuPreview } from "./menu-preview";
+import { Tuning } from "./tuning";
+import { PickupEffects } from "./pickup-effects";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
@@ -37,6 +39,10 @@ export class View {
   private readonly dinosaurShadow = new DinosaurShadow();
   private readonly dust: FootDust;
   private readonly feedback: FloatingFeedback;
+  private readonly pickupEffects: PickupEffects;
+  private readonly reducedMotion = matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
   private readonly feedbackAnchor = new THREE.Vector3();
   private readonly cactusMaterial = new THREE.MeshLambertMaterial({
     vertexColors: true,
@@ -114,6 +120,7 @@ export class View {
       () => game.feedbackTime,
       reducedMotion,
     );
+    this.pickupEffects = new PickupEffects(game, models, this.scene);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.BasicShadowMap;
@@ -161,8 +168,12 @@ export class View {
       mesh.receiveShadow = false;
     }
     this.off = [
-      game.events.on(GameEvent.Hit, () => this.rig.impulse(0.075, 0.22)),
-      game.events.on(GameEvent.Land, () => this.rig.impulse(0.0525, 0.2)),
+      game.events.on(GameEvent.Hit, () =>
+        this.rig.impulse(Tuning.camera.hitShake, 0.22),
+      ),
+      game.events.on(GameEvent.Land, () =>
+        this.rig.impulse(Tuning.camera.landShake, 0.2),
+      ),
       game.events.on(GameEvent.Death, () => {
         this.deathFirstPerson = this.rig.firstPerson;
         this.rig.firstPerson = false;
@@ -176,7 +187,9 @@ export class View {
     this.resize();
   }
   async initialize() {
+    for (const mesh of this.pickupEffects.meshes) mesh.visible = true;
     await this.renderer.compileAsync(this.scene, this.rig.camera);
+    for (const mesh of this.pickupEffects.meshes) mesh.visible = false;
   }
   registerObjectType(
     kind: ObjectKind,
@@ -243,6 +256,8 @@ export class View {
     );
     this.renderer.setClearColor(this.lighting.fogColour);
     (this.scene.fog as THREE.Fog).color.copy(this.lighting.fogColour);
+    (this.scene.fog as THREE.Fog).near = Tuning.camera.fogStart;
+    (this.scene.fog as THREE.Fog).far = Tuning.camera.fogEnd;
     this.ground.update(game, this.pose);
     this.dinosaur.update(
       game,
@@ -375,6 +390,13 @@ export class View {
       }
     }
     this.objectRenderers.finish();
+    this.pickupEffects.update(
+      game.previousFeedbackTime +
+        (game.feedbackTime - game.previousFeedbackTime) * alpha,
+      this.pose.x,
+      this.pose.z,
+      this.pickupMotion.angle,
+    );
     this.renderer.shadowMap.needsUpdate = this.shadows.prepare(
       game,
       this.pose,
@@ -390,7 +412,25 @@ export class View {
     this.renderer.info.render.frame++;
     this.renderer.render(this.scene, this.rig.camera);
     this.shadows.complete(this.lighting);
-    if (home) this.preview.draw(this.renderer);
+    if (home) this.preview.draw(this.renderer, dt);
+  }
+  get previewAnimating() {
+    return (
+      this.preview.visible &&
+      Tuning.effects.previewSpin !== 0 &&
+      !this.reducedMotion
+    );
+  }
+  applyTuning() {
+    this.rig.shakeMultiplier = Tuning.camera.shake;
+    this.rig.setPose(Tuning.camera, 0);
+    this.rig.camera.far = Tuning.camera.far;
+    this.rig.camera.updateProjectionMatrix();
+    this.lighting.key.shadow.bias = Tuning.rendering.shadowBias;
+    this.lighting.key.shadow.normalBias = Tuning.rendering.shadowNormalBias;
+    this.shadows.invalidate();
+    this.worldFov = 0;
+    this.resize();
   }
   stats() {
     return {
@@ -420,8 +460,8 @@ export class View {
       threeRevision: THREE.REVISION,
       cameraFov: this.rig.camera.fov,
       cameraFar: this.rig.camera.far,
-      fogStart: FOG_START,
-      fogEnd: FOG_END,
+      fogStart: Tuning.camera.fogStart,
+      fogEnd: Tuning.camera.fogEnd,
       shakeMultiplier: this.rig.shakeMultiplier,
       playerOpacity: (this.dinosaur.mesh.material as THREE.MeshLambertMaterial)
         .opacity,
@@ -430,7 +470,9 @@ export class View {
       cameraY: this.rig.camera.position.y,
       cameraZ: this.rig.camera.position.z,
       terrainLayers: TerrainLayout.layers,
-      terrainTileMetres: TerrainLayout.worldTileSize,
+      terrainTileMetres: Tuning.terrain.tileMetres,
+      lodNear:Rules.lodNear,
+      lodFar:Rules.lodFar,
       boundaryCount: 0,
       obstacleVariants: this.models.cacti.length,
       obstacleCapacity: Rules.poolSize,
@@ -468,6 +510,9 @@ export class View {
           : 0,
       shadowStrength: this.lighting.shadowStrength,
       feedbackCount: this.feedback.active,
+      pickupEffectCount: this.pickupEffects.count,
+      pickupEffectAlpha:this.pickupEffects.firstAlpha,
+      pickupEffectY:this.pickupEffects.firstY,
       dinosaurShadowX: this.dinosaurShadow.mesh.position.x,
       dinosaurShadowZ: this.dinosaurShadow.mesh.position.z,
       dinosaurShadowWidth: this.dinosaurShadow.mesh.scale.x,
@@ -487,6 +532,7 @@ export class View {
     this.dinosaurShadow.dispose();
     this.dust.dispose();
     this.feedback.dispose();
+    this.pickupEffects.dispose();
     this.ground.dispose();
     this.models.dispose();
     this.lighting.dispose();

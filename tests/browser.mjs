@@ -13,6 +13,7 @@ import { checkDinoRun } from "./dino-run-browser.mjs";
 import { checkShop } from "./shop-browser.mjs";
 import { checkPolish } from "./polish-browser.mjs";
 import { checkMenuWorld } from "./menu-world-browser.mjs";
+import {checkExpansion} from "./expanded-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -43,6 +44,7 @@ const phone = {
 const errors = [],
   report = {};
 async function ready(page) {
+  await page.addInitScript(()=>{try{localStorage.setItem("dinorun-help-seen-v1","1");}catch{}});
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (
@@ -73,6 +75,7 @@ try {
   assert.equal(await desktop.locator("#mobile-required").isVisible(), true);
   await desktop.close();
   const context = await browser.newContext(phone);
+  await context.addInitScript(()=>localStorage.setItem("dinorun-help-seen-v1","1"));
   report.dinoRun = await checkDinoRun(context, url, "chromium");
   report.feedback = await checkFeedback(context, url);
   report.turning = await checkTurning(context, url, "chromium");
@@ -747,6 +750,7 @@ try {
     }),
   );
   await ready(noStorage);
+  if(await noStorage.locator("#help-back").isVisible())await noStorage.tap("#help-back");
   await noStorage.tap("#action");
   assert.equal(
     await noStorage.evaluate(() => window.__runner.game.phase),
@@ -778,6 +782,7 @@ try {
   report.shop = await checkShop(context, url, "chromium");
   report.polish = await checkPolish(context,url,"chromium");
   report.menuWorld=await checkMenuWorld(context,url,"chromium");
+  report.expansion=await checkExpansion(browser,url,"chromium");
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(

@@ -9,7 +9,7 @@ import type { ModelLibrary } from "../src/models.ts";
 import { COSMETICS, CosmeticInventory } from "../src/cosmetics.ts";
 import { DinosaurCosmetics } from "../src/dinosaur-cosmetics.ts";
 
-test("all wardrobe swaps reuse one rig and three attachment meshes, including animated crouch", async () => {
+test("all wardrobe swaps reuse one rig and six attachment meshes, including animated crouch", async () => {
   const bytes = await readFile(
     new URL("../src/assets/game-models.glb", import.meta.url),
   );
@@ -70,7 +70,7 @@ test("all wardrobe swaps reuse one rig and three attachment meshes, including an
   mesh.traverse((o) => {
     if (o.type === "Mesh") attachments.push(o.uuid);
   });
-  assert.equal(attachments.length, 3);
+  assert.equal(attachments.length, 6);
   for (let i = 0; i < 1000; i++) {
     inventory.choose(COSMETICS[i % COSMETICS.length].id);
     wardrobe.apply(inventory);
@@ -183,10 +183,10 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
   const json = JSON.parse(
     buffer.toString("utf8", 20, 20 + buffer.readUInt32LE(12)),
   );
-  assert.equal(json.meshes.length, 27);
+  assert.equal(json.meshes.length, 127);
   assert.equal(json.images, undefined);
   assert.equal(json.textures, undefined);
-  assert.equal(json.skins.length, 4);
+  assert.equal(json.skins.length, 24);
   assert.equal(json.skins[0].joints.length, 11);
   for (const skin of json.skins)
     assert.deepEqual(skin.joints, json.skins[0].joints);
@@ -209,7 +209,7 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
     json.animations.map((a: { name: string }) => a.name),
     ["run", "jump", "duck", "hit", "death"],
   );
-  assert.ok(buffer.length < 800000);
+  assert.ok(buffer.length < 1300000);
   for (const name of ["coin", "diamond", "heart"]) {
     const node = json.nodes.find(
       (n: { name: string }) => n.name === `pickup-${name}`,
@@ -244,7 +244,7 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
     assert.equal(mesh.primitives.length, 1);
     const primitive = mesh.primitives[0];
     assert.ok(primitive.attributes.COLOR_0 !== undefined);
-    assert.ok(json.accessors[primitive.indices].count / 3 <= 1000);
+    assert.ok(json.accessors[primitive.indices].count / 3 <= 1200);
   }
   for (const node of json.nodes.filter((node: { name?: string }) =>
     node.name?.startsWith("pickup-"),

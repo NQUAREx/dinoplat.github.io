@@ -1,4 +1,5 @@
 import { Matrix4, Vector3 } from "three";
+import { Tuning } from "./tuning";
 import type { LightingRig } from "./lighting";
 import type { RenderPose } from "./render-pose";
 import type { Simulation } from "./simulation";
@@ -36,7 +37,11 @@ export class CachedShadows {
       Math.abs(pose.x - this.x) > 8 ||
       Math.abs(pose.z - this.distance) > 8 ||
       game.time < this.time ||
-      game.time - this.time >= (quality <= 0.55 ? 0.25 : 0.125);
+      game.time - this.time >=
+        1 /
+          (quality <= 0.55
+            ? Tuning.rendering.shadowLowHz
+            : Tuning.rendering.shadowHz);
     shadow.needsUpdate = this.refresh;
     if (this.refresh) {
       this.x = pose.x;

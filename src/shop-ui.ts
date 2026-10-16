@@ -1,5 +1,6 @@
 import {
   COSMETICS,
+  COSMETIC_CATEGORIES,
   type CosmeticCategory,
   type CosmeticInventory,
 } from "./cosmetics";
@@ -18,14 +19,19 @@ export class ShopUI {
     choose: (id: string) => void,
     remove: (category: CosmeticCategory) => void,
   ) {
-    for (const category of ["dino", "hat", "boots"] as const) {
+    for (const category of COSMETIC_CATEGORIES) {
       const section = document.createElement("section");
       section.className = "shop-section";
       const heading = document.createElement("div");
       heading.className = "shop-heading";
       const title = document.createElement("h3");
-      title.textContent =
-        category === "dino" ? "ДИНО" : category === "hat" ? "ШАПКИ" : "БОТИНКИ";
+      title.textContent = {
+        dino: "ДИНО",
+        hat: "ШАПКИ",
+        boots: "БОТИНКИ",
+        watch: "ЧАСЫ",
+        gloves: "ПЕРЧАТКИ",
+      }[category];
       heading.append(title);
       if (category !== "dino") {
         const clear = document.createElement("button");
@@ -48,6 +54,8 @@ export class ShopUI {
         img.width = 160;
         img.height = 160;
         img.draggable = false;
+        img.loading = "lazy";
+        img.decoding = "async";
         const name = document.createElement("strong");
         name.textContent = item.name;
         const price = document.createElement("span");

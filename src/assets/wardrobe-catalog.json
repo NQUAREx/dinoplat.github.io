@@ -1,0 +1,1002 @@
+[
+  {
+    "id": "dino-extra-01",
+    "category": "dino",
+    "name": "ЛАГУНА",
+    "price": 500,
+    "currency": 0,
+    "style": 0,
+    "primary": 16740443,
+    "accent": 13847625
+  },
+  {
+    "id": "dino-extra-02",
+    "category": "dino",
+    "name": "ЛАВА",
+    "price": 625,
+    "currency": 0,
+    "style": 1,
+    "primary": 3589593,
+    "accent": 7917131
+  },
+  {
+    "id": "dino-extra-03",
+    "category": "dino",
+    "name": "КОСМОС",
+    "price": 750,
+    "currency": 0,
+    "style": 2,
+    "primary": 9723110,
+    "accent": 10934769
+  },
+  {
+    "id": "dino-extra-04",
+    "category": "dino",
+    "name": "МЯТА",
+    "price": 135,
+    "currency": 1,
+    "style": 3,
+    "primary": 16761917,
+    "accent": 7883962
+  },
+  {
+    "id": "dino-extra-05",
+    "category": "dino",
+    "name": "ЗАКАТ",
+    "price": 1000,
+    "currency": 0,
+    "style": 4,
+    "primary": 2717142,
+    "accent": 15371061
+  },
+  {
+    "id": "dino-extra-06",
+    "category": "dino",
+    "name": "НЕОН",
+    "price": 1125,
+    "currency": 0,
+    "style": 5,
+    "primary": 16218048,
+    "accent": 2701651
+  },
+  {
+    "id": "dino-extra-07",
+    "category": "dino",
+    "name": "ПАНДА",
+    "price": 1250,
+    "currency": 0,
+    "style": 6,
+    "primary": 4416599,
+    "accent": 16313807
+  },
+  {
+    "id": "dino-extra-08",
+    "category": "dino",
+    "name": "ТИГР",
+    "price": 195,
+    "currency": 1,
+    "style": 7,
+    "primary": 13847625,
+    "accent": 2274970
+  },
+  {
+    "id": "dino-extra-09",
+    "category": "dino",
+    "name": "КОБАЛЬТ",
+    "price": 1500,
+    "currency": 0,
+    "style": 8,
+    "primary": 7917131,
+    "accent": 12800907
+  },
+  {
+    "id": "dino-extra-10",
+    "category": "dino",
+    "name": "ЛИМОН",
+    "price": 1625,
+    "currency": 0,
+    "style": 9,
+    "primary": 10934769,
+    "accent": 6197666
+  },
+  {
+    "id": "dino-extra-11",
+    "category": "dino",
+    "name": "ДРАКОН",
+    "price": 1750,
+    "currency": 0,
+    "style": 10,
+    "primary": 7883962,
+    "accent": 10248767
+  },
+  {
+    "id": "dino-extra-12",
+    "category": "dino",
+    "name": "РОБОТ",
+    "price": 255,
+    "currency": 1,
+    "style": 11,
+    "primary": 15371061,
+    "accent": 12049209
+  },
+  {
+    "id": "dino-extra-13",
+    "category": "dino",
+    "name": "ПЕРСИК",
+    "price": 2000,
+    "currency": 0,
+    "style": 12,
+    "primary": 2701651,
+    "accent": 15052385
+  },
+  {
+    "id": "dino-extra-14",
+    "category": "dino",
+    "name": "ГРОЗА",
+    "price": 2125,
+    "currency": 0,
+    "style": 13,
+    "primary": 16313807,
+    "accent": 16740443
+  },
+  {
+    "id": "dino-extra-15",
+    "category": "dino",
+    "name": "ДЖУНГЛИ",
+    "price": 2250,
+    "currency": 0,
+    "style": 14,
+    "primary": 2274970,
+    "accent": 3589593
+  },
+  {
+    "id": "dino-extra-16",
+    "category": "dino",
+    "name": "КОМЕТА",
+    "price": 315,
+    "currency": 1,
+    "style": 15,
+    "primary": 12800907,
+    "accent": 9723110
+  },
+  {
+    "id": "dino-extra-17",
+    "category": "dino",
+    "name": "ОКЕАН",
+    "price": 2500,
+    "currency": 0,
+    "style": 16,
+    "primary": 6197666,
+    "accent": 16761917
+  },
+  {
+    "id": "dino-extra-18",
+    "category": "dino",
+    "name": "ВИШНЯ",
+    "price": 2625,
+    "currency": 0,
+    "style": 17,
+    "primary": 10248767,
+    "accent": 2717142
+  },
+  {
+    "id": "dino-extra-19",
+    "category": "dino",
+    "name": "ЛЁД",
+    "price": 2750,
+    "currency": 0,
+    "style": 18,
+    "primary": 12049209,
+    "accent": 16218048
+  },
+  {
+    "id": "dino-extra-20",
+    "category": "dino",
+    "name": "ГАЛАКТИКА",
+    "price": 375,
+    "currency": 1,
+    "style": 19,
+    "primary": 15052385,
+    "accent": 4416599
+  },
+  {
+    "id": "hat-extra-01",
+    "category": "hat",
+    "name": "ПИРАТ",
+    "price": 500,
+    "currency": 0,
+    "style": 0,
+    "primary": 16761917,
+    "accent": 13847625
+  },
+  {
+    "id": "hat-extra-02",
+    "category": "hat",
+    "name": "ВИКИНГ",
+    "price": 625,
+    "currency": 0,
+    "style": 1,
+    "primary": 2717142,
+    "accent": 7917131
+  },
+  {
+    "id": "hat-extra-03",
+    "category": "hat",
+    "name": "МАГ",
+    "price": 750,
+    "currency": 0,
+    "style": 2,
+    "primary": 16218048,
+    "accent": 10934769
+  },
+  {
+    "id": "hat-extra-04",
+    "category": "hat",
+    "name": "НЛО",
+    "price": 135,
+    "currency": 1,
+    "style": 3,
+    "primary": 4416599,
+    "accent": 7883962
+  },
+  {
+    "id": "hat-extra-05",
+    "category": "hat",
+    "name": "АКУЛА",
+    "price": 1000,
+    "currency": 0,
+    "style": 4,
+    "primary": 13847625,
+    "accent": 15371061
+  },
+  {
+    "id": "hat-extra-06",
+    "category": "hat",
+    "name": "КОСМОНАВТ",
+    "price": 1125,
+    "currency": 0,
+    "style": 5,
+    "primary": 7917131,
+    "accent": 2701651
+  },
+  {
+    "id": "hat-extra-07",
+    "category": "hat",
+    "name": "ПОВАР",
+    "price": 1250,
+    "currency": 0,
+    "style": 6,
+    "primary": 10934769,
+    "accent": 16313807
+  },
+  {
+    "id": "hat-extra-08",
+    "category": "hat",
+    "name": "ГРИБ",
+    "price": 195,
+    "currency": 1,
+    "style": 7,
+    "primary": 7883962,
+    "accent": 2274970
+  },
+  {
+    "id": "hat-extra-09",
+    "category": "hat",
+    "name": "КАКТУС",
+    "price": 1500,
+    "currency": 0,
+    "style": 8,
+    "primary": 15371061,
+    "accent": 12800907
+  },
+  {
+    "id": "hat-extra-10",
+    "category": "hat",
+    "name": "РОБОТ",
+    "price": 1625,
+    "currency": 0,
+    "style": 9,
+    "primary": 2701651,
+    "accent": 6197666
+  },
+  {
+    "id": "hat-extra-11",
+    "category": "hat",
+    "name": "ДРАКОН",
+    "price": 1750,
+    "currency": 0,
+    "style": 10,
+    "primary": 16313807,
+    "accent": 10248767
+  },
+  {
+    "id": "hat-extra-12",
+    "category": "hat",
+    "name": "БАНАН",
+    "price": 255,
+    "currency": 1,
+    "style": 11,
+    "primary": 2274970,
+    "accent": 12049209
+  },
+  {
+    "id": "hat-extra-13",
+    "category": "hat",
+    "name": "КОТ",
+    "price": 2000,
+    "currency": 0,
+    "style": 12,
+    "primary": 12800907,
+    "accent": 15052385
+  },
+  {
+    "id": "hat-extra-14",
+    "category": "hat",
+    "name": "КРЫЛЬЯ",
+    "price": 2125,
+    "currency": 0,
+    "style": 13,
+    "primary": 6197666,
+    "accent": 16740443
+  },
+  {
+    "id": "hat-extra-15",
+    "category": "hat",
+    "name": "СНЕГОВИК",
+    "price": 2250,
+    "currency": 0,
+    "style": 14,
+    "primary": 10248767,
+    "accent": 3589593
+  },
+  {
+    "id": "hat-extra-16",
+    "category": "hat",
+    "name": "КОВБОЙ",
+    "price": 315,
+    "currency": 1,
+    "style": 15,
+    "primary": 12049209,
+    "accent": 9723110
+  },
+  {
+    "id": "hat-extra-17",
+    "category": "hat",
+    "name": "ТИКИ",
+    "price": 2500,
+    "currency": 0,
+    "style": 16,
+    "primary": 15052385,
+    "accent": 16761917
+  },
+  {
+    "id": "hat-extra-18",
+    "category": "hat",
+    "name": "АНТЕННЫ",
+    "price": 2625,
+    "currency": 0,
+    "style": 17,
+    "primary": 16740443,
+    "accent": 2717142
+  },
+  {
+    "id": "hat-extra-19",
+    "category": "hat",
+    "name": "ФЕНИКС",
+    "price": 2750,
+    "currency": 0,
+    "style": 18,
+    "primary": 3589593,
+    "accent": 16218048
+  },
+  {
+    "id": "hat-extra-20",
+    "category": "hat",
+    "name": "ПЛАНЕТА",
+    "price": 375,
+    "currency": 1,
+    "style": 19,
+    "primary": 9723110,
+    "accent": 4416599
+  },
+  {
+    "id": "boots-extra-01",
+    "category": "boots",
+    "name": "РАКЕТЫ",
+    "price": 500,
+    "currency": 0,
+    "style": 0,
+    "primary": 4416599,
+    "accent": 13847625
+  },
+  {
+    "id": "boots-extra-02",
+    "category": "boots",
+    "name": "РОЛИКИ",
+    "price": 625,
+    "currency": 0,
+    "style": 1,
+    "primary": 13847625,
+    "accent": 7917131
+  },
+  {
+    "id": "boots-extra-03",
+    "category": "boots",
+    "name": "ПОХОД",
+    "price": 750,
+    "currency": 0,
+    "style": 2,
+    "primary": 7917131,
+    "accent": 10934769
+  },
+  {
+    "id": "boots-extra-04",
+    "category": "boots",
+    "name": "ЛУНА",
+    "price": 135,
+    "currency": 1,
+    "style": 3,
+    "primary": 10934769,
+    "accent": 7883962
+  },
+  {
+    "id": "boots-extra-05",
+    "category": "boots",
+    "name": "ЛАСТЫ",
+    "price": 1000,
+    "currency": 0,
+    "style": 4,
+    "primary": 7883962,
+    "accent": 15371061
+  },
+  {
+    "id": "boots-extra-06",
+    "category": "boots",
+    "name": "РЫЦАРЬ",
+    "price": 1125,
+    "currency": 0,
+    "style": 5,
+    "primary": 15371061,
+    "accent": 2701651
+  },
+  {
+    "id": "boots-extra-07",
+    "category": "boots",
+    "name": "ОБЛАКО",
+    "price": 1250,
+    "currency": 0,
+    "style": 6,
+    "primary": 2701651,
+    "accent": 16313807
+  },
+  {
+    "id": "boots-extra-08",
+    "category": "boots",
+    "name": "ОГОНЬ",
+    "price": 195,
+    "currency": 1,
+    "style": 7,
+    "primary": 16313807,
+    "accent": 2274970
+  },
+  {
+    "id": "boots-extra-09",
+    "category": "boots",
+    "name": "ЛЁД",
+    "price": 1500,
+    "currency": 0,
+    "style": 8,
+    "primary": 2274970,
+    "accent": 12800907
+  },
+  {
+    "id": "boots-extra-10",
+    "category": "boots",
+    "name": "ПРУЖИНЫ",
+    "price": 1625,
+    "currency": 0,
+    "style": 9,
+    "primary": 12800907,
+    "accent": 6197666
+  },
+  {
+    "id": "boots-extra-11",
+    "category": "boots",
+    "name": "ПИРАТ",
+    "price": 1750,
+    "currency": 0,
+    "style": 10,
+    "primary": 6197666,
+    "accent": 10248767
+  },
+  {
+    "id": "boots-extra-12",
+    "category": "boots",
+    "name": "НЕОН",
+    "price": 255,
+    "currency": 1,
+    "style": 11,
+    "primary": 10248767,
+    "accent": 12049209
+  },
+  {
+    "id": "boots-extra-13",
+    "category": "boots",
+    "name": "КЛОУН",
+    "price": 2000,
+    "currency": 0,
+    "style": 12,
+    "primary": 12049209,
+    "accent": 15052385
+  },
+  {
+    "id": "boots-extra-14",
+    "category": "boots",
+    "name": "ТИГР",
+    "price": 2125,
+    "currency": 0,
+    "style": 13,
+    "primary": 15052385,
+    "accent": 16740443
+  },
+  {
+    "id": "boots-extra-15",
+    "category": "boots",
+    "name": "КОСМОС",
+    "price": 2250,
+    "currency": 0,
+    "style": 14,
+    "primary": 16740443,
+    "accent": 3589593
+  },
+  {
+    "id": "boots-extra-16",
+    "category": "boots",
+    "name": "ДЖУНГЛИ",
+    "price": 315,
+    "currency": 1,
+    "style": 15,
+    "primary": 3589593,
+    "accent": 9723110
+  },
+  {
+    "id": "boots-extra-17",
+    "category": "boots",
+    "name": "КРИСТАЛЛ",
+    "price": 2500,
+    "currency": 0,
+    "style": 16,
+    "primary": 9723110,
+    "accent": 16761917
+  },
+  {
+    "id": "boots-extra-18",
+    "category": "boots",
+    "name": "ШТОРМ",
+    "price": 2625,
+    "currency": 0,
+    "style": 17,
+    "primary": 16761917,
+    "accent": 2717142
+  },
+  {
+    "id": "boots-extra-19",
+    "category": "boots",
+    "name": "ПАНДА",
+    "price": 2750,
+    "currency": 0,
+    "style": 18,
+    "primary": 2717142,
+    "accent": 16218048
+  },
+  {
+    "id": "boots-extra-20",
+    "category": "boots",
+    "name": "ЗВЁЗДЫ",
+    "price": 375,
+    "currency": 1,
+    "style": 19,
+    "primary": 16218048,
+    "accent": 4416599
+  },
+  {
+    "id": "watch-extra-01",
+    "category": "watch",
+    "name": "ЛАЙМ",
+    "price": 500,
+    "currency": 0,
+    "style": 0,
+    "primary": 10934769,
+    "accent": 13847625
+  },
+  {
+    "id": "watch-extra-02",
+    "category": "watch",
+    "name": "КОМПАС",
+    "price": 625,
+    "currency": 0,
+    "style": 1,
+    "primary": 7883962,
+    "accent": 7917131
+  },
+  {
+    "id": "watch-extra-03",
+    "category": "watch",
+    "name": "КОСМОС",
+    "price": 750,
+    "currency": 0,
+    "style": 2,
+    "primary": 15371061,
+    "accent": 10934769
+  },
+  {
+    "id": "watch-extra-04",
+    "category": "watch",
+    "name": "АКВАЛАНГ",
+    "price": 135,
+    "currency": 1,
+    "style": 3,
+    "primary": 2701651,
+    "accent": 7883962
+  },
+  {
+    "id": "watch-extra-05",
+    "category": "watch",
+    "name": "РЕТРО",
+    "price": 1000,
+    "currency": 0,
+    "style": 4,
+    "primary": 16313807,
+    "accent": 15371061
+  },
+  {
+    "id": "watch-extra-06",
+    "category": "watch",
+    "name": "КРИСТАЛЛ",
+    "price": 1125,
+    "currency": 0,
+    "style": 5,
+    "primary": 2274970,
+    "accent": 2701651
+  },
+  {
+    "id": "watch-extra-07",
+    "category": "watch",
+    "name": "ЛАВА",
+    "price": 1250,
+    "currency": 0,
+    "style": 6,
+    "primary": 12800907,
+    "accent": 16313807
+  },
+  {
+    "id": "watch-extra-08",
+    "category": "watch",
+    "name": "ЛЁД",
+    "price": 195,
+    "currency": 1,
+    "style": 7,
+    "primary": 6197666,
+    "accent": 2274970
+  },
+  {
+    "id": "watch-extra-09",
+    "category": "watch",
+    "name": "РАДУГА",
+    "price": 1500,
+    "currency": 0,
+    "style": 8,
+    "primary": 10248767,
+    "accent": 12800907
+  },
+  {
+    "id": "watch-extra-10",
+    "category": "watch",
+    "name": "ДРАКОН",
+    "price": 1625,
+    "currency": 0,
+    "style": 9,
+    "primary": 12049209,
+    "accent": 6197666
+  },
+  {
+    "id": "watch-extra-11",
+    "category": "watch",
+    "name": "КОМЕТА",
+    "price": 1750,
+    "currency": 0,
+    "style": 10,
+    "primary": 15052385,
+    "accent": 10248767
+  },
+  {
+    "id": "watch-extra-12",
+    "category": "watch",
+    "name": "РОБОТ",
+    "price": 255,
+    "currency": 1,
+    "style": 11,
+    "primary": 16740443,
+    "accent": 12049209
+  },
+  {
+    "id": "watch-extra-13",
+    "category": "watch",
+    "name": "ЛУНА",
+    "price": 2000,
+    "currency": 0,
+    "style": 12,
+    "primary": 3589593,
+    "accent": 15052385
+  },
+  {
+    "id": "watch-extra-14",
+    "category": "watch",
+    "name": "НЕОН",
+    "price": 2125,
+    "currency": 0,
+    "style": 13,
+    "primary": 9723110,
+    "accent": 16740443
+  },
+  {
+    "id": "watch-extra-15",
+    "category": "watch",
+    "name": "ПИРАТ",
+    "price": 2250,
+    "currency": 0,
+    "style": 14,
+    "primary": 16761917,
+    "accent": 3589593
+  },
+  {
+    "id": "watch-extra-16",
+    "category": "watch",
+    "name": "ЗОЛОТО",
+    "price": 315,
+    "currency": 1,
+    "style": 15,
+    "primary": 2717142,
+    "accent": 9723110
+  },
+  {
+    "id": "watch-extra-17",
+    "category": "watch",
+    "name": "ПАНДА",
+    "price": 2500,
+    "currency": 0,
+    "style": 16,
+    "primary": 16218048,
+    "accent": 16761917
+  },
+  {
+    "id": "watch-extra-18",
+    "category": "watch",
+    "name": "ДЖУНГЛИ",
+    "price": 2625,
+    "currency": 0,
+    "style": 17,
+    "primary": 4416599,
+    "accent": 2717142
+  },
+  {
+    "id": "watch-extra-19",
+    "category": "watch",
+    "name": "ПЛАНЕТА",
+    "price": 2750,
+    "currency": 0,
+    "style": 18,
+    "primary": 13847625,
+    "accent": 16218048
+  },
+  {
+    "id": "watch-extra-20",
+    "category": "watch",
+    "name": "ТИТАН",
+    "price": 375,
+    "currency": 1,
+    "style": 19,
+    "primary": 7917131,
+    "accent": 4416599
+  },
+  {
+    "id": "gloves-extra-01",
+    "category": "gloves",
+    "name": "БОКС",
+    "price": 500,
+    "currency": 0,
+    "style": 0,
+    "primary": 2701651,
+    "accent": 13847625
+  },
+  {
+    "id": "gloves-extra-02",
+    "category": "gloves",
+    "name": "РОБОТ",
+    "price": 625,
+    "currency": 0,
+    "style": 1,
+    "primary": 16313807,
+    "accent": 7917131
+  },
+  {
+    "id": "gloves-extra-03",
+    "category": "gloves",
+    "name": "КОСМОС",
+    "price": 750,
+    "currency": 0,
+    "style": 2,
+    "primary": 2274970,
+    "accent": 10934769
+  },
+  {
+    "id": "gloves-extra-04",
+    "category": "gloves",
+    "name": "ДРАКОН",
+    "price": 135,
+    "currency": 1,
+    "style": 3,
+    "primary": 12800907,
+    "accent": 7883962
+  },
+  {
+    "id": "gloves-extra-05",
+    "category": "gloves",
+    "name": "ЛАПКИ",
+    "price": 1000,
+    "currency": 0,
+    "style": 4,
+    "primary": 6197666,
+    "accent": 15371061
+  },
+  {
+    "id": "gloves-extra-06",
+    "category": "gloves",
+    "name": "НЕОН",
+    "price": 1125,
+    "currency": 0,
+    "style": 5,
+    "primary": 10248767,
+    "accent": 2701651
+  },
+  {
+    "id": "gloves-extra-07",
+    "category": "gloves",
+    "name": "ЛЁД",
+    "price": 1250,
+    "currency": 0,
+    "style": 6,
+    "primary": 12049209,
+    "accent": 16313807
+  },
+  {
+    "id": "gloves-extra-08",
+    "category": "gloves",
+    "name": "ЛАВА",
+    "price": 195,
+    "currency": 1,
+    "style": 7,
+    "primary": 15052385,
+    "accent": 2274970
+  },
+  {
+    "id": "gloves-extra-09",
+    "category": "gloves",
+    "name": "РЫЦАРЬ",
+    "price": 1500,
+    "currency": 0,
+    "style": 8,
+    "primary": 16740443,
+    "accent": 12800907
+  },
+  {
+    "id": "gloves-extra-10",
+    "category": "gloves",
+    "name": "ПИРАТ",
+    "price": 1625,
+    "currency": 0,
+    "style": 9,
+    "primary": 3589593,
+    "accent": 6197666
+  },
+  {
+    "id": "gloves-extra-11",
+    "category": "gloves",
+    "name": "ПОВАР",
+    "price": 1750,
+    "currency": 0,
+    "style": 10,
+    "primary": 9723110,
+    "accent": 10248767
+  },
+  {
+    "id": "gloves-extra-12",
+    "category": "gloves",
+    "name": "КРИСТАЛЛ",
+    "price": 255,
+    "currency": 1,
+    "style": 11,
+    "primary": 16761917,
+    "accent": 12049209
+  },
+  {
+    "id": "gloves-extra-13",
+    "category": "gloves",
+    "name": "ТИГР",
+    "price": 2000,
+    "currency": 0,
+    "style": 12,
+    "primary": 2717142,
+    "accent": 15052385
+  },
+  {
+    "id": "gloves-extra-14",
+    "category": "gloves",
+    "name": "ГРОЗА",
+    "price": 2125,
+    "currency": 0,
+    "style": 13,
+    "primary": 16218048,
+    "accent": 16740443
+  },
+  {
+    "id": "gloves-extra-15",
+    "category": "gloves",
+    "name": "ЛАЙМ",
+    "price": 2250,
+    "currency": 0,
+    "style": 14,
+    "primary": 4416599,
+    "accent": 3589593
+  },
+  {
+    "id": "gloves-extra-16",
+    "category": "gloves",
+    "name": "АКВАЛАНГ",
+    "price": 315,
+    "currency": 1,
+    "style": 15,
+    "primary": 13847625,
+    "accent": 9723110
+  },
+  {
+    "id": "gloves-extra-17",
+    "category": "gloves",
+    "name": "ЗОЛОТО",
+    "price": 2500,
+    "currency": 0,
+    "style": 16,
+    "primary": 7917131,
+    "accent": 16761917
+  },
+  {
+    "id": "gloves-extra-18",
+    "category": "gloves",
+    "name": "ПАНДА",
+    "price": 2625,
+    "currency": 0,
+    "style": 17,
+    "primary": 10934769,
+    "accent": 2717142
+  },
+  {
+    "id": "gloves-extra-19",
+    "category": "gloves",
+    "name": "КОМЕТА",
+    "price": 2750,
+    "currency": 0,
+    "style": 18,
+    "primary": 7883962,
+    "accent": 16218048
+  },
+  {
+    "id": "gloves-extra-20",
+    "category": "gloves",
+    "name": "ТИТАН",
+    "price": 375,
+    "currency": 1,
+    "style": 19,
+    "primary": 15371061,
+    "accent": 4416599
+  }
+]

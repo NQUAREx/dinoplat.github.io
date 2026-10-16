@@ -1,6 +1,7 @@
 import { MeshLambertMaterial, Vector2, type DataArrayTexture } from "three";
 import { GridMath } from "./config";
-import { TerrainLayout, TERRAIN_LENGTH } from "./terrain";
+import { TerrainLayout } from "./terrain";
+import { Tuning } from "./tuning";
 import { TerrainSurface } from "./terrain-surface";
 import { TerrainField } from "./terrain-field";
 import type { Simulation } from "./simulation";
@@ -23,6 +24,8 @@ export class Ground {
       terrainBiomeOffset: { value: new Vector2() },
       terrainBiomeCell: { value: new Vector2() },
       terrainSeed: { value: 1 },
+      terrainTileMetres: { value: Tuning.terrain.tileMetres },
+      terrainRegionMetres: { value: Tuning.terrain.regionMetres },
     };
     this.material.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.uniforms);
@@ -37,6 +40,7 @@ export class Ground {
         uniform highp sampler2DArray terrainAtlas;
         uniform vec2 terrainOrigin, terrainTiles, terrainBiomeOffset, terrainBiomeCell;
         uniform uint terrainSeed;
+        uniform float terrainTileMetres, terrainRegionMetres;
         varying vec2 vTerrainLocal;
         uint tileHash(ivec2 p) {
           // Wrap BOTH the local sum and CPU anchor: otherwise variants change
@@ -58,12 +62,12 @@ export class Ground {
       shader.fragmentShader = shader.fragmentShader.replace(
         "#include <map_fragment>",
         `
-        vec2 uv = (vec2(vTerrainLocal.x, -vTerrainLocal.y) + terrainOrigin) / ${TerrainLayout.worldTileSize.toFixed(1)};
+        vec2 uv = (vec2(vTerrainLocal.x, -vTerrainLocal.y) + terrainOrigin) / terrainTileMetres;
         vec2 gradX = dFdx(uv), gradY = dFdy(uv);
         float variant = float(tileHash(ivec2(floor(uv) + terrainTiles)) & 3u);
-        vec2 regionUv = (vec2(vTerrainLocal.x, -vTerrainLocal.y) + terrainBiomeOffset) / ${TERRAIN_LENGTH.toFixed(1)};
+        vec2 regionUv = (vec2(vTerrainLocal.x, -vTerrainLocal.y) + terrainBiomeOffset) / terrainRegionMetres;
         ivec2 cell = ivec2(floor(regionUv)) + ivec2(terrainBiomeCell);
-        vec2 nearest = (fract(regionUv) - step(vec2(.5), fract(regionUv))) * ${TERRAIN_LENGTH.toFixed(1)};
+        vec2 nearest = (fract(regionUv) - step(vec2(.5), fract(regionUv))) * terrainRegionMetres;
         bool acrossX = abs(nearest.x) < abs(nearest.y);
         float boundary = acrossX ? nearest.x : nearest.y;
         float layer; vec2 sampleUv = uv;
@@ -96,7 +100,10 @@ export class Ground {
   update(game: Simulation, pose: RenderPose) {
     this.surface.update(pose);
     const u = this.uniforms,
-      size = TerrainLayout.worldTileSize;
+      size = Tuning.terrain.tileMetres,
+      region = Tuning.terrain.regionMetres;
+    u.terrainTileMetres.value = size;
+    u.terrainRegionMetres.value = region;
     const x = this.surface.anchorX,
       distance = this.surface.anchorDistance;
     u.terrainOrigin.value.set(
@@ -108,12 +115,12 @@ export class Ground {
       GridMath.mod(Math.floor(distance / size), 65536),
     );
     u.terrainBiomeOffset.value.set(
-      GridMath.mod(x + TerrainField.originX, TERRAIN_LENGTH),
-      GridMath.mod(distance + TerrainField.originZ, TERRAIN_LENGTH),
+      GridMath.mod(x + TerrainField.originX, region),
+      GridMath.mod(distance + TerrainField.originZ, region),
     );
     u.terrainBiomeCell.value.set(
-      Math.floor((x + TerrainField.originX) / TERRAIN_LENGTH),
-      Math.floor((distance + TerrainField.originZ) / TERRAIN_LENGTH),
+      Math.floor((x + TerrainField.originX) / region),
+      Math.floor((distance + TerrainField.originZ) / region),
     );
     u.terrainSeed.value = game.seed >>> 0;
   }

@@ -3,8 +3,9 @@ import { clone } from "three/addons/utils/SkeletonUtils.js";
 import type { ModelLibrary } from "./models";
 import type { CosmeticInventory } from "./cosmetics";
 import { DinosaurCosmetics } from "./dinosaur-cosmetics";
+import { Tuning } from "./tuning";
 
-/** Event-driven preview: shared renderer/geometry, independent rig and material. */
+/** Bounded autorotating preview: shared renderer/geometry, independent rig/material. */
 export class MenuPreview {
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(32, 1, 0.1, 20);
@@ -19,6 +20,9 @@ export class MenuPreview {
   private readonly colour = new THREE.Color();
   private readonly bounds = new THREE.Vector3();
   private pointer = -1;
+  private readonly reducedMotion = matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
   private lastX = 0;
   yaw = 0.35;
   constructor(models: ModelLibrary, redraw: () => void) {
@@ -69,6 +73,7 @@ export class MenuPreview {
   get visible() {
     return (
       !document.getElementById("overlay")!.hidden &&
+      document.getElementById("developer-panel")?.hidden !== false &&
       document.getElementById("app")!.dataset.menu === "home"
     );
   }
@@ -76,7 +81,9 @@ export class MenuPreview {
     this.cosmetics.apply(inventory);
     this.mesh.position.y = this.cosmetics.groundLift;
   }
-  draw(renderer: THREE.WebGLRenderer) {
+  draw(renderer: THREE.WebGLRenderer, dt = 0) {
+    if (this.pointer < 0 && !this.reducedMotion)
+      this.yaw += Tuning.effects.previewSpin * Math.min(0.1, Math.max(0, dt));
     renderer.getSize(this.size);
     renderer.getClearColor(this.colour);
     const auto = renderer.autoClear;
@@ -98,14 +105,15 @@ export class MenuPreview {
     const r = clearRect(this.avatar, 0xb8ec9b);
     if (r.width > 0 && r.height > 0) {
       this.camera.aspect = r.width / r.height;
+      this.camera.fov = Tuning.effects.previewFov;
       this.camera.updateProjectionMatrix();
-      const width =
-        Math.abs(Math.cos(this.yaw)) * this.bounds.x +
-        Math.abs(Math.sin(this.yaw)) * this.bounds.z;
+      const width = Math.hypot(this.bounds.x, this.bounds.z);
       this.camera.position.z = -Math.max(
-        4.8,
-        (width + 0.35) /
-          (2 * Math.tan((16 * Math.PI) / 180) * this.camera.aspect) +
+        Tuning.effects.previewDistance,
+        (width + 0.15) /
+          (2 *
+            Math.tan((this.camera.fov * Math.PI) / 360) *
+            this.camera.aspect) +
           0.5,
       );
       this.camera.lookAt(0, 1.1, 0);
@@ -119,7 +127,12 @@ export class MenuPreview {
     renderer.setClearColor(this.colour);
   }
   stats() {
-    return { visible: this.visible, yaw: this.yaw, ...this.cosmetics.stats() };
+    return {
+      visible: this.visible,
+      yaw: this.yaw,
+      distance: this.camera.position.z,
+      ...this.cosmetics.stats(),
+    };
   }
   dispose() {
     this.abort.abort();

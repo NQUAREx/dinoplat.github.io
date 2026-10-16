@@ -2,6 +2,13 @@
 
 All runtime assets are local static files, with no third-party CDN requests.
 
+## Current expanded wardrobe (2026-10-16)
+
+- `src/assets/wardrobe-catalog.json` adds100 original items:20 skins,20 hats,20 boots,20 watches and20 gloves. Existing10 IDs remain. `tools/low-poly-cosmetics.mjs` authors their geometry offline; skin variants share base attributes/rig and differ in packed vertex colours. Watch/glove attachment geometry follows the dinosaur arm bones. No external cosmetic assets or runtime modelling library.
+- `tools/low-poly-dinosaur.mjs` rounds197 large body facets with projected subdivisions:788→1182 triangles, exactly+50%, preserving11 bones/five clips and collider dimensions. Geometry/animation skills informed bounded geometry, shared rig and attachment ownership.
+- Current local `game-models.glb`:1,061,664bytes /127meshes /24skinned palettes. `public/shop` has110 offline192² WebP thumbnails. Cactus geometry and shadows unchanged; LOD distances26.4–36m.
+- Below are historical asset records; their old27-mesh/788-triangle/ten-thumbnail counts are superseded here.
+
 ## Wardrobe and audio (2026-10-16)
 
 - Original `tools/low-poly-cosmetics.mjs`: white/pink/gold recoloured skinned geometry keeps the green dinosaur's rig, eyes, mouth, belly and plates. Six original accessories: cap/safari/crown56/96/60 triangles; red/blue/gold shoes72 triangles each. Shared local GLB27meshes/653724bytes. In play only one skin, one hat and two shared-geometry shoes are rendered; no extra textures or rigs. No borrowed cosmetic models.

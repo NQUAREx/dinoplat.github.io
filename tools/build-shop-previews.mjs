@@ -2,7 +2,7 @@
 import { chromium } from "playwright";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const exec = promisify(execFile),
@@ -58,6 +58,9 @@ try {
     "dino-white",
     "dino-pink",
     "dino-gold",
+    ...JSON.parse(
+      await readFile("src/assets/wardrobe-catalog.json", "utf8"),
+    ).map((item) => item.id),
     "hat-cap",
     "hat-safari",
     "hat-crown",

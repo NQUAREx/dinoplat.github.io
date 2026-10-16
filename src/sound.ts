@@ -1,5 +1,6 @@
 import { GameEvent, GameEvents } from "./events";
 import sprite from "./assets/audio-sprite.json";
+import { Tuning } from "./tuning";
 
 type Cue = keyof typeof sprite;
 type Voice = { gain: GainNode; source?: AudioBufferSourceNode; until: number };
@@ -87,7 +88,7 @@ export class GameSound {
       if (!this.context) {
         this.context = new AudioContext();
         this.master = this.context.createGain();
-        this.master.gain.value = 0.8;
+        this.master.gain.value = Tuning.audio.master;
         this.master.connect(this.context.destination);
         this.limiter = this.context.createDynamicsCompressor();
         this.limiter.threshold.value = -10;
@@ -96,7 +97,7 @@ export class GameSound {
         this.limiter.release.value = 0.15;
         this.limiter.connect(this.master);
         this.musicGain = this.context.createGain();
-        this.musicGain.gain.value = 0.2;
+        this.musicGain.gain.value = Tuning.audio.music;
         this.musicGain.connect(this.limiter);
         for (let i = 0; i < 8; i++) {
           const gain = this.context.createGain();
@@ -104,7 +105,10 @@ export class GameSound {
           this.voices.push({ gain, until: 0 });
         }
       }
-      this.master!.gain.setValueAtTime(0.8, this.context.currentTime);
+      this.master!.gain.setValueAtTime(
+        Tuning.audio.master,
+        this.context.currentTime,
+      );
       void this.context
         .resume()
         .then(() => {
@@ -198,7 +202,7 @@ export class GameSound {
     source.buffer = this.buffer;
     source.playbackRate.value = rate;
     source.connect(voice.gain);
-    voice.gain.gain.setValueAtTime(volume, now);
+    voice.gain.gain.setValueAtTime(volume * Tuning.audio.effects, now);
     voice.source = source;
     voice.until = now + delay + clip.duration / rate;
     source.onended = () => {
@@ -254,6 +258,16 @@ export class GameSound {
     }
   }
   configure(effects: boolean, music: boolean) {
+    if (this.context) {
+      this.master?.gain.setValueAtTime(
+        Tuning.audio.master,
+        this.context.currentTime,
+      );
+      this.musicGain?.gain.setValueAtTime(
+        Tuning.audio.music,
+        this.context.currentTime,
+      );
+    }
     this.enabled = effects;
     this.musicEnabled = music;
     if (!music) this.stopMusic();

@@ -7,6 +7,7 @@ import {
   Vector3,
 } from "three";
 import { Rules } from "./config";
+import { Tuning } from "./tuning";
 
 export const CAMERA_FOV = 50;
 export const CAMERA_FAR = 96;
@@ -40,13 +41,17 @@ export class CameraRig {
   private shakeAge = 0;
   private walkingBlend = 0;
   heading = 0;
-  readonly followDelay = 0.42;
+  get followDelay() {
+    return Tuning.camera.followDelay;
+  }
   shakeMultiplier = 2.9;
   private mode = false;
   private modeFrom = 0;
   private modeTime = 0.65;
   private modeValue = 0;
-  readonly transitionSeconds = 0.65;
+  get transitionSeconds() {
+    return Tuning.camera.transitionSeconds;
+  }
   private readonly rearPosition = new Vector3();
   private readonly frontPosition = new Vector3();
   private readonly rearRotation = new Quaternion();
@@ -81,14 +86,15 @@ export class CameraRig {
     if (pose.offsetX !== undefined)
       this.target.offsetX = Math.max(-2, Math.min(2, pose.offsetX));
     if (pose.height !== undefined)
-      this.target.height = Math.max(4, pose.height);
+      this.target.height = Math.max(1, pose.height);
     if (pose.distance !== undefined)
-      this.target.distance = Math.max(5, pose.distance);
+      this.target.distance = Math.max(1, pose.distance);
     if (pose.targetY !== undefined) this.target.targetY = pose.targetY;
     if (pose.targetZ !== undefined) this.target.targetZ = pose.targetZ;
     if (pose.fov !== undefined)
-      this.target.fov = Math.max(35, Math.min(65, pose.fov));
+      this.target.fov = Math.max(25, Math.min(90, pose.fov));
     this.blendTime = Math.max(0.01, seconds);
+    if (seconds === 0) Object.assign(this.current, this.target);
   }
   impulse(strength: number, seconds: number) {
     this.shake = Math.min(0.12, Math.max(this.shake, strength));
@@ -125,8 +131,10 @@ export class CameraRig {
     p.targetY += (t.targetY - p.targetY) * blend;
     p.targetZ += (t.targetZ - p.targetZ) * blend;
     p.fov += (t.fov - p.fov) * blend;
-    const fov = p.fov + (65 - p.fov) * viewBlend,
-      near = 0.2 - 0.12 * viewBlend;
+    const fov = p.fov + (Tuning.camera.frontFov - p.fov) * viewBlend,
+      near =
+        Tuning.camera.rearNear +
+        (Tuning.camera.frontNear - Tuning.camera.rearNear) * viewBlend;
     if (Math.abs(fov - this.camera.fov) > 0.001 || near !== this.camera.near) {
       this.camera.fov = fov;
       this.camera.near = near;
@@ -140,7 +148,11 @@ export class CameraRig {
       ((walking ? 1 : 0) - this.walkingBlend) *
       (1 - Math.exp(-Math.max(0, dt) * 12));
     const bob = !this.reducedMotion
-      ? Math.sin(phase) * 0.035 * intensity * 1.5 * this.walkingBlend
+      ? Math.sin(phase) *
+        Tuning.camera.walkBob *
+        intensity *
+        1.5 *
+        this.walkingBlend
       : 0;
     this.shakeTime = Math.max(0, this.shakeTime - dt);
     this.shakeAge += dt;
@@ -154,7 +166,11 @@ export class CameraRig {
     const sin = Math.sin(this.heading),
       cos = Math.cos(this.heading);
     const x = p.offsetX + localPlayerX * 0.75;
-    const eye = 1.45 + playerY - crouch * 0.65 + bob * 0.2 * frontFactor;
+    const eye =
+      Tuning.camera.frontEye +
+      playerY -
+      crouch * Tuning.camera.frontDuck +
+      bob * 0.2 * frontFactor;
     this.frontPosition.set(
       -sin * 0.05 + shake * cos * 0.35 * frontFactor,
       eye,
@@ -201,12 +217,7 @@ export class CameraRig {
     this.modeTime = this.transitionSeconds;
     this.setPose(
       {
-        offsetX: 0,
-        height: 8.5,
-        distance: 12,
-        targetY: 1,
-        targetZ: -5,
-        fov: CAMERA_FOV,
+        ...Tuning.camera,
       },
       0.01,
     );

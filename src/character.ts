@@ -5,6 +5,7 @@ import type { ModelLibrary } from "./models";
 import { Palette, Rules } from "./config";
 import type { ObjectVisibility } from "./camera";
 import { DeathMotion } from "./death-motion";
+import { Tuning } from "./tuning";
 
 export class AnimatedDinosaur {
   private readonly material = new THREE.MeshLambertMaterial({
@@ -201,10 +202,12 @@ export class FootDust {
     this.mesh.count = 0;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.off = [
-      game.events.on(GameEvent.Step, (side) => this.emit(game, 42, side)),
+      game.events.on(GameEvent.Step, (side) =>
+        this.emit(game, Tuning.effects.stepDust, side),
+      ),
       game.events.on(GameEvent.Land, () => {
-        this.emit(game, 36, 0);
-        this.emit(game, 36, 1);
+        this.emit(game, Tuning.effects.landDust / 2, 0);
+        this.emit(game, Tuning.effects.landDust / 2, 1);
       }),
       game.events.on(GameEvent.Start, () => {
         this.life.fill(0);
@@ -230,7 +233,7 @@ export class FootDust {
       this.state = (Math.imul(this.state, 1664525) + 1013904223) >>> 0;
       const spread = this.state / 4294967296 - 0.5;
       const variation = ((this.state >>> 16) & 255) / 255;
-      this.life[i] = 0.85;
+      this.life[i] = Tuning.effects.dustLife;
       this.worldX[i] = originX + spread * cos * 0.1;
       this.worldZ[i] = originZ + spread * sin * 0.1 + (variation - 0.5) * 0.1;
       this.lift[i] = 0.35 + variation * 0.9;
@@ -249,8 +252,10 @@ export class FootDust {
     for (let i = 0; i < this.life.length; i++) {
       this.life[i] = Math.max(0, this.life[i] - dt);
       if (!this.life[i]) continue;
-      const age = 0.85 - this.life[i],
-        size = ((0.22 + this.lift[i] * 0.1) * this.life[i]) / 0.85;
+      const age = Math.max(0, Tuning.effects.dustLife - this.life[i]),
+        size =
+          ((0.22 + this.lift[i] * 0.1) * this.life[i]) /
+          Tuning.effects.dustLife;
       const x = this.worldX[i] - renderX + this.driftX[i] * age;
       const z = renderDistance - this.worldZ[i] - this.driftZ[i] * age;
       const y = 0.04 + age * this.lift[i];

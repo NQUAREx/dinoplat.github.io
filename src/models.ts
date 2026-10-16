@@ -8,6 +8,7 @@ import {
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import modelUrl from "./assets/game-models.glb?url";
 import { Rules } from "./config";
+import { COSMETICS } from "./cosmetics";
 
 /** Owns all preloaded poses/variants. No scenes are cloned during gameplay. */
 export class ModelLibrary {
@@ -76,17 +77,10 @@ export class ModelLibrary {
         requireGeometry("pickup-diamond"),
         requireGeometry("pickup-heart"),
         new Map(
-          [
-            "dino-white",
-            "dino-pink",
-            "dino-gold",
-            "hat-cap",
-            "hat-safari",
-            "hat-crown",
-            "boots-red",
-            "boots-blue",
-            "boots-gold",
-          ].map((id) => [id, requireGeometry(id)]),
+          COSMETICS.filter((item) => item.id !== "dino-green").map(({ id }) => [
+            id,
+            requireGeometry(id),
+          ]),
         ),
       );
     } catch {

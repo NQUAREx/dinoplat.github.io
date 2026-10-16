@@ -73,14 +73,21 @@ export async function checkPolish(context, url, engine) {
     await page.waitForTimeout(100);
     const draws = await page.evaluate(() => window.__previewDraws);
     await page.waitForTimeout(200);
-    assert.equal(
-      await page.evaluate(() => window.__previewDraws),
-      draws,
-      "menu must not redraw while idle",
+    assert.ok(
+      (await page.evaluate(() => window.__previewDraws)) > draws,
+      "Home auto-rotation must draw",
     );
     assert.equal(await page.locator("canvas").count(), 1);
     await page.tap("#shop-toggle");
-    assert.equal(await page.locator(".card-price .currency-icon").count(), 9);
+    await page.waitForTimeout(100);
+    const shopDraws = await page.evaluate(() => window.__previewDraws);
+    await page.waitForTimeout(200);
+    assert.equal(
+      await page.evaluate(() => window.__previewDraws),
+      shopDraws,
+      "shop must remain idle",
+    );
+    assert.equal(await page.locator(".card-price .currency-icon").count(), 109);
     await page.evaluate(() => {
       const r = window.__runner;
       r.game.wallet.add(1, 2000);
@@ -119,7 +126,7 @@ export async function checkPolish(context, url, engine) {
     );
     await page.tap("#pause");
     assert.equal(await page.locator("#menu-shell").isVisible(), false);
-    assert.equal(await page.locator("#pause-panel button").count(), 2);
+    assert.equal(await page.locator("#pause-panel button").count(), 3);
     await page.tap("#pause-settings");
     await page.tap("#music");
     await page.tap("#sound");

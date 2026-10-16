@@ -1,7 +1,7 @@
 /** Shared phase for every pickup. Simulation and rendering sample the same clock. */
 export class PickupMotion {
-  static readonly amplitude = 0.1;
-  static readonly period = 2.4;
+  static amplitude = 0.1;
+  static period = 2.4;
   angle = 0;
   bob = 0;
   update(time: number) {

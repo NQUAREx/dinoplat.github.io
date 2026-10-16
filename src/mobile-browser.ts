@@ -33,6 +33,7 @@ export class MobileBrowser {
   ) {
     const options = { signal: this.abort.signal };
     const prevent = (event: Event) => {
+      if(event.target instanceof Element && event.target.closest("input[data-native-input]"))return;
       if (event.cancelable) event.preventDefault();
     };
     for (const type of [
@@ -61,7 +62,9 @@ export class MobileBrowser {
         clearSelection();
         if (
           event.target instanceof Element &&
-          !event.target.closest('input[type="range"], a[href]')
+          !event.target.closest(
+            'input[type="range"], input[data-native-input], a[href]',
+          )
         )
           prevent(event);
       },
@@ -75,7 +78,9 @@ export class MobileBrowser {
           clearSelection();
           if (
             event.target instanceof Element &&
-            event.target.closest('input[type="range"], a[href]')
+            event.target.closest(
+              'input[type="range"], input[data-native-input], a[href]',
+            )
           )
             return;
           prevent(event);
@@ -89,7 +94,7 @@ export class MobileBrowser {
         if (
           event.touches.length === 1 &&
           event.target instanceof Element &&
-          event.target.closest('input[type="range"]')
+          event.target.closest('input[type="range"], input[data-native-input]')
         )
           return;
         prevent(event);

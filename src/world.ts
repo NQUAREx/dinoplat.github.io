@@ -1,5 +1,6 @@
 import { Rules, GridMath } from "./config";
 import colliders from "./assets/model-colliders.json";
+import { Tuning } from "./tuning";
 
 export enum ObjectKind {
   Cactus,
@@ -76,6 +77,19 @@ export class ObjectRegistry {
   }
   get(kind: ObjectKind) {
     return this.byKind.get(kind);
+  }
+  setWeight(kind: ObjectKind, weight: number) {
+    if (!Number.isFinite(weight) || weight < 0) throw Error("Invalid weight");
+    const old = this.byKind.get(kind);
+    if (!old) return;
+    const next = Object.freeze({ ...old, weight });
+    this.definitions[this.definitions.indexOf(old)] = next;
+    this.byKind.set(kind, next);
+    this.totalWeight = this.pickupWeight = 0;
+    for (const definition of this.definitions)
+      if (definition.spawnGroup === "pickup")
+        this.pickupWeight += definition.weight;
+      else this.totalWeight += definition.weight;
   }
   pick(random: number, pickup = false) {
     let value = random * (pickup ? this.pickupWeight : this.totalWeight);
@@ -167,7 +181,7 @@ export class WorldSpawner {
   private centerZ = Infinity;
   constructor(
     readonly registry = ObjectRegistry.defaults(),
-    readonly pickupRate = Rules.pickupSpawnChance,
+    readonly pickupRate?: number,
   ) {}
   reset(seed: number) {
     this.seed = seed >>> 0 || 1;
@@ -193,17 +207,26 @@ export class WorldSpawner {
   safeCenter(z: number, corridor = 0) {
     const phase = (this.seed % 4096) * 0.013;
     return (
-      corridor * 32 +
+      corridor * Tuning.generation.corridorSpacing +
       3 * (Math.sin(z / 48 + phase) - Math.sin(phase)) +
       2 * (Math.sin(z / 110 + phase * 2) - Math.sin(phase * 2))
     );
   }
   isRouteClear(x: number, z: number, halfX: number, halfZ: number) {
     const center = this.safeCenter(z);
-    const gap = Math.abs(x - center - Math.round((x - center) / 32) * 32);
+    const spacing = Tuning.generation.corridorSpacing;
+    const gap = Math.abs(
+      x - center - Math.round((x - center) / spacing) * spacing,
+    );
     // |route derivative| <= .081: Minkowski padding covers the full cactus,
     // avatar, 300ms delayed following and substep steering error, not just centres.
-    return gap < halfX + Rules.playerRadius + 1.1 + 0.081 * halfZ;
+    return (
+      gap <
+      halfX +
+        Rules.playerRadius +
+        Tuning.generation.corridorPadding +
+        0.081 * halfZ
+    );
   }
   private random(column: number, row: number, candidate: number, salt: number) {
     return (
@@ -259,7 +282,8 @@ export class WorldSpawner {
     const pickup = candidate >= Rules.candidatesPerChunk;
     if (
       pickup &&
-      this.random(column, row, candidate, 0x63f1) >= this.pickupRate
+      this.random(column, row, candidate, 0x63f1) >=
+        (this.pickupRate ?? Rules.pickupSpawnChance)
     )
       return;
     const x =
@@ -269,11 +293,15 @@ export class WorldSpawner {
     // Denser than old rows; fewer candidates per second as natural speed grows.
     // World-distance-based acceptance stays deterministic through slowdown/reentry.
     const radius = Math.hypot(x, z);
-    const speed = Math.min(Rules.maxSpeed, Rules.startSpeed + radius * 0.008);
+    const speed = Math.min(
+      Rules.maxSpeed,
+      Rules.startSpeed + radius * Tuning.generation.speedGrowth,
+    );
     if (
-      radius < (pickup ? 12 : Rules.firstRow) ||
+      radius < (pickup ? Tuning.generation.pickupClearing : Rules.firstRow) ||
       this.random(column, row, candidate, 0x17f3) >
-        0.96 - (speed - Rules.startSpeed) * 0.012
+        Tuning.generation.acceptance -
+          (speed - Rules.startSpeed) * Tuning.generation.speedPenalty
     )
       return;
     const definition = this.registry.pick(
@@ -344,7 +372,8 @@ export class WorldSpawner {
             if (this.random(cx, rz, n, 0xa193) >= priority) continue;
             const nx = (cx + this.random(cx, rz, n, 0x311a)) * Rules.chunkSize;
             const nz = (rz + this.random(cx, rz, n, 0x741d)) * Rules.chunkSize;
-            if ((nx - x) ** 2 + (nz - z) ** 2 < 3.3 ** 2) return;
+            if ((nx - x) ** 2 + (nz - z) ** 2 < Tuning.generation.spacing ** 2)
+              return;
           }
     }
     this.active[slot] = 1;

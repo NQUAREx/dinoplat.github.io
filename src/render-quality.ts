@@ -2,8 +2,11 @@
  * Keep detail unless sustained frame intervals fall below a usable 25fps budget.
  * Hysteresis prevents resolution pumping; never upscale an undersized pixel grid
  * with nearest-neighbour CSS (pixel art filtering belongs to the texture only). */
+import { Tuning } from "./tuning";
 export class RenderQuality {
-  static readonly pixelBudget = 1300000;
+  static get pixelBudget() {
+    return Tuning.rendering.pixelBudget;
+  }
   quality = 1;
   meanFrameSeconds = 0;
   private elapsed = 0;
@@ -12,7 +15,7 @@ export class RenderQuality {
   ratio(width: number, height: number, dpr: number) {
     const ceiling = Math.min(
       Math.max(1, dpr),
-      2,
+      Tuning.rendering.maxDpr,
       Math.sqrt(RenderQuality.pixelBudget / (width * height)),
     );
     return Math.min(

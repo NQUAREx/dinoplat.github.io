@@ -1,6 +1,16 @@
 # Проверка прототипа — 16 октября 2026
 
-## Current update: shop balance, world menus and faster jump (2026-10-16)
+## Current update: expanded wardrobe, developer controls and help (2026-10-16)
+
+- All78 unit tests pass; strict TypeScript/Vite production build passes. New tests cover110 unique catalogue entries and thumbnails,1182-triangle dinosaur,20% LOD extension, developer-cookie handling, bounded32-item pickup visual pool, fade/lift/large coordinates/restart. Existing route-generation and collision tests remain enabled.
+- Focused Chromium mobile check passes: first-visit12-entry manual, fixed-scale autorotation, wrong-code rejection, remembered developer flag,88 fields, live camera/weight changes and reload reset; all five shop categories/equipped attachment bones; live debug shield; separate pause Help; pickup lift/fade. No page/shader errors. Correct author-code unlock was separately exercised successfully; plaintext is not committed.
+- Runtime structural capacities remain read-only; this is intentionally not an arbitrary private-state editor. Normal bonus drops remain disabled. Geometry/animation skills guided shared skinned geometry and pooled animation, not a new runtime dependency.
+- Full browser/mobile regression results recorded below after completion. No physical iPhone/Android FPS measurements or guarantee of native-game performance.
+- Full Chromium production regression passes with no JS/shader/GL errors, including100 restarts. Warm geometry/textures remain22/5; sampled GC heap21,330,318→21,326,678bytes. Initial run hit a transient small-screen pause-tap timeout under cloud rendering; the isolated fixture and full rerun both passed. This is finite resource evidence, not an exhaustive leak proof.
+- Offline GLB rebuild is deterministic:SHA256 `f8fc1920365e11c819cbf1677a75eda30ba45301d3ab8f67cfd22870895645db`. Model generation and catalogue thumbnails are offline only.
+- Full final Android/Chromium and iPhone/WebKit profile suites pass, including the expansion fixture: first-run manual, persistent developer flag/session-reset tuning,110 cards and worn watches/gloves, fixed-scale rotation and pickup fade. Page/shader/GL errors empty. Portrait/touch/lifecycle/fullscreen fallbacks, terrain/light continuity, camera, collision, audio and existing wardrobe regressions remain passing. These are cloud profiles, not physical devices.
+
+## Historical update: shop balance, world menus and faster jump (2026-10-16)
 
 - Shop adds sticky coin/diamond counters with the existing HUD icons. GameUI's dirty-counter path refreshes Home and Shop together, including spends and reload; no per-frame DOM allocation or separate wallet state.
 - Home no longer clears the entire canvas blue. World renders first, then the bounded character preview; Home/Shop/Settings use transparent overlays so the preview/panels keep their saturated colours. Pause retains its dimming. No new render target, texture or context; no idle menu RAF. Menu button events draw once rather than scheduling a redundant second frame.

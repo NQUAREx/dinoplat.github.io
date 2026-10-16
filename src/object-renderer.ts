@@ -51,7 +51,11 @@ export class InstancedObjectType {
     if (this.meshes.length > this.variantCount) {
       const d2 = x * x + z * z;
       const high =
-        d2 <= 22 * 22 ? 1 : d2 >= 30 * 30 ? 0 : (30 - Math.sqrt(d2)) / 8;
+        d2 <= Rules.lodNear ** 2
+          ? 1
+          : d2 >= Rules.lodFar ** 2
+            ? 0
+            : (Rules.lodFar - Math.sqrt(d2)) / (Rules.lodFar - Rules.lodNear);
       if (high > 0) this.write(variant, x, z, angle, y, high);
       if (high < 1)
         this.write(variant + this.variantCount, x, z, angle, y, -1 - high);

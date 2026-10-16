@@ -1,5 +1,5 @@
 import { GridMath } from "./config";
-import { TERRAIN_LENGTH } from "./terrain";
+import { Tuning } from "./tuning";
 
 /** A reversible 2D world cannot paint biomes using odometer distance: turning
  * would drag the border through stationary cacti. Seeded 500m regions stay put;
@@ -12,8 +12,8 @@ export class TerrainField {
   }
   static at(x: number, z: number, seed: number) {
     return TerrainField.materialAt(
-      Math.floor((x + TerrainField.originX) / TERRAIN_LENGTH),
-      Math.floor((z + TerrainField.originZ) / TERRAIN_LENGTH),
+      Math.floor((x + TerrainField.originX) / Tuning.terrain.regionMetres),
+      Math.floor((z + TerrainField.originZ) / Tuning.terrain.regionMetres),
       seed,
     );
   }

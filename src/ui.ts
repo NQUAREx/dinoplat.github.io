@@ -57,9 +57,15 @@ export class GameUI {
       remove,
     );
   }
-  selectSection(section: "home" | "shop" | "settings") {
+  selectSection(section: "home" | "shop" | "settings" | "help") {
     if (this.phase === "paused") {
-      this.showPause(section === "settings");
+      this.showPause(
+        section === "settings"
+          ? "settings"
+          : section === "help"
+            ? "help"
+            : "pause",
+      );
       return;
     }
     if (this.phase === "running" || this.phase === "dying") return;
@@ -70,22 +76,26 @@ export class GameUI {
     )
       this.element("menu-content").append(this.element("settings-panel"));
     this.element("menu-shell").hidden = false;
+    this.element("menu-content").append(this.element("help-panel"));
     this.element("menu-panel").hidden = section !== "home";
     this.element("shop-panel").hidden = section !== "shop";
     this.element("settings-panel").hidden = section !== "settings";
+    this.element("help-panel").hidden = section !== "help";
     this.app.dataset.menu = section;
-    for (const name of ["home", "shop", "settings"])
+    for (const name of ["home", "shop", "settings", "help"])
       this.element(`${name}-toggle`).setAttribute(
         "aria-pressed",
         String(name === section),
       );
   }
-  private showPause(settings = false) {
+  private showPause(section: "pause" | "settings" | "help" = "pause") {
     this.element("menu-shell").hidden = true;
-    this.element("pause-panel").hidden = settings;
+    this.element("pause-panel").hidden = section !== "pause";
     this.element("overlay").append(this.element("settings-panel"));
-    this.element("settings-panel").hidden = !settings;
-    this.app.dataset.menu = settings ? "pause-settings" : "pause";
+    this.element("overlay").append(this.element("help-panel"));
+    this.element("settings-panel").hidden = section !== "settings";
+    this.element("help-panel").hidden = section !== "help";
+    this.app.dataset.menu = section === "pause" ? "pause" : `pause-${section}`;
   }
   shopMessage(message: string) {
     this.element("shop-message").textContent = message;
