@@ -102,7 +102,7 @@
   {
     "id": "dino-extra-11",
     "category": "dino",
-    "name": "ДРАКОН",
+    "name": "ГРЕБЕНЬ",
     "price": 1750,
     "currency": 0,
     "style": 10,
@@ -222,7 +222,7 @@
   {
     "id": "hat-extra-03",
     "category": "hat",
-    "name": "МАГ",
+    "name": "КОНУС",
     "price": 750,
     "currency": 0,
     "style": 2,
@@ -302,7 +302,7 @@
   {
     "id": "hat-extra-11",
     "category": "hat",
-    "name": "ДРАКОН",
+    "name": "ГРЕБЕНЬ",
     "price": 1750,
     "currency": 0,
     "style": 10,
@@ -362,7 +362,7 @@
   {
     "id": "hat-extra-17",
     "category": "hat",
-    "name": "ТИКИ",
+    "name": "МАСКА",
     "price": 2500,
     "currency": 0,
     "style": 16,
@@ -382,7 +382,7 @@
   {
     "id": "hat-extra-19",
     "category": "hat",
-    "name": "ФЕНИКС",
+    "name": "СОКОЛ",
     "price": 2750,
     "currency": 0,
     "style": 18,
@@ -692,7 +692,7 @@
   {
     "id": "watch-extra-10",
     "category": "watch",
-    "name": "ДРАКОН",
+    "name": "ГРЕБЕНЬ",
     "price": 1625,
     "currency": 0,
     "style": 9,
@@ -792,7 +792,7 @@
   {
     "id": "watch-extra-20",
     "category": "watch",
-    "name": "ТИТАН",
+    "name": "СПЛАВ",
     "price": 375,
     "currency": 1,
     "style": 19,
@@ -832,7 +832,7 @@
   {
     "id": "gloves-extra-04",
     "category": "gloves",
-    "name": "ДРАКОН",
+    "name": "ГРЕБЕНЬ",
     "price": 135,
     "currency": 1,
     "style": 3,
@@ -992,7 +992,7 @@
   {
     "id": "gloves-extra-20",
     "category": "gloves",
-    "name": "ТИТАН",
+    "name": "СПЛАВ",
     "price": 375,
     "currency": 1,
     "style": 19,

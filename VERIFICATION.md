@@ -1,5 +1,13 @@
 # Проверка прототипа — 16 октября 2026
 
+## Current fix: native author input and naming
+
+- Native author-code focus/selection is exempt from global selection clearing and touch-default cancellation. A focus-scoped `data-editing` flag prevents the landscape warning from hiding the form when the soft keyboard shortens a portrait viewport. Gameplay remains portrait-only. Input text uses16px to avoid Safari's small-input autozoom.
+- Regression covers native focus, typing through a390×280 keyboard-sized viewport, hidden rotation warning, return to390×844, and author unlock flow in Chromium/WebKit profiles. These emulate viewport changes, not a physical device keyboard.
+- Catalogue display names are neutral; stable inventory IDs and models are unchanged. Context-cost rules now limit repeated reads, verbose logs/status polling and duplicated historical instructions; independent bounded tasks use subagents. Platform billing/automatic compaction cannot be controlled by repository code.
+- Focused Chromium and WebKit expansion checks pass, including actual tap focus, typed input, keyboard-sized viewport and existing shop/DEV/pickup flows; no page/shader errors. Seven browser-shell unit checks and the production build pass. Physical soft-keyboard behavior still needs device confirmation.
+- All79 unit tests pass; the focused10-test shell/catalogue/effects subset also passes after adding neutral-name regression coverage. Independent subagent audited/renamed catalogue entries and consolidated AGENTS.md; main agent integrated and verified changes.
+
 ## Current update: expanded wardrobe, developer controls and help (2026-10-16)
 
 - All78 unit tests pass; strict TypeScript/Vite production build passes. New tests cover110 unique catalogue entries and thumbnails,1182-triangle dinosaur,20% LOD extension, developer-cookie handling, bounded32-item pickup visual pool, fade/lift/large coordinates/restart. Existing route-generation and collision tests remain enabled.

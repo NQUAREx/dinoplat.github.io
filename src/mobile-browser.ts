@@ -32,8 +32,10 @@ export class MobileBrowser {
     private readonly suspend: () => void,
   ) {
     const options = { signal: this.abort.signal };
+    const nativeInput = (target: EventTarget | null) =>
+      target instanceof Element && !!target.closest("input[data-native-input]");
     const prevent = (event: Event) => {
-      if(event.target instanceof Element && event.target.closest("input[data-native-input]"))return;
+      if (nativeInput(event.target)) return;
       if (event.cancelable) event.preventDefault();
     };
     for (const type of [
@@ -51,14 +53,24 @@ export class MobileBrowser {
         capture: true,
       });
     const clearSelection = () => {
+      if (nativeInput(document.activeElement)) return;
       const selection = window.getSelection?.();
       if (selection?.rangeCount) selection.removeAllRanges();
     };
     document.addEventListener("selectionchange", clearSelection, options);
+    // The soft keyboard can make a portrait viewport report landscape. Hiding
+    // the focused input then dismisses it again: keep the editor visible.
+    document.addEventListener("focusin", (event) => {
+      if (nativeInput(event.target)) document.body.dataset.editing = "true";
+    }, options);
+    document.addEventListener("focusout", (event) => {
+      if (nativeInput(event.target)) delete document.body.dataset.editing;
+    }, options);
     document.addEventListener(
       "pointerdown",
       (event) => {
         if (event.pointerType !== "touch") return;
+        if (nativeInput(event.target)) return;
         clearSelection();
         if (
           event.target instanceof Element &&
@@ -75,6 +87,7 @@ export class MobileBrowser {
       document.addEventListener(
         type,
         (event) => {
+          if (nativeInput(event.target)) return;
           clearSelection();
           if (
             event.target instanceof Element &&
@@ -257,6 +270,7 @@ export class MobileBrowser {
   }
   dispose() {
     this.alive = false;
+    delete document.body.dataset.editing;
     this.abort.abort();
     cancelAnimationFrame(this.resizeFrame);
     this.resizeFrame = 0;

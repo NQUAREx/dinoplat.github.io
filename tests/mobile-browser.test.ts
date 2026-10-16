@@ -235,6 +235,25 @@ test("native long-press touch defaults and selection ranges are cleared, native 
   env.doc.dispatchEvent(event);
   assert.equal(event.defaultPrevented, false);
 });
+test("native author editing preserves selection and marks soft-keyboard focus", (t) => {
+  const env = environment(t);
+  const input = Object.assign(env.root, { closest: (selector: string) => selector.includes("data-native-input") ? env.root : null });
+  let cleared = 0;
+  Object.assign(env.doc, { activeElement: input });
+  Object.assign(env.win, { getSelection: () => ({ rangeCount: 1, removeAllRanges: () => cleared++ }) });
+  for (const type of ["focusin", "touchstart", "pointerdown", "selectionchange"]) {
+    const event = new Event(type, { cancelable: true });
+    Object.defineProperties(event, { target: { value: input }, pointerType: { value: "touch" } });
+    env.doc.dispatchEvent(event);
+    assert.equal(event.defaultPrevented, false);
+  }
+  assert.equal(cleared, 0);
+  assert.equal(env.doc.body.dataset.editing, "true");
+  const blur = new Event("focusout");
+  Object.defineProperty(blur, "target", { value: input });
+  env.doc.dispatchEvent(blur);
+  assert.equal(env.doc.body.dataset.editing, undefined);
+});
 test("static home-screen manifest and PNG icons resolve inside GitHub Pages subpath", async () => {
   const manifest = JSON.parse(
     await readFile(

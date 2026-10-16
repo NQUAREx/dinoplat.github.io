@@ -62,6 +62,16 @@ export async function checkExpansion(browser, url, engine) {
       d0,
     );
     await page.tap("#settings-toggle");
+    await page.tap("#author-code");
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "author-code");
+    await page.setViewportSize({ width: 390, height: 280 });
+    await page.waitForFunction(() => document.body.dataset.editing === "true");
+    assert.equal(await page.locator("#author-code").isVisible(), true);
+    assert.equal(await page.locator("#rotate").isVisible(), false);
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "author-code");
+    await page.keyboard.type("typing-check");
+    assert.equal(await page.locator("#author-code").inputValue(), "typing-check");
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.fill("#author-code", "wrong-code");
     await page.tap("#author-unlock");
     await page.waitForFunction(() =>

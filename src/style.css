@@ -480,10 +480,10 @@ h1 em {
   }
 }
 @media (orientation: landscape) and (pointer: coarse) {
-  #app {
+  body:not([data-editing="true"]) #app {
     visibility: hidden;
   }
-  #rotate {
+  body:not([data-editing="true"]) #rotate {
     display: grid;
   }
 }
@@ -941,7 +941,7 @@ body[data-device="unsupported"] #mobile-required {
   background: #fff9e3;
   border: 3px solid var(--ink);
   font: inherit;
-  font-size: 10px;
+  font-size: 16px;
   padding: 6px;
   color: var(--ink);
 }

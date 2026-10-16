@@ -13,6 +13,8 @@ import { DeveloperDevice } from "../src/developer.ts";
 test("110 cosmetic entries have unique IDs, real thumbnails, five complete categories", async () => {
   assert.equal(COSMETICS.length, 110);
   assert.equal(new Set(COSMETICS.map((i) => i.id)).size, 110);
+  for (const item of COSMETICS)
+    assert.doesNotMatch(item.name, /магия|магический|^маг$|волшеб|колдун|чарод|заклин|дракон|феникс|^тики$|^титан$|magic|wizard|sorcer|witch|enchant/iu);
   const expected = { dino: 24, hat: 23, boots: 23, watch: 20, gloves: 20 };
   for (const category of COSMETIC_CATEGORIES)
     assert.equal(
