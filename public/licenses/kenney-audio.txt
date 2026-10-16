@@ -1,0 +1,12 @@
+Kenney — Interface Sounds (1.0, 2020-02-11) and Impact Sounds (1.0, 2019-11-19)
+Created/distributed by Kenney (www.kenney.nl).
+License: Creative Commons Zero (CC0 1.0 Universal)
+https://creativecommons.org/publicdomain/zero/1.0/
+Free for personal, educational and commercial projects; attribution appreciated,
+not required. Original selected OGG files and pack notices are in art/audio/.
+Sources:
+https://kenney.nl/assets/interface-sounds
+https://kenney.nl/assets/impact-sounds
+Dino Run adaptations: selected/trimmed, mono 22050Hz, loudness normalized,
+combined into a local MP3 sprite. Background music is original project-authored
+procedural marimba/bass music, not part of the Kenney packs (project GPL-3.0).

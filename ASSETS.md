@@ -2,13 +2,20 @@
 
 All runtime assets are local static files, with no third-party CDN requests.
 
+## Wardrobe and audio (2026-10-16)
+
+- Original `tools/low-poly-cosmetics.mjs`: white/pink recoloured skinned geometry keeps the green dinosaur's rig, eyes, mouth, belly and plates. Six original accessories: cap/safari/crown56/96/60 triangles; red/blue/gold shoes72 triangles each. Shared local GLB26meshes/600788bytes. In play only one skin, one hat and two shared-geometry shoes are rendered; no extra textures or rigs. No borrowed cosmetic models.
+- `public/shop/*.webp`: nine192² thumbnails of the actual GLB art, generated offline by `npm run shop:build` (Playwright Chromium + ffmpeg), about25KB total. DOM-only images, no extra live 3D preview canvas. No downloaded UI designs/icons: connected tabs and SVG Home/Shop/Settings icons are original project work.
+- Selected source recordings from [Kenney Interface Sounds](https://kenney.nl/assets/interface-sounds) and [Kenney Impact Sounds](https://kenney.nl/assets/impact-sounds), both explicitly CC0 1.0. Original13 OGGs and pack License.txt files preserved in art/audio/interface and art/audio/impact. Public credit/license summary: public/licenses/kenney-audio.txt. Sources verified from pack download/licence pages; no unclear-license audio included.
+- `npm run audio:build` selects/trims/normalizes these clips, converts mono22050Hz and creates public/audio/game.mp3 (160748bytes) with src/assets/audio-sprite.json offsets. Original procedural marimba/bass16s loop is authored in tools/prepare-audio.mjs (project GPL-3.0), not Kenney music. Runtime MP3 decode is cached (<4MiB at48kHz); no remote requests/decoders. Only eight SFX sources and one music source may be active; sources disconnect on end/steal/pause/dispose.
+
 ## dino3d voxel models — GPLv3
 
 - Source: https://github.com/hushenghao/dino3d , commit **cae7ed3da5646839e6aaa24f698b8c07cc3ffc85**. Original upstream author: **© 2020 Abraham Tugalov**, https://howdyho.net . See upstream README for other contributors. Licence: **GNU GPL version 3**; preserved in LICENSE and public/licenses/GPL-3.0.txt.
 - The project owner explicitly approved distributing DinoPlat3d under compatible GPLv3 terms. The menu links the licence/source and states the lack of warranty.
 - Original preferred editable files are preserved in `art/reference-models/t-rex/` (0–7.vox and death.vox, upstream other/wow.vox) and `art/reference-models/cactus/` (six upstream cactus/fcactus variants). The original author used MagicaVoxel. No upstream game code, old Three.js, Howler, vox.js or Nebula is included in this game.
 - Historical adaptation (2026-10-15) converted exposed VOX surfaces; that pipeline has been replaced. Current `tools/build-reference-models.mjs` assembles original procedural low-poly geometry offline, with no VOX input.
-- Runtime: `src/assets/game-models.glb`, **468 608 bytes**, 18 meshes: one original animated low-poly dinosaur, seven detailed cacti, seven low LODs and three original low-poly pickups. No images, texture maps, external decoders or runtime VOX parser. Imported dinosaur/cactus VOX archives are attribution/source only, never builder/runtime inputs.
+- Runtime: `src/assets/game-models.glb`, **600 788 bytes**, 26 meshes: three original animated low-poly dinosaur palettes, six accessories, seven detailed cacti, seven low LODs and three original low-poly pickups. No images, texture maps, external decoders or runtime VOX parser. Imported dinosaur/cactus VOX archives are attribution/source only, never builder/runtime inputs.
 - Original dinosaur editable source: `tools/low-poly-dinosaur.mjs`, GPL-3.0-only. **788 triangles**, one indexed vertex-colour skinned mesh, 11 joints and five blended clips. The owner's watch/keyring screenshots guide the original angular long-muzzle/large-eye/turquoise-body/coral-spine design; no meshes/images were imported from the retailer. One small bone texture, no albedo maps. 256 pooled 8-triangle dust octahedra use one draw (42 per step /72 on landing). No upstream animation/gameplay implementation copied.
 - `src/assets/model-colliders.json` is regenerated with the model library and holds normalized variant bounds. Cactus yaw is included in collision extents. The retired hand-made Blender dinosaur, GLB and generator were removed from the current tree; history retains them.
 
@@ -40,7 +47,7 @@ All runtime assets are local static files, with no third-party CDN requests.
 ## Current project-authored low-poly collectibles
 
 - Original editable source: `tools/low-poly-collectibles.mjs`; `npm run collectibles:build` rebuilds the shared GLB without ImageMagick. Beveled gold coin / faceted cyan diamond / extruded beveled heart: **192/48/84 triangles**, heights **0.75/0.7/0.7m**, indexed vertex colours, no textures, shared instanced animation. HUD palettes remain recognizable; not voxel geometry or image planes.
-- Current `game-models.glb`: **468,608 bytes /18 meshes**, including original dinosaur and seven near/far cactus pairs. Crouch gait is a trimmed cached .65s clip with distance-driven legs. Dust now256 pooled8-triangle particles,42/step and72/landing, one draw. Earlier model sizes and VOX conversion descriptions below are historical only; imported VOX art is not a current builder input.
+- Current `game-models.glb`: **600,788 bytes /26 meshes**, including original dinosaur and seven near/far cactus pairs. Crouch gait is a trimmed cached .65s clip with distance-driven legs. Dust now256 pooled8-triangle particles,42/step and72/landing, one draw. Earlier model sizes and VOX conversion descriptions below are historical only; imported VOX art is not a current builder input.
 
 ## Historical project-authored voxel collectibles (not used at runtime)
 

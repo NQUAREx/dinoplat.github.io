@@ -10,6 +10,7 @@ import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 import { checkFeedback } from "./feedback-browser.mjs";
 import { checkTurning, checkRetina } from "./turning-browser.mjs";
 import { checkDinoRun } from "./dino-run-browser.mjs";
+import { checkShop } from "./shop-browser.mjs";
 
 const url = "http://127.0.0.1:4176";
 const server = spawn(
@@ -531,6 +532,7 @@ try {
         await fallback.close();
       }
       assert.deepEqual(errors, []);
+      results[engine].shop = await checkShop(context, url, engine);
       await context.close();
     } finally {
       await browser.close();

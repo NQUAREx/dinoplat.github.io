@@ -6,6 +6,81 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { AnimatedDinosaur } from "../src/character.ts";
 import { Simulation } from "../src/simulation.ts";
 import type { ModelLibrary } from "../src/models.ts";
+import { COSMETICS, CosmeticInventory } from "../src/cosmetics.ts";
+import { DinosaurCosmetics } from "../src/dinosaur-cosmetics.ts";
+
+test("all wardrobe swaps reuse one rig and three attachment meshes, including animated crouch", async () => {
+  const bytes = await readFile(
+    new URL("../src/assets/game-models.glb", import.meta.url),
+  );
+  const gltf = await new GLTFLoader().parseAsync(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    "",
+  );
+  const mesh = gltf.scene.getObjectByName("dinosaur") as SkinnedMesh;
+  const geometries = new Map(
+    COSMETICS.filter((i) => i.id !== "dino-green").map((i) => [
+      i.id,
+      (gltf.scene.getObjectByName(i.id) as SkinnedMesh).geometry,
+    ]),
+  );
+  const game = new Simulation(1),
+    inventory = new CosmeticInventory(game.wallet, {
+      getItem: () => null,
+      setItem: () => {},
+    });
+  game.wallet.add(0, 100000);
+  game.wallet.add(1, 100000);
+  const actor = new AnimatedDinosaur(
+    { dinosaur: mesh, animations: gltf.animations } as ModelLibrary,
+    game,
+  );
+  const wardrobe = new DinosaurCosmetics(
+    { greenGeometry: mesh.geometry, cosmetics: geometries },
+    mesh,
+  );
+  for (const item of COSMETICS) {
+    inventory.choose(item.id);
+    wardrobe.apply(inventory);
+  }
+  const attachments: string[] = [];
+  mesh.traverse((o) => {
+    if (o.type === "Mesh") attachments.push(o.uuid);
+  });
+  assert.equal(attachments.length, 3);
+  for (let i = 0; i < 1000; i++) {
+    inventory.choose(COSMETICS[i % 9].id);
+    wardrobe.apply(inventory);
+  }
+  const after: string[] = [];
+  mesh.traverse((o) => {
+    if (o.type === "Mesh") after.push(o.uuid);
+  });
+  assert.deepEqual(after, attachments);
+  assert.equal(mesh.skeleton.bones.length, 11);
+  game.phase = "running";
+  game.crouch = game.previousCrouch = 1;
+  game.distance = game.previousDistance = 0.2;
+  actor.update(game, 1);
+  mesh.updateMatrixWorld(true);
+  const shin = mesh.skeleton.bones.find((b) => b.name === "dino-shin-l")!,
+    shoe = shin.children.find((o) => o.type === "Mesh")!;
+  const start = shoe.getWorldPosition(new Vector3());
+  game.distance = game.previousDistance = 1.2;
+  actor.update(game, 1);
+  mesh.updateMatrixWorld(true);
+  assert.ok(
+    shoe.getWorldPosition(new Vector3()).distanceTo(start) > 0.02,
+    "shoe follows real crouch leg motion",
+  );
+  assert.equal(wardrobe.stats().hatParent, "dino-head");
+  assert.equal(wardrobe.stats().rightParent, "dino-shin-r");
+  actor.dispose();
+  mesh.skeleton.dispose();
+  gltf.scene.traverse((object) => {
+    if ("geometry" in object) (object as SkinnedMesh).geometry.dispose();
+  });
+});
 
 test("exported low-poly rig animates limbs and lowers the head when ducking", async () => {
   const bytes = await readFile(
@@ -85,11 +160,28 @@ test("model asset contains an animated low-poly dinosaur, seven decorated cacti 
   const json = JSON.parse(
     buffer.toString("utf8", 20, 20 + buffer.readUInt32LE(12)),
   );
-  assert.equal(json.meshes.length, 18);
+  assert.equal(json.meshes.length, 26);
   assert.equal(json.images, undefined);
   assert.equal(json.textures, undefined);
-  assert.equal(json.skins.length, 1);
+  assert.equal(json.skins.length, 3);
   assert.equal(json.skins[0].joints.length, 11);
+  for (const skin of json.skins)
+    assert.deepEqual(skin.joints, json.skins[0].joints);
+  for (const name of [
+    "hat-cap",
+    "hat-safari",
+    "hat-crown",
+    "boots-red",
+    "boots-blue",
+    "boots-gold",
+  ]) {
+    const node = json.nodes.find((n: { name: string }) => n.name === name);
+    assert.ok(node);
+    assert.ok(
+      json.accessors[json.meshes[node.mesh].primitives[0].indices].count / 3 <=
+        96,
+    );
+  }
   assert.deepEqual(
     json.animations.map((a: { name: string }) => a.name),
     ["run", "jump", "duck", "hit", "death"],

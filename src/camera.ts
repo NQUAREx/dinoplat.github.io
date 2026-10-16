@@ -1,4 +1,11 @@
-import { Box3, Frustum, Matrix4, PerspectiveCamera, Vector3 } from "three";
+import {
+  Box3,
+  Frustum,
+  Matrix4,
+  PerspectiveCamera,
+  Quaternion,
+  Vector3,
+} from "three";
 import { Rules } from "./config";
 
 export const CAMERA_FOV = 50;
@@ -35,7 +42,34 @@ export class CameraRig {
   heading = 0;
   readonly followDelay = 0.42;
   shakeMultiplier = 2.9;
-  firstPerson = false;
+  private mode = false;
+  private modeFrom = 0;
+  private modeTime = 0.65;
+  private modeValue = 0;
+  readonly transitionSeconds = 0.65;
+  private readonly rearPosition = new Vector3();
+  private readonly frontPosition = new Vector3();
+  private readonly rearRotation = new Quaternion();
+  private readonly frontRotation = new Quaternion();
+  private readonly rotationMatrix = new Matrix4();
+  get firstPerson() {
+    return this.mode;
+  }
+  set firstPerson(value: boolean) {
+    if (value === this.mode) return;
+    this.modeFrom = this.modeValue;
+    this.modeTime = 0;
+    this.mode = value;
+  }
+  get firstPersonBlend() {
+    return this.modeValue;
+  }
+  get transitioning() {
+    return this.modeTime < this.transitionSeconds;
+  }
+  get avatarVisible() {
+    return this.modeValue < 0.94;
+  }
   constructor(private readonly reducedMotion = false) {
     this.update(0, 0, 0, false);
   }
@@ -70,11 +104,18 @@ export class CameraRig {
     playerY = 0,
     crouch = 0,
   ) {
-    if (this.firstPerson) this.heading = heading;
-    else
-      this.heading +=
-        (heading - this.heading) *
-        (1 - Math.exp(-Math.max(0, dt) / this.followDelay));
+    this.heading +=
+      (heading - this.heading) *
+      (1 - Math.exp(-Math.max(0, dt) / this.followDelay));
+    this.modeTime = Math.min(
+      this.transitionSeconds,
+      this.modeTime + Math.max(0, dt),
+    );
+    const ease =
+      (1 - Math.cos((Math.PI * this.modeTime) / this.transitionSeconds)) * 0.5;
+    this.modeValue =
+      this.modeFrom + ((this.mode ? 1 : 0) - this.modeFrom) * ease;
+    const viewBlend = this.modeValue;
     const blend = 1 - Math.exp((-dt * 4) / this.blendTime);
     const p = this.current,
       t = this.target;
@@ -84,8 +125,8 @@ export class CameraRig {
     p.targetY += (t.targetY - p.targetY) * blend;
     p.targetZ += (t.targetZ - p.targetZ) * blend;
     p.fov += (t.fov - p.fov) * blend;
-    const fov = this.firstPerson ? 65 : p.fov,
-      near = this.firstPerson ? 0.08 : 0.2;
+    const fov = p.fov + (65 - p.fov) * viewBlend,
+      near = 0.2 - 0.12 * viewBlend;
     if (Math.abs(fov - this.camera.fov) > 0.001 || near !== this.camera.near) {
       this.camera.fov = fov;
       this.camera.near = near;
@@ -93,6 +134,8 @@ export class CameraRig {
     }
     const phase = (distance * Math.PI * 2) / Rules.stepStride;
     const intensity = Math.max(0, Math.min(3, this.shakeMultiplier)) * 1.5;
+    const rearFactor = 0.85,
+      frontFactor = 1.3;
     this.walkingBlend +=
       ((walking ? 1 : 0) - this.walkingBlend) *
       (1 - Math.exp(-Math.max(0, dt) * 12));
@@ -111,31 +154,42 @@ export class CameraRig {
     const sin = Math.sin(this.heading),
       cos = Math.cos(this.heading);
     const x = p.offsetX + localPlayerX * 0.75;
-    if (this.firstPerson) {
-      const eye = 1.45 + playerY - crouch * 0.65 + bob * 0.2;
-      this.camera.position.set(
-        -sin * 0.05 + shake * cos * 0.35,
-        eye,
-        -cos * 0.05 - shake * sin * 0.35,
-      );
-      this.look.set(-sin * 10, eye - 0.12, -cos * 10);
-      this.camera.lookAt(this.look);
-      this.camera.rotateZ(bob * 0.015);
-      this.camera.updateMatrixWorld();
-      return;
-    }
-    this.camera.position.set(
-      (x + bob * 0.25 + shake) * cos + p.distance * sin,
-      p.height + bob,
-      p.distance * cos - (x + bob * 0.25 + shake) * sin,
+    const eye = 1.45 + playerY - crouch * 0.65 + bob * 0.2 * frontFactor;
+    this.frontPosition.set(
+      -sin * 0.05 + shake * cos * 0.35 * frontFactor,
+      eye,
+      -cos * 0.05 - shake * sin * 0.35 * frontFactor,
+    );
+    this.look.set(-sin * 10, eye - 0.12, -cos * 10);
+    this.rotationMatrix.lookAt(this.frontPosition, this.look, this.camera.up);
+    this.frontRotation.setFromRotationMatrix(this.rotationMatrix);
+    this.rearPosition.set(
+      (x + (bob * 0.25 + shake) * rearFactor) * cos + p.distance * sin,
+      p.height + bob * rearFactor,
+      p.distance * cos - (x + (bob * 0.25 + shake) * rearFactor) * sin,
     );
     this.look.set(
       x * cos + p.targetZ * sin,
       p.targetY,
       p.targetZ * cos - x * sin,
     );
-    this.camera.lookAt(this.look);
-    this.camera.rotateZ(bob * 0.025);
+    this.rotationMatrix.lookAt(this.rearPosition, this.look, this.camera.up);
+    this.rearRotation.setFromRotationMatrix(this.rotationMatrix);
+    this.camera.position.lerpVectors(
+      this.rearPosition,
+      this.frontPosition,
+      viewBlend,
+    );
+    this.camera.quaternion.slerpQuaternions(
+      this.rearRotation,
+      this.frontRotation,
+      viewBlend,
+    );
+    this.camera.rotateZ(
+      bob *
+        (0.025 * rearFactor * (1 - viewBlend) +
+          0.015 * frontFactor * viewBlend),
+    );
     this.camera.updateMatrixWorld();
   }
   reset() {
@@ -143,6 +197,8 @@ export class CameraRig {
     this.shakeAge = 0;
     this.walkingBlend = 0;
     this.heading = 0;
+    this.modeValue = this.modeFrom = this.mode ? 1 : 0;
+    this.modeTime = this.transitionSeconds;
     this.setPose(
       {
         offsetX: 0,

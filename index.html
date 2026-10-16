@@ -79,95 +79,143 @@
         </div>
       </section>
       <main id="overlay">
-        <section id="menu-panel" class="panel" aria-labelledby="title">
-          <svg
-            class="mascot"
-            viewBox="0 0 32 32"
-            aria-hidden="true"
-            shape-rendering="crispEdges"
-          >
-            <path
-              fill="#38543c"
-              d="M13 2h17v13H20v4h-3v4h-1v7H9v-7H6v-3H3v-3H1V8h5v6h3v2h4z"
-            />
-            <path
-              fill="#a5d56d"
-              d="M15 4h13v9H18v5h-3v4h-1v6h-3v-7H7v-3H5v-3H3v-5h1v6h7v2h4z"
-            />
-            <path
-              fill="#fff4d6"
-              d="M23 6h3v3h-3zM21 12h7v1h-7zM15 20h2v3h-2z"
-            />
-            <path fill="#38543c" d="M24 6h2v2h-2z" />
-            <path fill="#ecc77e" d="M2 30h28v2H2z" />
-          </svg>
-          <div id="chapter" class="chapter">МИР ПРИКЛЮЧЕНИЙ</div>
-          <h1 id="title">Дино,<br /><em>вперёд!</em></h1>
-          <p id="description">
-            Целый мир без границ!<br />Обходи кактусы и прыгай дальше.
-          </p>
-          <div id="result" hidden>
-            <span id="final-distance">0</span><span>метров за забег</span>
-          </div>
-          <button id="action" class="pixel-button primary">
-            ИГРАТЬ <span aria-hidden="true">→</span>
-          </button>
-          <p class="touch-help">
-            Удерживай слева или справа — поворачивай.<br />Отдельный свайп вверх
-            — прыжок.<br />Свайп вниз — приземлиться или пригнуться.
-          </p>
-          <p class="record-note">
-            Твой рекорд: <span id="menu-best">0</span> м
-          </p>
-          <button
-            id="settings-toggle"
-            class="pixel-button settings-link"
-            hidden
-          >
-            НАСТРОЙКИ
-          </button>
-          <p class="licence-note">
-            <a
-              href="https://github.com/NQUAREx/DinoPlat3d"
-              target="_blank"
-              rel="noopener"
-              >Исходники</a
+        <div class="menu-shell">
+          <nav class="menu-nav" aria-label="Разделы меню">
+            <button
+              id="home-toggle"
+              class="menu-tab"
+              aria-label="Главная"
+              aria-pressed="true"
             >
-            ·
-            <a href="./licenses/GPL-3.0.txt" target="_blank" rel="noopener"
-              >GPLv3, без гарантий</a
-            ><br />Модели: © 2020 Abraham Tugalov / dino3d
-          </p>
-        </section>
-        <section
-          id="settings-panel"
-          class="panel"
-          aria-labelledby="settings-title"
-          hidden
-        >
-          <h2 id="settings-title">НАСТРОЙКИ</h2>
-          <button
-            id="vibration"
-            class="pixel-button setting-toggle"
-            aria-pressed="true"
-          >
-            ВИБРАЦИЯ: ДА
-          </button>
-          <button
-            id="sound"
-            class="pixel-button setting-toggle"
-            aria-pressed="true"
-          >
-            ЗВУК: ДА
-          </button>
-          <button id="settings-back" class="pixel-button settings-link">
-            ← НАЗАД
-          </button>
-          <button id="fullscreen" class="pixel-button settings-link" hidden>
-            НА ВЕСЬ ЭКРАН
-          </button>
-          <p id="install-help" hidden></p>
-        </section>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2 11 12 2l10 9v3h-3v8h-5v-7h-4v7H5v-8H2z" />
+              </svg>
+            </button>
+            <button
+              id="shop-toggle"
+              class="menu-tab"
+              aria-label="Магазин"
+              aria-pressed="false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M3 3h18l2 7-3 3v9H4v-9L1 10zm3 10v6h5v-6zm8 0v6h3v-6z"
+                />
+              </svg>
+            </button>
+            <button
+              id="settings-toggle"
+              class="menu-tab"
+              aria-label="Настройки"
+              aria-pressed="false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M9 1h6v4l3 1 3-2 3 5-3 2v3l3 2-3 5-3-2-3 1v3H9v-3l-3-1-3 2-3-5 3-2v-3L0 9l3-5 3 2 3-1zm3 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"
+                />
+              </svg>
+            </button>
+          </nav>
+          <div class="menu-content">
+            <section id="menu-panel" class="panel" aria-labelledby="title">
+              <div id="chapter" class="chapter">DINO RUN · ГЛАВНАЯ</div>
+              <h1 id="title">Большой мир.<br /><em>Твой дино!</em></h1>
+              <div class="hero-preview">
+                <img
+                  id="menu-avatar"
+                  src="./shop/dino-green.webp"
+                  alt="Твой динозавр"
+                  width="192"
+                  height="192"
+                /><span class="hero-stamp">БЕЗ ГРАНИЦ</span>
+              </div>
+              <p id="description">Новый маршрут. Новое приключение.</p>
+              <div id="result" hidden>
+                <span id="final-distance">0</span><span>метров за забег</span>
+              </div>
+              <button id="action" class="pixel-button primary">
+                ИГРАТЬ <span aria-hidden="true">→</span>
+              </button>
+              <button id="leave-run" class="pixel-button settings-link" hidden>
+                ЗАВЕРШИТЬ ЗАБЕГ
+              </button>
+              <p class="touch-help">
+                Удерживай слева или справа — поворачивай.<br />Отдельный свайп
+                вверх — прыжок.<br />Свайп вниз — приземлиться или пригнуться.
+              </p>
+              <div class="menu-wallet">
+                <div>
+                  <img src="/src/assets/icons/coin.png" alt="Монеты" /><span
+                    id="menu-coins"
+                    >0</span
+                  >
+                </div>
+                <div>
+                  <img src="/src/assets/icons/diamond.png" alt="Алмазы" /><span
+                    id="menu-diamonds"
+                    >0</span
+                  >
+                </div>
+                <div>
+                  <img src="/src/assets/icons/record.png" alt="Рекорд" /><span
+                    ><span id="menu-best">0</span> м</span
+                  >
+                </div>
+              </div>
+              <p class="licence-note">
+                <a
+                  href="https://github.com/NQUAREx/DinoPlat3d"
+                  target="_blank"
+                  rel="noopener"
+                  >Исходники</a
+                >
+                ·
+                <a href="./licenses/GPL-3.0.txt" target="_blank" rel="noopener"
+                  >GPLv3, без гарантий</a
+                ><br />Модели Dino Run · Звук Kenney (CC0)
+              </p>
+            </section>
+            <section
+              id="shop-panel"
+              class="panel"
+              aria-labelledby="shop-title"
+              hidden
+            >
+              <h2 id="shop-title">ГАРДЕРОБ</h2>
+              <p class="shop-intro">Твой стиль. Твои приключения.</p>
+              <div id="shop-message" role="status" aria-live="polite"></div>
+            </section>
+            <section
+              id="settings-panel"
+              class="panel"
+              aria-labelledby="settings-title"
+              hidden
+            >
+              <h2 id="settings-title">НАСТРОЙКИ</h2>
+              <button
+                id="vibration"
+                class="pixel-button setting-toggle"
+                aria-pressed="true"
+              >
+                ВИБРАЦИЯ: ДА
+              </button>
+              <button
+                id="sound"
+                class="pixel-button setting-toggle"
+                aria-pressed="true"
+              >
+                ЗВУК: ДА
+              </button>
+              <button id="settings-back" class="pixel-button settings-link">
+                ← НАЗАД
+              </button>
+              <button id="fullscreen" class="pixel-button settings-link" hidden>
+                НА ВЕСЬ ЭКРАН
+              </button>
+              <p id="install-help" hidden></p>
+            </section>
+          </div>
+        </div>
       </main>
       <footer class="bottom">
         <button

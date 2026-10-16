@@ -4,7 +4,7 @@ import type { Wallet } from "./progression";
 /** Project-scoped cookie; no frame polling. Coalesce pickups in one JS task. */
 export class CurrencyCookies {
   static readonly cookieName = "dinoplat3d-wallet-v1";
-  private readonly off: () => void;
+  private readonly off: (() => void)[];
   private pending = false;
   private alive = true;
   private saved = "";
@@ -35,12 +35,16 @@ export class CurrencyCookies {
     } catch {
       /* Cookie access may be blocked by privacy settings. */
     }
-    this.off = events.on(GameEvent.Pickup, () => {
+    const changed = () => {
       if (!this.pending) {
         this.pending = true;
         queueMicrotask(this.flushPending);
       }
-    });
+    };
+    this.off = [
+      events.on(GameEvent.Pickup, changed),
+      events.on(GameEvent.WalletChanged, changed),
+    ];
   }
   private readonly flushPending = () => {
     this.pending = false;
@@ -59,6 +63,6 @@ export class CurrencyCookies {
   dispose() {
     this.flush();
     this.alive = false;
-    this.off();
+    for (const off of this.off) off();
   }
 }

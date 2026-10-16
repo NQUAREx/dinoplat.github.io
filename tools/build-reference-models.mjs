@@ -5,6 +5,7 @@ import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { LowPolyCacti } from "./low-poly-cacti.mjs";
 import { LowPolyDinosaur } from "./low-poly-dinosaur.mjs";
 import { LowPolyCollectibles } from "./low-poly-collectibles.mjs";
+import { LowPolyCosmetics } from "./low-poly-cosmetics.mjs";
 
 globalThis.FileReader = class {
   readAsArrayBuffer(blob) {
@@ -30,6 +31,18 @@ class ModelBuilder {
     }
     const dinosaur = new LowPolyDinosaur().build();
     scene.add(dinosaur.mesh);
+    const cosmetics = new LowPolyCosmetics();
+    for (const id of ["dino-white", "dino-pink"])
+      scene.add(cosmetics.skin(dinosaur.mesh, id, material));
+    for (const id of [
+      "hat-cap",
+      "hat-safari",
+      "hat-crown",
+      "boots-red",
+      "boots-blue",
+      "boots-gold",
+    ])
+      scene.add(cosmetics.build(id, material));
     const cacti = new LowPolyCacti();
     for (let i = 0; i < 7; i++) {
       const geometry = cacti.build(i),

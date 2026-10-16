@@ -34,6 +34,9 @@ export async function checkDinoRun(context, url, engine) {
       time: window.__runner.game.time,
     }));
     await page.tap("#camera-mode");
+    await page.waitForFunction(
+      () => !window.__runner.stats().cameraTransitioning,
+    );
     const first = await page.evaluate(() => window.__runner.stats());
     assert.equal(first.firstPerson, true);
     assert.equal(first.playerVisible, false);
@@ -69,6 +72,9 @@ export async function checkDinoRun(context, url, engine) {
     });
     await page.screenshot({ path: `test-results/${engine}-first-person.png` });
     await page.tap("#camera-mode");
+    await page.waitForFunction(
+      () => !window.__runner.stats().cameraTransitioning,
+    );
     const rear = await page.evaluate(() => window.__runner.stats());
     assert.equal(rear.firstPerson, false);
     assert.equal(rear.playerVisible, true);

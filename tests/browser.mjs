@@ -10,6 +10,7 @@ import { checkInstanceMotion } from "./instance-motion-browser.mjs";
 import { checkFeedback } from "./feedback-browser.mjs";
 import { checkTurning } from "./turning-browser.mjs";
 import { checkDinoRun } from "./dino-run-browser.mjs";
+import { checkShop } from "./shop-browser.mjs";
 
 const url = "http://127.0.0.1:4174";
 const server = spawn(
@@ -299,7 +300,7 @@ try {
   await page.tap("#vibration");
   await page.tap("#sound");
   await page.waitForFunction(() => window.__runner.audio().state === "running");
-  assert.equal(await page.evaluate(() => window.__runner.audio().voices), 1);
+  assert.equal(await page.evaluate(() => window.__runner.audio().voices), 8);
   await page.tap("#settings-back");
   assert.equal(await page.locator("#menu-panel").isVisible(), true);
   await page.evaluate(() => {
@@ -772,6 +773,7 @@ try {
   }
   assert.deepEqual(errors, []);
   report.errors = errors;
+  report.shop = await checkShop(context, url, "chromium");
   await writeFile("test-results/report.json", JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   console.log(

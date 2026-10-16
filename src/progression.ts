@@ -29,6 +29,21 @@ export class Wallet {
     this.coins = this.diamonds = 0;
     this.revision++;
   }
+  spend(currency: Currency, amount: number) {
+    if (
+      (currency !== Currency.Coin && currency !== Currency.Diamond) ||
+      !Number.isSafeInteger(amount) ||
+      amount <= 0
+    )
+      return false;
+    const balance = currency === Currency.Coin ? this.coins : this.diamonds;
+    if (balance < amount) return false;
+    if (currency === Currency.Coin) this.coins -= amount;
+    else this.diamonds -= amount;
+    this.revision++;
+    this.events.emit(GameEvent.WalletChanged);
+    return true;
+  }
 }
 
 export interface BonusDefinition {

@@ -85,10 +85,11 @@ test("pickup density is a deterministic 90% subset, cactus field is unchanged", 
   );
 });
 
-test("first person follows facing and jump/duck height directly, restores rear projection", () => {
+test("first person follows jump/duck height and restores rear projection after a smooth transition", () => {
   const rig = new CameraRig(true);
   rig.firstPerson = true;
-  rig.update(0, 0, 0, false, Math.PI / 2, 2, 0);
+  rig.heading = Math.PI / 2;
+  rig.update(0, 0, 0.65, false, Math.PI / 2, 2, 0);
   assert.equal(rig.heading, Math.PI / 2);
   assert.equal(rig.camera.fov, 65);
   assert.equal(rig.camera.position.y, 3.45);
@@ -96,7 +97,7 @@ test("first person follows facing and jump/duck height directly, restores rear p
   rig.update(0, 0, 0, false, Math.PI / 2, 0, 1);
   assert.ok(Math.abs(rig.camera.position.y - 0.8) < 1e-10);
   rig.firstPerson = false;
-  rig.update(0, 0, 0, false, Math.PI / 2);
+  rig.update(0, 0, 0.65, false, Math.PI / 2);
   assert.equal(rig.camera.fov, 50);
   assert.equal(rig.camera.near, 0.2);
   assert.ok(Math.abs(rig.camera.position.x - 12) < 1e-10);

@@ -11,13 +11,14 @@ export enum GameEvent {
   Dive,
   Heal,
   Collected,
+  WalletChanged,
 }
 export type EventListener = (value: number, amount: number) => void;
 
 /** Subscribers are installed once. Emit numeric payloads without frame garbage. */
 export class GameEvents {
   private readonly listeners = Array.from(
-    { length: GameEvent.Collected + 1 },
+    { length: GameEvent.WalletChanged + 1 },
     () => new Set<EventListener>(),
   );
   on(type: GameEvent, listener: EventListener) {

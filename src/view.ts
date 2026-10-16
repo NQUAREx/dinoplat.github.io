@@ -16,6 +16,8 @@ import { PickupMotion } from "./pickup-motion";
 import { DinosaurShadow } from "./dinosaur-shadow";
 import { FloatingFeedback } from "./floating-feedback";
 import { RenderQuality } from "./render-quality";
+import type { CosmeticInventory } from "./cosmetics";
+import { DinosaurCosmetics } from "./dinosaur-cosmetics";
 
 /** Sole GPU owner. Only visible numeric cells become instances; no object churn. */
 export class View {
@@ -28,6 +30,7 @@ export class View {
   private readonly scene = new THREE.Scene();
   private readonly ground: Ground;
   private readonly dinosaur: AnimatedDinosaur;
+  private readonly cosmetics: DinosaurCosmetics;
   private readonly dinosaurShadow = new DinosaurShadow();
   private readonly dust: FootDust;
   private readonly feedback: FloatingFeedback;
@@ -69,6 +72,7 @@ export class View {
     this.rig = new CameraRig(reducedMotion);
     this.ground = new Ground(texture);
     this.dinosaur = new AnimatedDinosaur(models, game);
+    this.cosmetics = new DinosaurCosmetics(models, this.dinosaur.mesh);
     this.dust = new FootDust(game, reducedMotion);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -211,6 +215,9 @@ export class View {
   adapt(dt: number) {
     if (this.resolution.sample(dt)) this.resize();
   }
+  applyCosmetics(inventory: CosmeticInventory) {
+    this.cosmetics.apply(inventory);
+  }
   draw(alpha = 1, dt = 0) {
     const game = this.game;
     this.pose.update(game, alpha);
@@ -220,8 +227,11 @@ export class View {
     this.renderer.setClearColor(this.lighting.fogColour);
     (this.scene.fog as THREE.Fog).color.copy(this.lighting.fogColour);
     this.ground.update(game, this.pose);
-    this.dinosaur.mesh.visible = !this.rig.firstPerson;
-    this.dinosaur.update(game, alpha, !this.rig.firstPerson);
+    this.dinosaur.update(
+      game,
+      alpha,
+      this.rig.avatarVisible || this.rig.transitioning,
+    );
     this.dinosaurShadow.update(
       this.dinosaur,
       this.lighting,
@@ -232,7 +242,8 @@ export class View {
       !game.hitStopRemaining &&
       !game.y &&
       !game.velocityY;
-    const activeDt = game.phase === "running" ? dt : 0;
+    const activeDt =
+      game.phase === "running" || this.rig.transitioning ? dt : 0;
     this.rig.update(
       this.pose.distance,
       0,
@@ -242,7 +253,8 @@ export class View {
       this.dinosaur.mesh.position.y,
       game.previousCrouch + (game.crouch - game.previousCrouch) * alpha,
     );
-    if (this.rig.firstPerson) this.dinosaurShadow.mesh.visible = false;
+    this.dinosaur.mesh.visible = this.rig.avatarVisible;
+    if (!this.rig.avatarVisible) this.dinosaurShadow.mesh.visible = false;
     this.lighting.followView(this.rig.heading);
     this.feedbackAnchor
       .set(0, this.dinosaur.mesh.position.y + 1.95 - game.crouch * 0.55, 0)
@@ -250,10 +262,10 @@ export class View {
     this.feedback.update(
       game.previousFeedbackTime +
         (game.feedbackTime - game.previousFeedbackTime) * alpha,
-      this.rig.firstPerson
+      this.rig.firstPersonBlend > 0.5
         ? this.viewportWidth * 0.5
         : (this.feedbackAnchor.x * 0.5 + 0.5) * this.viewportWidth,
-      this.rig.firstPerson
+      this.rig.firstPersonBlend > 0.5
         ? this.viewportHeight * 0.45
         : (-this.feedbackAnchor.y * 0.5 + 0.5) * this.viewportHeight,
     );
@@ -370,6 +382,9 @@ export class View {
       antialias: this.renderer.getContext().getContextAttributes()?.antialias,
       cameraHeading: this.rig.heading,
       firstPerson: this.rig.firstPerson,
+      cameraBlend: this.rig.firstPersonBlend,
+      cameraTransitioning: this.rig.transitioning,
+      cosmetics: this.cosmetics.stats(),
       playerVisible: this.dinosaur.mesh.visible,
       width: this.renderer.domElement.width,
       height: this.renderer.domElement.height,

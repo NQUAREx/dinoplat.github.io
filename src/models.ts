@@ -11,6 +11,7 @@ import { Rules } from "./config";
 
 /** Owns all preloaded poses/variants. No scenes are cloned during gameplay. */
 export class ModelLibrary {
+  readonly greenGeometry: BufferGeometry;
   constructor(
     readonly dinosaur: SkinnedMesh,
     readonly animations: AnimationClip[],
@@ -19,7 +20,10 @@ export class ModelLibrary {
     readonly coin: BufferGeometry,
     readonly diamond: BufferGeometry,
     readonly heart: BufferGeometry,
-  ) {}
+    readonly cosmetics: ReadonlyMap<string, BufferGeometry> = new Map(),
+  ) {
+    this.greenGeometry = dinosaur.geometry;
+  }
   static async load() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20000);
@@ -38,8 +42,9 @@ export class ModelLibrary {
       gltf.scene.traverse((object) => {
         if (!(object instanceof Mesh)) return;
         const geometry = object.geometry;
-        if (object instanceof SkinnedMesh) dinosaur = object;
-        else geometry.applyMatrix4(object.matrixWorld);
+        if (object instanceof SkinnedMesh) {
+          if (object.name === "dinosaur") dinosaur = object;
+        } else geometry.applyMatrix4(object.matrixWorld);
         if (object.name.startsWith("cactus-"))
           geometry.scale(
             Rules.cactusScale,
@@ -70,6 +75,18 @@ export class ModelLibrary {
         requireGeometry("pickup-coin"),
         requireGeometry("pickup-diamond"),
         requireGeometry("pickup-heart"),
+        new Map(
+          [
+            "dino-white",
+            "dino-pink",
+            "hat-cap",
+            "hat-safari",
+            "hat-crown",
+            "boots-red",
+            "boots-blue",
+            "boots-gold",
+          ].map((id) => [id, requireGeometry(id)]),
+        ),
       );
     } catch {
       for (const geometry of geometries) geometry.dispose();
@@ -82,12 +99,13 @@ export class ModelLibrary {
     }
   }
   dispose() {
-    this.dinosaur.geometry.dispose();
+    this.greenGeometry.dispose();
     this.dinosaur.skeleton.dispose();
     for (const geometry of this.cacti) geometry.dispose();
     for (const geometry of this.cactusLods) geometry.dispose();
     this.coin.dispose();
     this.diamond.dispose();
     this.heart.dispose();
+    for (const geometry of this.cosmetics.values()) geometry.dispose();
   }
 }

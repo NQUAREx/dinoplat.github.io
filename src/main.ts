@@ -12,6 +12,7 @@ import { GameSound } from "./sound";
 import { MobileBrowser } from "./mobile-browser";
 import { CurrencyCookies } from "./currency-cookies";
 import { GameEvent } from "./events";
+import { CosmeticInventory } from "./cosmetics";
 
 class GameApplication {
   readonly game = new Simulation(1979);
@@ -28,6 +29,7 @@ class GameApplication {
   private input?: Input;
   private mobile?: MobileBrowser;
   private currency?: CurrencyCookies;
+  private cosmetics?: CosmeticInventory;
   private alive = true;
   private contextLost = false;
   private previous = 0;
@@ -48,10 +50,42 @@ class GameApplication {
       },
     );
     this.ui.loading();
+    this.sound.preload();
     this.currency = new CurrencyCookies(
       this.game.wallet,
       this.game.events,
       new URL(import.meta.env.BASE_URL, location.href).pathname,
+    );
+    this.cosmetics = new CosmeticInventory(this.game.wallet);
+    this.ui.initializeShop(
+      this.cosmetics,
+      this.game.wallet,
+      (id) => {
+        const result = this.cosmetics!.choose(id);
+        this.ui.shopMessage(
+          result === "funds"
+            ? "Не хватает монет или алмазов"
+            : result === "purchased"
+              ? "Куплено и надето!"
+              : "Надето!",
+        );
+        this.sound.unlock();
+        this.sound.menu(
+          result === "funds" ? "error" : result === "purchased" ? "buy" : "ui",
+        );
+        this.currency?.flush();
+        this.view?.applyCosmetics(this.cosmetics!);
+        this.ui.update(this.game);
+        this.view?.draw();
+      },
+      (category) => {
+        this.cosmetics!.remove(category);
+        this.sound.unlock();
+        this.sound.menu("ui");
+        this.view?.applyCosmetics(this.cosmetics!);
+        this.ui.update(this.game);
+        this.view?.draw();
+      },
     );
     try {
       if (!WebGL.isWebGL2Available())
@@ -80,6 +114,7 @@ class GameApplication {
         throw error;
       }
       await this.view.initialize();
+      this.view.applyCosmetics(this.cosmetics);
       if (!this.alive) return;
       this.input = new Input(
         this.canvas,
@@ -111,6 +146,7 @@ class GameApplication {
             lighting: this.view.lighting,
             settings: this.settings,
             audio: () => this.sound.stats(),
+            cosmetics: this.cosmetics,
             mobile: () => this.mobile!.stats(),
             snapshot: () => ({
               phase: this.game.phase,
@@ -161,7 +197,10 @@ class GameApplication {
           )
             return;
           event.preventDefault();
+          this.sound.unlock();
+          if (button.id !== "sound") this.sound.menu("ui");
           handler();
+          this.ui.update(this.game);
         },
         options,
       );
@@ -181,7 +220,26 @@ class GameApplication {
         rig.firstPerson ? "Вид сзади" : "Вид от первого лица",
       );
       this.view.draw(1, 0);
+      if (this.game.phase !== "running") this.previous = performance.now();
+      this.schedule();
     });
+    touchButton(
+      document.getElementById("home-toggle") as HTMLButtonElement,
+      () => this.ui.selectSection("home"),
+    );
+    touchButton(
+      document.getElementById("shop-toggle") as HTMLButtonElement,
+      () => this.ui.selectSection("shop"),
+    );
+    touchButton(
+      document.getElementById("leave-run") as HTMLButtonElement,
+      () => {
+        this.pause();
+        this.game.phase = "over";
+        this.ui.show(this.game);
+        this.view?.draw();
+      },
+    );
     touchButton(
       document.getElementById("fullscreen") as HTMLButtonElement,
       () => {
@@ -292,6 +350,7 @@ class GameApplication {
     this.game.phase = "running";
     this.haptics.stop();
     this.sound.unlock();
+    this.sound.setRunning(true);
     this.input?.clear();
     this.previous = this.accumulator = 0;
     this.ui.show(this.game);
@@ -302,6 +361,7 @@ class GameApplication {
     this.input?.clear();
     this.haptics.stop();
     this.sound.suspend();
+    this.sound.setRunning(false);
     if (this.game.phase !== "running") return;
     this.game.phase = "paused";
     this.previous = this.accumulator = 0;
@@ -344,6 +404,7 @@ class GameApplication {
       this.view.adapt(dt);
     }
     if (this.ui.phase !== this.game.phase) {
+      if (this.game.phase !== "running") this.sound.setRunning(false);
       this.input?.clear();
       this.ui.show(this.game);
     }
@@ -352,7 +413,8 @@ class GameApplication {
       this.game.phase === "running" ? this.accumulator / STEP : 1,
       Math.min(dt, 0.25),
     );
-    if (this.game.phase === "running") this.schedule();
+    if (this.game.phase === "running" || this.view.rig.transitioning)
+      this.schedule();
   };
   dispose() {
     if (!this.alive) return;
@@ -364,6 +426,7 @@ class GameApplication {
     this.input?.dispose();
     this.haptics.dispose();
     this.sound.dispose();
+    this.ui.dispose();
     this.view?.dispose();
     this.view = undefined;
     this.game.events.dispose();

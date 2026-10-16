@@ -1,4 +1,7 @@
 import type { Phase, Simulation } from "./simulation";
+import { ShopUI } from "./shop-ui";
+import type { CosmeticCategory, CosmeticInventory } from "./cosmetics";
+import type { Wallet } from "./progression";
 
 /** DOM ownership and dirty counters live outside simulation/rendering. */
 export class GameUI {
@@ -21,6 +24,9 @@ export class GameUI {
   private readonly hearts = this.element("lives").querySelectorAll("img");
   best = 0;
   phase: Phase | "loading" | "error" = "loading";
+  private shop?: ShopUI;
+  private inventory?: CosmeticInventory;
+  private cosmeticRevision = -1;
   constructor() {
     try {
       this.best = Math.max(
@@ -41,6 +47,35 @@ export class GameUI {
   loading() {
     this.action.disabled = true;
     this.action.textContent = "ЗАГРУЗКА…";
+  }
+  initializeShop(
+    inventory: CosmeticInventory,
+    wallet: Wallet,
+    choose: (id: string) => void,
+    remove: (category: CosmeticCategory) => void,
+  ) {
+    this.inventory = inventory;
+    this.shop = new ShopUI(
+      this.element("shop-panel"),
+      inventory,
+      wallet,
+      choose,
+      remove,
+    );
+  }
+  selectSection(section: "home" | "shop" | "settings") {
+    this.element("menu-panel").hidden = section !== "home";
+    this.element("shop-panel").hidden = section !== "shop";
+    this.element("settings-panel").hidden = section !== "settings";
+    this.app.dataset.menu = section;
+    for (const name of ["home", "shop", "settings"])
+      this.element(`${name}-toggle`).setAttribute(
+        "aria-pressed",
+        String(name === section),
+      );
+  }
+  shopMessage(message: string) {
+    this.element("shop-message").textContent = message;
   }
   update(game: Simulation) {
     const values0 = game.wallet.coins,
@@ -65,8 +100,20 @@ export class GameUI {
           this.counters[i].setAttribute("aria-label", `${value} из 3 жизней`);
           for (let h = 0; h < this.hearts.length; h++)
             this.hearts[h].classList.toggle("empty-heart", h >= value);
-        } else this.counters[i].textContent = this.format(value);
+        } else {
+          this.counters[i].textContent = this.format(value);
+          if (i === 0)
+            this.element("menu-coins").textContent = this.format(value);
+          if (i === 1)
+            this.element("menu-diamonds").textContent = this.format(value);
+        }
       }
+    }
+    this.shop?.update();
+    if (this.inventory && this.cosmeticRevision !== this.inventory.revision) {
+      this.cosmeticRevision = this.inventory.revision;
+      (this.element("menu-avatar") as HTMLImageElement).src =
+        `${import.meta.env.BASE_URL}shop/${this.inventory.equipped.dino}.webp`;
     }
   }
   show(game: Simulation) {
@@ -75,7 +122,7 @@ export class GameUI {
     this.app.dataset.phase = phase;
     this.overlay.hidden = phase === "running";
     this.showSettings(false);
-    this.element("settings-toggle").hidden = phase !== "paused";
+    this.element("leave-run").hidden = phase !== "paused";
     this.pauseButton.disabled = phase !== "running" && phase !== "paused";
     this.cameraButton.disabled = phase !== "running" && phase !== "paused";
     this.pauseButton.setAttribute(
@@ -91,11 +138,11 @@ export class GameUI {
       } catch {
         /* Optional. */
       }
-      this.title.innerHTML = "Вот это<br /><em>забег!</em>";
-      this.description.textContent = "Новый мир уже ждёт тебя!";
-      this.chapter.textContent = "МОЛОДЕЦ!";
+      this.title.innerHTML = "Новый мир.<br /><em>Новый забег!</em>";
+      this.description.textContent = "Твой дино готов к приключениям.";
+      this.chapter.textContent = "DINO RUN · ГЛАВНАЯ";
       this.element("final-distance").textContent = this.format(game.distance);
-      this.action.textContent = "ЕЩЁ ЗАБЕГ →";
+      this.action.textContent = "НАЧАТЬ ЗАБЕГ →";
       this.element("live").textContent =
         `Конец игры. ${Math.floor(game.distance)} метров.`;
     } else if (phase === "paused") {
@@ -110,10 +157,10 @@ export class GameUI {
     this.update(game);
   }
   showSettings(visible: boolean) {
-    this.element("menu-panel").hidden = visible;
-    this.element("settings-panel").hidden = !visible;
+    this.selectSection(visible ? "settings" : "home");
   }
   error(error: unknown) {
+    this.selectSection("home");
     this.phase = "error";
     this.app.dataset.phase = "error";
     this.overlay.hidden = false;
@@ -124,9 +171,13 @@ export class GameUI {
     this.action.textContent = "ЕЩЁ РАЗ";
   }
   graphicsLost() {
+    this.selectSection("home");
     this.overlay.hidden = false;
     this.action.disabled = true;
     this.title.textContent = "Графика на паузе";
     this.description.textContent = "Ждём восстановления изображения…";
+  }
+  dispose() {
+    this.shop?.dispose();
   }
 }
