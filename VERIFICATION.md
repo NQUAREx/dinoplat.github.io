@@ -11,6 +11,7 @@
 - Current npm browser/mobile scripts use the new landscape suite and retain relevant shop/polish/feedback/GPU regressions. Earlier atlas-specific browser fixtures below are historical and are not evidence for the new terrain.
 - Final full unit run:98/98 pass, strict TypeScript/Vite production build passes. A fourteen-test focused rerun also passes after centring tumbleweed rotation on its geometric centre, anchoring bird wings to shoulders, and validating required environment LODs before renderer construction. The old first-help browser wait was corrected to await Ready rather than the obsolete atlas-inclusive texture count.
 - Final production Chromium/WebKit rendering checks confirm centred tumbleweed geometry/rootY.45, normal dinosaur opacity1 and zero terrain texture layers; page errors empty. All110 shop thumbnails regenerated after the winding correction. Original floor source art retained; removed runtime atlas remains recoverable from Git history.
+- A further regression verifies that an incoming bird reaches a constant-velocity target (rather than the old touch-time position). Launch uses a fixed quadratic intercept and never homes after launch; five focused landscape/flight tests and the rebuilt production bundle pass. The full route pilot remains part of the deployment gate.
 
 ## Historical fix: developer touch, lit dust and joined dinosaur
 

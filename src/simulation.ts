@@ -202,7 +202,7 @@ export class Simulation {
       return;
     }
     this.world.update(this.x, this.z);
-    this.world.step(this.time, dt, this.x, this.z, this.heading);
+    this.world.step(this.time, dt, this.x, this.z, this.heading,this.speed);
     this.collisions();
     if (!this.hitStopRemaining && this.distance >= this.nextStep) {
       this.nextStep += Rules.stepStride;

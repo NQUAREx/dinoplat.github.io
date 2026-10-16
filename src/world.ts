@@ -498,7 +498,7 @@ export class WorldSpawner {
       this.originalHeight[i] * Math.cos(this.lean[i]),
     );
   }
-  step(time: number, dt: number, px: number, pz: number, heading: number) {
+  step(time: number, dt: number, px: number, pz: number, heading: number, speed=Rules.startSpeed) {
     if (!this.landscape?.enabled) return;
     const sin = -Math.sin(heading),
       cos = Math.cos(heading);
@@ -529,6 +529,12 @@ export class WorldSpawner {
           bird = this.kinds[i] === ObjectKind.Bird;
         this.velocityX[i] = bird ? -dx * inv * 9 : cos * 2.5;
         this.velocityZ[i] = bird ? -dz * inv * 9 : -sin * 2.5;
+        if(bird){
+          // Aim once at a constant-velocity intercept, never home after launch.
+          const a=speed*speed-81,b=-2*speed*(dx*sin+dz*cos),disc=b*b-4*a*d2;
+          const t=Math.abs(a)<1e-8?-d2/b:disc>=0?(-b-Math.sqrt(disc))/(2*a):-1;
+          if(t>0&&t<6){this.velocityX[i]=(sin*speed*t-dx)/t;this.velocityZ[i]=(cos*speed*t-dz)/t;}
+        }
         this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);
         this.motion[i] = 3;
         this.fallStart[i] = time;
