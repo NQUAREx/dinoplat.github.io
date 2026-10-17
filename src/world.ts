@@ -563,26 +563,26 @@ export class WorldSpawner {
         if (time < this.nextMovingTime) continue;
         const bird = this.kinds[i] === ObjectKind.Bird;
         if (bird) {
-          // 48m gives >1.1s before contact even at 24+18m/s closing speed.
+          // Slow approach keeps the overhead cue readable on small screens.
           if (d2 > 64 * 64 || d2 < 48 * 48) continue;
           const vx = this.x[i] - cameraX, vz = this.z[i] - cameraZ;
           const dot = (vx * viewSin + vz * viewCos) / Math.hypot(vx, vz);
           if (!(dot + Number.EPSILON * 4 >= Math.SQRT1_2)) continue;
         } else if (d2 > 48 * 48 || d2 < 28 * 28 || dx * sin + dz * cos < -1e-9) continue;
         const inv = 1 / Math.sqrt(d2);
-        this.velocityX[i] = bird ? -dx * inv * 18 : cos * 7.5;
-        this.velocityZ[i] = bird ? -dz * inv * 18 : -sin * 7.5;
+        this.velocityX[i] = bird ? -dx * inv * 9 : cos * 7.5;
+        this.velocityZ[i] = bird ? -dz * inv * 9 : -sin * 7.5;
         this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);
         this.motion[i] = 3;
         this.fallStart[i] = time;
         this.nextMovingTime = time + 5;
       }
       if (this.kinds[i] === ObjectKind.Bird && this.motion[i] === 3 && d2 <= 10 * 10) {
-        // Solve |playerVelocity*t - birdOffset| = 18*t once at lock.
+        // Solve |playerVelocity*t - birdOffset| = 9*t once at lock.
         // Keep the earliest positive intercept within one second; an escaping
         // runner with no reachable intercept leaves the existing course intact.
         const vx = sin * speed, vz = cos * speed,
-          a = vx * vx + vz * vz - 18 * 18,
+          a = vx * vx + vz * vz - 9 * 9,
           b = -2 * (dx * vx + dz * vz),
           discriminant = b * b - 4 * a * d2;
         let intercept = Infinity;
@@ -606,7 +606,7 @@ export class WorldSpawner {
         if (this.kinds[i] === ObjectKind.Bird && this.motion[i] === 3) {
           // Track only at range; the last 10m are a dodgeable straight fly-through.
           const distance = Math.sqrt(d2),
-            factor = distance > 0 ? Math.min(18, distance / dt) / distance : 0;
+            factor = distance > 0 ? Math.min(9, distance / dt) / distance : 0;
           this.velocityX[i] = -dx * factor;
           this.velocityZ[i] = -dz * factor;
           this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);

@@ -2,12 +2,12 @@ import {
   Box3, BufferAttribute, BufferGeometry, Color, DynamicDrawUsage,
   Mesh, MeshLambertMaterial, Sphere,
 } from "three";
-import { LandscapeField, Surface } from "./landscape";
+import { Biome, LandscapeField } from "./landscape";
 import type { RenderPose } from "./render-pose";
 
 const CELLS = 56, TILE = LandscapeField.tile, HALF = CELLS * TILE / 2;
 const VERTICES = (CELLS + 1) ** 2, FACES = CELLS * CELLS * 2;
-// Clip vertices: local world X, absolute Y, local world Z, hazard, bridge, plank.
+// Clip vertices: local world X, absolute Y, local world Z, hazard, bridge, pit/plank.
 const STRIDE = 6, EPS = 1e-7;
 const COLOURS = [
   0xf4cf78, 0xeab360, 0xe79d66, 0x66526b, 0x8e5d57, 0x493f59,
@@ -129,6 +129,14 @@ function clip(input: Float64Array, count: number, output: Float64Array, componen
   }
   return result;
 }
+function polygonAreaXZ(p: Float64Array, count: number) {
+  let area = 0;
+  for (let i = 0; i < count; i++) {
+    const a = i * STRIDE, b = ((i + 1) % count) * STRIDE;
+    area += p[a] * p[b + 2] - p[b] * p[a + 2];
+  }
+  return Math.abs(area) * 0.5;
+}
 
 /** Four opaque banks: irregular clipped shores, deep beds, liquids and arbitrary-angle bridge decks. */
 export class TerrainSurface {
@@ -148,7 +156,7 @@ export class TerrainSurface {
   private readonly lavaMaterial = new MeshLambertMaterial({ vertexColors: true, emissive: 0xff4b13, emissiveIntensity: 0.38 });
   private readonly woodMaterial = new MeshLambertMaterial({ vertexColors: true });
   // Each triangle split by one shore yields <=3 top faces plus two bank faces.
-  private readonly ground = new GeometryBank(this.groundMaterial, FACES * 5, "landscape-ground");
+  private readonly ground = new GeometryBank(this.groundMaterial, FACES * 8, "landscape-ground");
   private readonly water = new GeometryBank(this.waterMaterial, FACES * 2, "landscape-water");
   private readonly lava = new GeometryBank(this.lavaMaterial, FACES * 2, "landscape-lava");
   // Two clips yield <=5 vertices: 3 top+3 bottom+4 boundary-wall triangles.
@@ -158,6 +166,8 @@ export class TerrainSurface {
   private readonly face = new Float64Array(STRIDE * 3);
   private readonly land = new Float64Array(STRIDE * 10);
   private readonly hazard = new Float64Array(STRIDE * 10);
+  private readonly dry = new Float64Array(STRIDE * 10);
+  private readonly wet = new Float64Array(STRIDE * 10);
   private readonly deck = new Float64Array(STRIDE * 10);
   constructor(private readonly field: LandscapeField) {
     // Local depth haze, not layered transparent fog: no extra texture, draw or overdraw.
@@ -198,6 +208,7 @@ export class TerrainSurface {
       this.grid[i] = wx - this.anchorX; this.grid[i + 1] = this.field.vertexHeight(wx, wz);
       this.grid[i + 2] = wz - this.anchorDistance;
       this.grid[i + 3] = this.field.hazardAt(wx, wz); this.grid[i + 4] = this.field.bridgeMaskAt(wx, wz);
+      this.grid[i + 5] = Math.max(this.field.pitMaskAt(wx, wz), this.field.pitMaskAt(wx, wz, 1));
     }
     for (let z = 0; z < CELLS; z++) for (let x = 0; x < CELLS; x++) {
       const a = (z * (CELLS + 1) + x) * STRIDE, b = a + STRIDE, c = a + (CELLS + 1) * STRIDE, d = c + STRIDE;
@@ -215,16 +226,30 @@ export class TerrainSurface {
     this.ground.polygon(this.land, landCount, 0, tint);
     const hazardCount = clip(this.face, 3, this.hazard, 3, 1);
     if (hazardCount < 3) return;
-    const kind = this.field.hazardKindAt(wx, wz), pit = kind === Surface.Pit, depth = pit ? -14 : -4.8;
-    this.ground.polygon(this.hazard, hazardCount, depth, tint, 0.46, pit ? 1 : 0);
-    for (let i = 0; i < hazardCount; i++) {
-      const a = i * STRIDE, b = ((i + 1) % hazardCount) * STRIDE;
-      if (Math.abs(this.hazard[a + 3]) < EPS && Math.abs(this.hazard[b + 3]) < EPS)
-        this.ground.wall(this.hazard, a, b, 0, depth, tint, pit ? 1 : 0);
+    // Split the combined hazard polygon by its independent pit mask. A narrow
+    // pit can cross only a triangle corner, where centroid classification used
+    // to emit cyan liquid wedges over the dry 14m bed.
+    const dryCount = clip(this.hazard, hazardCount, this.dry, 5, 1);
+    if (dryCount >= 3 && polygonAreaXZ(this.dry, dryCount) > EPS) {
+      this.ground.polygon(this.dry, dryCount, -14, tint, 0.46, 1);
+      for (let i = 0; i < dryCount; i++) {
+        const a = i * STRIDE, b = ((i + 1) % dryCount) * STRIDE;
+        if ((Math.abs(this.dry[a + 3]) < EPS && Math.abs(this.dry[b + 3]) < EPS) ||
+            (Math.abs(this.dry[a + 5]) < EPS && Math.abs(this.dry[b + 5]) < EPS))
+          this.ground.wall(this.dry, a, b, 0, -14, tint, 1);
+      }
     }
-    if (!pit) (kind === Surface.Lava ? this.lava : this.water).polygon(this.hazard, hazardCount, -0.9, kind === Surface.Lava ? 10 : 9);
-    if (pit) return; // Dry ravines have no support deck: jump or go around.
-    const deckCount = clip(this.hazard, hazardCount, this.deck, 4, 1);
+    const wetCount = clip(this.hazard, hazardCount, this.wet, 5, -1);
+    if (wetCount < 3 || polygonAreaXZ(this.wet, wetCount) <= EPS) return;
+    this.ground.polygon(this.wet, wetCount, -4.8, tint, 0.46);
+    for (let i = 0; i < wetCount; i++) {
+      const a = i * STRIDE, b = ((i + 1) % wetCount) * STRIDE;
+      if (Math.abs(this.wet[a + 3]) < EPS && Math.abs(this.wet[b + 3]) < EPS)
+        this.ground.wall(this.wet, a, b, 0, -4.8, tint);
+    }
+    const liquid = biome === Biome.Lava ? this.lava : this.water;
+    liquid.polygon(this.wet, wetCount, -0.9, biome === Biome.Lava ? 10 : 9);
+    const deckCount = clip(this.wet, wetCount, this.deck, 4, 1);
     if (deckCount < 3) return;
     // Plank direction follows the crossing, not the terrain's storage axes.
     let lo = Infinity;

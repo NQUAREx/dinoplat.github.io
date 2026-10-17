@@ -123,6 +123,7 @@ const LIMITS: Record<string, [number, number, number]> = {
   "camera.slopeDelay": [0.1, 1.5, 0.05],
   "camera.slopeUp": [0, 1.2, 0.05],
   "camera.slopeDown": [0, 0.9, 0.05],
+  "camera.slopeFov": [0, 24, 1],
   "camera.terrainClearance": [0.3, 4, 0.1],
 };
 

@@ -12,6 +12,9 @@ test("terrain pitch follows ascent/descent in both views and every heading witho
       for (let i = 0; i < 240; i++) rig.update(0, 0, 1 / 60, false, heading, 13, 0, 13, field, 0, 0);
       const target = Math.max(-0.55, Math.min(0.95, Math.atan(grade)));
       assert.ok(Math.abs(rig.terrainPitch - target) < 0.00002);
+      const flatFov = first ? 65 : 50;
+      if (grade === 0) assert.ok(Math.abs(rig.camera.fov - flatFov) < 0.001);
+      else assert.ok(rig.camera.fov > flatFov, "ascending and descending terrain widens FOV");
       const direction = rig.camera.getWorldDirection(new Vector3());
       if (grade >= 0.8) assert.ok(direction.y > 0, "look up the approaching mountain, not into it");
       if (grade < 0) assert.ok(direction.y < 0, "look down the descent");

@@ -23,6 +23,7 @@ export interface CameraPose {
 }
 export interface HeightSampler {
   heightAt(x: number, z: number): number;
+  smoothHeightAt?(x: number, z: number): number;
 }
 
 /** Event-driven camera extension point; allocations happen only at construction. */
@@ -45,6 +46,7 @@ export class CameraRig {
   private walkingBlend = 0;
   heading = 0;
   terrainPitch = 0;
+  slopeFovBoost = 0;
   get followDelay() {
     return Tuning.camera.followDelay;
   }
@@ -139,15 +141,9 @@ export class CameraRig {
     p.targetY += (t.targetY - p.targetY) * blend;
     p.targetZ += (t.targetZ - p.targetZ) * blend;
     p.fov += (t.fov - p.fov) * blend;
-    const fov = p.fov + (Tuning.camera.frontFov - p.fov) * viewBlend,
-      near =
+    const near =
         Tuning.camera.rearNear +
         (Tuning.camera.frontNear - Tuning.camera.rearNear) * viewBlend;
-    if (Math.abs(fov - this.camera.fov) > 0.001 || near !== this.camera.near) {
-      this.camera.fov = fov;
-      this.camera.near = near;
-      this.camera.updateProjectionMatrix();
-    }
     const phase = (distance * Math.PI * 2) / Rules.stepStride;
     const intensity = Math.max(0, Math.min(3, this.shakeMultiplier)) * 1.5;
     const rearFactor = 0.85,
@@ -177,11 +173,22 @@ export class CameraRig {
     // height. Look ahead before climbing, then ease over crests and descents.
     const ahead = Tuning.camera.slopeAhead, behind = Tuning.camera.slopeBehind;
     const grade = terrain
-      ? (terrain.heightAt(worldX - sin * ahead, worldZ + cos * ahead) -
-         terrain.heightAt(worldX + sin * behind, worldZ - cos * behind)) / (ahead + behind)
+      ? ((terrain.smoothHeightAt?.(worldX - sin * ahead, worldZ + cos * ahead) ??
+          terrain.heightAt(worldX - sin * ahead, worldZ + cos * ahead)) -
+         (terrain.smoothHeightAt?.(worldX + sin * behind, worldZ - cos * behind) ??
+          terrain.heightAt(worldX + sin * behind, worldZ - cos * behind))) / (ahead + behind)
       : 0;
     const targetPitch = Math.max(-Tuning.camera.slopeDown, Math.min(Tuning.camera.slopeUp, Math.atan(grade)));
     this.terrainPitch += (targetPitch - this.terrainPitch) * (1 - Math.exp(-Math.max(0, dt) / Tuning.camera.slopeDelay));
+    const targetFovBoost = Math.min(Tuning.camera.slopeFov, Math.abs(this.terrainPitch) * Tuning.camera.slopeFov);
+    this.slopeFovBoost += (targetFovBoost - this.slopeFovBoost) *
+      (1 - Math.exp(-Math.max(0, dt) / Tuning.camera.slopeDelay));
+    const fov = p.fov + (Tuning.camera.frontFov - p.fov) * viewBlend + this.slopeFovBoost;
+    if (Math.abs(fov - this.camera.fov) > 0.001 || near !== this.camera.near) {
+      this.camera.fov = fov;
+      this.camera.near = near;
+      this.camera.updateProjectionMatrix();
+    }
     const pitchSin = Math.sin(this.terrainPitch), pitchCos = Math.cos(this.terrainPitch);
     const x = p.offsetX + localPlayerX * 0.75;
     const eye =
@@ -240,6 +247,7 @@ export class CameraRig {
     this.walkingBlend = 0;
     this.heading = 0;
     this.terrainPitch = 0;
+    this.slopeFovBoost = 0;
     this.modeValue = this.modeFrom = this.mode ? 1 : 0;
     this.modeTime = this.transitionSeconds;
     this.setPose(

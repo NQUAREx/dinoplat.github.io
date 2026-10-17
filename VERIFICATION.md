@@ -1,5 +1,13 @@
 # Проверка прототипа — 17 октября 2026
 
+## Current terrain readability and movement update
+
+- Bird flight speed is halved18→9m/s. Camera-facing±45° launch,48–64m warning band,10m predictive lock and straight committed fly-through remain. Measured24m/s head-on contact warning is1.442–1.925s.
+- Smooth terrain grade is sampled without blocking ledges. Uphill horizontal speed scales down toward50%; downhill assistance is capped12%; flat speed is unchanged. Camera FOV adds an eased0–12° boost for both ascent and descent while retaining existing pitch and camera-mode interpolation.
+- Dry pit geometry now clips a separate interpolated pit mask inside the combined hazard polygon. Four persistent opaque banks remain, but14m pit beds/walls cannot emit cyan water or lava triangles. Zero-area clip fragments are rejected before wall emission.
+- Blocking ledges no longer use eased mound profiles. They are broad2.2–3.6m polygonal rectangle/diamond shelves with minimum9m footprint radius and10m route clearance. Smooth hills remain non-blocking.
+- Final unit suite passes183/183, including100 seeds×5 simulated minutes with all lives. Strict TypeScript/Vite build passes. Chromium/Android and isolated WebKit/iPhone production suites pass terrain, gestures, slopes, hazards, bridges,30 resets, DEV/shop/pause and report no JS/WebGL errors. The first concurrently loaded WebKit run missed an idle-animation timing assertion; the isolated rerun passed. These are software-GPU browser checks, not physical-phone FPS measurements.
+
 ## Current follow-up: dry pits, verified day cycle and falling objects (2026-10-17)
 
 - Dry pits override every bridge mask in CPU classification; renderer emits no deck for pit triangles. Both pit families remain. Whole footprints relocate with8m safe-route guards instead of carving/filling artificial causeways. A100-seed probe verifies180000 supported route samples and4190 dry pits,312 inside positive bridge masks; union density remains1.936× family zero. A pathological all-pit/positive-bridge fixture has a14m bed and zero bridge/water/lava geometry.

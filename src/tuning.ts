@@ -29,6 +29,7 @@ export const Tuning = {
     slopeUp: 0.95,
     slopeDown: 0.55,
     terrainClearance: 1.2,
+    slopeFov: 12,
     transitionSeconds: 0.65,
     frontFov: 65,
     frontEye: 1.45,

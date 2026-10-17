@@ -170,7 +170,7 @@ test("curved routes stay supported and bridge samples preserve underlying bed", 
       assert.equal(field.sample(x, z, sample), sample);
       seen.add(sample.surface);
       assert.equal(sample.waterLevel, sample.height - 0.9);
-      assert.equal(sample.floor, sample.surface === Surface.Land ? sample.height : sample.height - (field.hazardKindAt(x, z) === Surface.Pit ? 14 : 4.8));
+      assert.equal(sample.floor, sample.surface === Surface.Land ? sample.height : sample.height - (sample.surface === Surface.Pit ? 14 : 4.8));
       assert.equal(field.supportAt(x, z), sample.surface === Surface.Land || sample.surface === Surface.Bridge);
       if (sample.surface === Surface.Bridge && Math.abs(field.bridgeAngleAt(x, z)) > 0.5) oblique = true;
     }
@@ -246,8 +246,7 @@ test("dry pits survive every seed and world sign, reject bridge masks, and leave
       let found = 0;
       for (let i = 0; i < 1000; i++) {
         const x = origin + (i % 40) * 4.7, z = origin + Math.floor(i / 40) * 7.3;
-        const kind = field.hazardKindAt(x, z);
-        if (kind !== Surface.Pit || field.surfaceAt(x, z) === Surface.Land) continue;
+        if (field.surfaceAt(x, z) !== Surface.Pit) continue;
         found++; pits++;
         assert.equal(field.surfaceAt(x, z), Surface.Pit);
         assert.equal(field.supportAt(x, z), false);
@@ -322,7 +321,7 @@ test("ledge component follows the same triangles, has jumpable steep faces and g
   let steep = 0, raised = 0, maximum = 0;
   for (let z = -500; z <= 500; z += 2.3) for (let x = -500; x <= 500; x += 2.7) {
     const h = field.ledgeHeightAt(x, z);
-    assert.ok(h >= -1e-10 && h <= 3.2 + 1e-10);
+    assert.ok(h >= -1e-10 && h <= 3.6 + 1e-10);
     maximum = Math.max(maximum, h); raised += +(h > 0.5);
     if (Math.abs(field.ledgeHeightAt(x + 0.1, z) - h) / 0.1 > 0.28) steep++;
   }
@@ -343,14 +342,14 @@ test("ledge component follows the same triangles, has jumpable steep faces and g
   assert.ok(raised > 1000 && steep > 100 && maximum > 2.8);
 });
 
-test("rectangle, diamond and elliptical ledges produce distinct footprints", () => {
+test("large rectangle and diamond rock steps produce distinct polygonal footprints", () => {
   class ShapedField extends LandscapeField {
     shape = 0;
     override hash(x: number, z: number, salt = 0) {
       return salt === 228 ? this.shape : super.hash(x, z, salt);
     }
   }
-  const field = new ShapedField(1979), area = [0, 0, 0], shapes = [0.1, 0.5, 0.9];
+  const field = new ShapedField(1979), area = [0, 0], shapes = [0.1, 0.9];
   let distinct = 0;
   for (let z = -240; z <= 240; z += 2.3) for (let x = -240; x <= 240; x += 2.7) {
     const heights = shapes.map((shape, i) => {
@@ -359,9 +358,9 @@ test("rectangle, diamond and elliptical ledges produce distinct footprints", () 
       area[i] += +(h > 0.5);
       return h;
     });
-    if (heights[0] - heights[1] > 0.4 && heights[2] > heights[1] + 0.1) distinct++;
+    if (Math.abs(heights[0] - heights[1]) > 0.4) distinct++;
   }
-  assert.ok(area[0] > area[2] && area[2] > area[1], "rectangle encloses ellipse, which encloses diamond");
+  assert.ok(area[0] > area[1], "rectangle encloses more ground than diamond");
   assert.ok(distinct > 100, "shape selection measurably changes the actual interpolated surface");
 });
 

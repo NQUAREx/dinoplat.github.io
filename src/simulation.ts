@@ -47,6 +47,8 @@ export class Simulation {
   distance = 0;
   previousDistance = 0;
   speed = Rules.startSpeed;
+  terrainGrade = 0;
+  slopeSpeedFactor = 1;
   time = 0;
   previousTime = 0;
   feedbackTime = 0;
@@ -83,6 +85,8 @@ export class Simulation {
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
     this.speed = Rules.startSpeed;
+    this.terrainGrade = 0;
+    this.slopeSpeedFactor = 1;
     this.nextStep = Rules.stepStride;
     this.world.reset(this.seed);
     this.world.update(0, 0);
@@ -179,13 +183,20 @@ export class Simulation {
       feet += this.velocityY * dt - (Rules.gravity * dt * dt) / 2;
       this.velocityY -= Rules.gravity * dt;
     }
-    this.speed =
+    const moveSin = -Math.sin(this.heading), moveCos = Math.cos(this.heading),
+      grade = (this.landscape.smoothHeightAt(this.x + moveSin, this.z + moveCos) -
+        this.landscape.smoothHeightAt(this.x - moveSin, this.z - moveCos)) * 0.5;
+    this.terrainGrade += (grade - this.terrainGrade) * (1 - Math.exp(-dt / 0.22));
+    this.slopeSpeedFactor = this.terrainGrade >= 0
+      ? Math.max(0.5, 1 / (1 + this.terrainGrade * 0.65))
+      : Math.min(1.12, 1 - this.terrainGrade * 0.12);
+    this.speed = (
       this.health.immunity > 0
         ? Rules.startSpeed
         : Math.min(
             Rules.maxSpeed,
             Rules.startSpeed + this.distance * Tuning.generation.speedGrowth,
-          );
+          )) * this.slopeSpeedFactor;
     this.distance += this.speed * dt;
     const midHeading = (this.heading + this.previousHeading) * 0.5;
     this.x -= Math.sin(midHeading) * this.speed * dt;

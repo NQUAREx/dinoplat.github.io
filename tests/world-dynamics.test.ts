@@ -33,7 +33,7 @@ test("bird launch cone uses actual camera origin and facing, including both 45 d
     w.step(0, STEP, 0, 0, heading, 24, facing, cameraX, cameraZ);
     assert.equal(w.motion[i], Math.abs(angle) <= 45 ? 3 : 0, `facing=${facing}, angle=${angle}`);
     if (w.motion[i] === 3)
-      assert.ok(Math.abs(Math.hypot(w.x[i] - w.previousX[i], w.z[i] - w.previousZ[i]) / STEP - 18) < 1e-5);
+      assert.ok(Math.abs(Math.hypot(w.x[i] - w.previousX[i], w.z[i] - w.previousZ[i]) / STEP - 9) < 1e-5);
   }
   // A player-relative angle outside 45 degrees is visible from the rear camera.
   const { world: w, slot: i } = moving(ObjectKind.Bird);
@@ -85,7 +85,7 @@ test("committed bird wings clear crouched runners on steep uphill and downhill p
     w.step(1, STEP, 0, 0, 0, 24);
     assert.ok(w.baseY[i] >= Rules.duckBodyHeight + 0.39, `grade ${grade}`);
     assert.equal(w.motion[i], 4, "clearance does not reacquire horizontal target");
-    assert.ok(Math.abs((w.z[i] + 0.9) / STEP + 18) < 1e-8);
+    assert.ok(Math.abs((w.z[i] + 0.9) / STEP + 9) < 1e-8);
     if (grade > 0)
       assert.ok(w.baseY[i] < Rules.playerBodyHeight, "standing uphill runner still meets bird");
   }
@@ -125,11 +125,11 @@ test("bird commits full velocity on encounter and never follows after a duck", (
   w.x[i] = 0; w.z[i] = 0.5;
   w.step(1, 1 / 120, 0, 0, 0, 24);
   assert.equal(w.motion[i], 4);
-  assert.ok(Math.abs(w.z[i] - 0.35) < 1e-6);
+  assert.ok(Math.abs(w.z[i] - 0.425) < 1e-6);
   for (let tick = 1; tick < 120; tick++) w.step(1 + tick / 120, 1 / 120, 10, 10, 0, 24);
   assert.equal(w.motion[i], 4);
   assert.equal(w.x[i], 0);
-  assert.ok(Math.abs(w.z[i] - (0.5 - 18)) < 1e-5);
+  assert.ok(Math.abs(w.z[i] - (0.5 - 9)) < 1e-5);
   w.step(11, 1 / 120, 0, 0, 0, 24);
   assert.equal(w.active[i], 0);
 });
@@ -273,8 +273,8 @@ test("simulation: relative bird sweep crosses the runner between disjoint frame 
   w.baseY[i] = w.previousBaseY[i] = 1.05;
   const extent = w.halfZ[i] * Rules.cactusHitScale + Rules.blockingRadius;
   assert.ok(w.z[i] > extent);
-  // At 18m/s a 100ms sweep still crosses both separated collider endpoints.
-  game.step(1 / 10);
+  // At 9m/s a 200ms sweep still crosses both separated collider endpoints.
+  game.step(1 / 5);
   assert.ok(w.z[i] < -extent, "final collider also lies outside the player endpoint");
   assert.equal(game.health.lives, 2);
   assert.equal(w.active[i], 0);
@@ -282,7 +282,7 @@ test("simulation: relative bird sweep crosses the runner between disjoint frame 
   assert.ok(game.z > 0 && game.z < Rules.startSpeed / 10, "impact clamps within the tick");
 });
 
-test("simulation: fastest head-on approach gives 1.1–1.6 seconds of warning", (t) => {
+test("simulation: slower head-on birds give 1.4–2.0 seconds of warning", (t) => {
   for (const distance of [48, 64]) {
     const { game, w, slot: i } = flatSimulation(ObjectKind.Bird);
     w.x[i] = w.previousX[i] = 0;
@@ -300,7 +300,7 @@ test("simulation: fastest head-on approach gives 1.1–1.6 seconds of warning", 
     const warning = ticks * STEP;
     t.diagnostic(`${distance}m: contact after ${warning.toFixed(3)}s`);
     assert.equal(game.health.lives, 2);
-    assert.ok(warning >= 1.1 && warning <= 1.6, `${distance}m: ${warning}s`);
+    assert.ok(warning >= 1.4 && warning <= 2, `${distance}m: ${warning}s`);
   }
 });
 
@@ -317,7 +317,7 @@ test("bird lock predicts a steady 24m/s runner with a 3m lateral launch offset",
       const vz = (w.z[i] - w.previousZ[i]) / STEP;
       if (!locked) {
         locked = true; velocityX = vx; velocityZ = vz;
-        assert.ok(Math.abs(Math.hypot(vx, vz) - 18) < 1e-5);
+        assert.ok(Math.abs(Math.hypot(vx, vz) - 9) < 1e-5);
       }
       assert.ok(Math.abs(vx - velocityX) < 1e-8);
       assert.ok(Math.abs(vz - velocityZ) < 1e-8);
@@ -356,7 +356,7 @@ test("simulation: a late legal turn sidesteps a locked bird without ducking", ()
       if (locked && w.active[i]) {
         assert.equal(w.motion[i], 4);
         assert.equal(w.x[i], 0, "locked flight cannot chase lateral movement");
-        assert.ok(Math.abs(w.z[i] - (lockZ - 18 * (game.time - lockTime))) < 1e-5);
+        assert.ok(Math.abs(w.z[i] - (lockZ - 9 * (game.time - lockTime))) < 1e-5);
       }
       assert.equal(game.health.lives, 3);
     }

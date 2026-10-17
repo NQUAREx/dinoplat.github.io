@@ -31,6 +31,9 @@ class Fixture extends LandscapeField {
   }
   override biomeAt(): Biome { return Biome.Meadow; }
   override hazardKindAt() { return this.kind; }
+  override pitMaskAt(x: number, z: number) {
+    return this.kind === Surface.Pit ? this.hazardAt(x, z) : -1;
+  }
   override hazardAt(x: number, z: number) {
     if (!this.enabled || this.mode === "land") return -1;
     if (this.mode === "alternating") return (Math.round(x / 4) + Math.round(z / 4)) % 2 === 0 ? 1 : -1;
@@ -184,7 +187,7 @@ test("normal frames upload nothing; anchor/seed/revision/enabled invalidate", ()
 
 test("real fields retain bounded triangles and exact CPU support", t => {
   const field = new LandscapeField(), ground = new Ground(field), pose = new RenderPose();
-  let maximum = 0, supported = 0, bridges = 0;
+  let maximum = 0, supported = 0, bridges = 0, dryPits = 0;
   try {
     for (const [seed, x, z] of [[1, 0, 0], [12, -999043, -1397], [32, -997303, -3937], [38, -996781, -4699], [1979, 1000000, -1000000]]) {
       field.reset(seed); pose.x = x; pose.z = z; ground.surface.update(pose);
@@ -194,13 +197,18 @@ test("real fields retain bounded triangles and exact CPU support", t => {
         const wx = x + (field.hash(i, 5) - 0.5) * 160, wz = z + (field.hash(i, 9) - 0.5) * 160;
         const surface = field.surfaceAt(wx, wz), deck = down(ground.extraMeshes[2], pose, wx, wz);
         assert.equal(!!deck, surface === Surface.Bridge);
+        if (surface === Surface.Pit) {
+          dryPits++;
+          assert.equal(down(ground.extraMeshes[0], pose, wx, wz), undefined, "no cyan water triangle in dry pit");
+          assert.equal(down(ground.extraMeshes[1], pose, wx, wz), undefined, "no lava triangle in dry pit");
+        }
         if (!field.supportAt(wx, wz)) continue;
         supported++; if (deck) bridges++;
         near((deck ?? down(ground.mesh, pose, wx, wz))!.point.y, field.heightAt(wx, wz));
       }
     }
-    assert.ok(supported > 100 && bridges > 0);
-    t.diagnostic(`maximum ${maximum} triangles; ${supported} support rays including ${bridges} bridges`);
+    assert.ok(supported > 100 && bridges > 0 && dryPits > 0);
+    t.diagnostic(`maximum ${maximum} triangles; ${supported} support rays including ${bridges} bridges; ${dryPits} dry-pit rays without liquid`);
   } finally { ground.dispose(); }
 });
 
