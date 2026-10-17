@@ -31,6 +31,7 @@ export interface ObjectDefinition {
   readonly kind: ObjectKind;
   readonly weight: number;
   readonly blocking: boolean;
+  readonly walkable?: boolean;
   readonly colliders: readonly ColliderDefinition[];
   readonly reward?: number;
   readonly healing?: number;
@@ -71,6 +72,7 @@ export class ObjectRegistry {
       throw new Error("Invalid/duplicate world object definition");
     const entry = Object.freeze({
       ...definition,
+      walkable: definition.walkable ?? false,
       colliders: definition.colliders.map((bounds) =>
         Object.freeze({ ...bounds }),
       ),
@@ -164,7 +166,8 @@ export class ObjectRegistry {
       registry.register({
         kind,
         weight: 0,
-        blocking: true,
+        blocking: kind !== ObjectKind.Rock && kind !== ObjectKind.Log,
+        walkable: kind === ObjectKind.Rock || kind === ObjectKind.Log,
         colliders: Array.from({ length: count }, () => ({
           halfX: radius,
           halfZ: radius,
@@ -183,6 +186,9 @@ export class WorldSpawner {
   readonly rows = new Float64Array(Rules.poolSize).fill(Infinity);
   readonly x = new Float64Array(Rules.poolSize);
   readonly z = new Float64Array(Rules.poolSize);
+  readonly previousX = new Float64Array(Rules.poolSize);
+  readonly previousZ = new Float64Array(Rules.poolSize);
+  readonly previousBaseY = new Float32Array(Rules.poolSize);
   readonly kinds = new Uint8Array(Rules.poolSize);
   readonly variants = new Uint8Array(Rules.poolSize);
   readonly angles = new Float32Array(Rules.poolSize);
@@ -200,6 +206,8 @@ export class WorldSpawner {
   private readonly originalHeight = new Float32Array(Rules.poolSize);
   private readonly dynamic = new Uint16Array(Rules.poolSize);
   private dynamicCount = 0;
+  private readonly walkables = new Uint16Array(Rules.poolSize);
+  private walkableCount = 0;
   private nextMovingTime = 0;
   radius = (Rules.maxColumns - 1) / 2;
   generated = 0;
@@ -219,6 +227,7 @@ export class WorldSpawner {
     this.lean.fill(0);
     this.fallStart.fill(-1);
     this.dynamicCount = 0;
+    this.walkableCount = 0;
     this.nextMovingTime = 0;
     this.columns.fill(Infinity);
     this.rows.fill(Infinity);
@@ -302,7 +311,10 @@ export class WorldSpawner {
           this.populate(first + candidate, column, row, candidate);
       }
     this.dynamicCount = 0;
-    for (let i = 0; i < this.active.length; i++)
+    this.walkableCount = 0;
+    for (let i = 0; i < this.active.length; i++) {
+      if (this.active[i] && this.registry.get(this.kinds[i])?.walkable)
+        this.walkables[this.walkableCount++] = i;
       if (
         this.active[i] &&
         (this.motion[i] === 1 ||
@@ -310,6 +322,7 @@ export class WorldSpawner {
           this.kinds[i] === ObjectKind.Tumbleweed)
       )
         this.dynamic[this.dynamicCount++] = i;
+    }
     this.revision++;
   }
   private populate(
@@ -346,8 +359,8 @@ export class WorldSpawner {
     if (
       radius < (pickup ? Tuning.generation.pickupClearing : Rules.firstRow) ||
       this.random(column, row, candidate, 0x17f3) >
-        Tuning.generation.acceptance -
-          (speed - Rules.startSpeed) * Tuning.generation.speedPenalty
+        (pickup ? 1 : 2) * (Tuning.generation.acceptance -
+          (speed - Rules.startSpeed) * Tuning.generation.speedPenalty)
     )
       return;
     let definition = this.registry.pick(
@@ -365,9 +378,9 @@ export class WorldSpawner {
             ? ObjectKind.Bird
             : r < 0.12 && biome === Biome.Desert
               ? ObjectKind.Tumbleweed
-              : r < 0.22
+              : r < 0.15
                 ? ObjectKind.Log
-                : r < 0.4
+                : r < 0.17
                   ? ObjectKind.Rock
                   : biome === Biome.Meadow
                     ? ObjectKind.Tree
@@ -448,13 +461,13 @@ export class WorldSpawner {
       }
     }
     if (
-      definition.blocking &&
+      (definition.blocking || definition.walkable) &&
       this.isRouteClear(x, z, this.halfX[slot], this.halfZ[slot])
     )
       return;
     // Deterministic hard-core thinning over this and neighbouring chunks avoids
     // interpenetrating clusters without storing an unbounded spatial index.
-    if (definition.blocking) {
+    if (definition.blocking || definition.walkable) {
       const priority = this.random(column, row, candidate, 0xa193);
       for (let rz = row - 1; rz <= row + 1; rz++)
         for (let cx = column - 1; cx <= column + 1; cx++)
@@ -462,11 +475,28 @@ export class WorldSpawner {
             if (this.random(cx, rz, n, 0xa193) >= priority) continue;
             const nx = (cx + this.random(cx, rz, n, 0x311a)) * Rules.chunkSize;
             const nz = (rz + this.random(cx, rz, n, 0x741d)) * Rules.chunkSize;
-            if ((nx - x) ** 2 + (nz - z) ** 2 < Tuning.generation.spacing ** 2)
+            if ((nx - x) ** 2 + (nz - z) ** 2 < (Tuning.generation.spacing * 0.5) ** 2)
               return;
           }
     }
+    this.previousX[slot] = this.collisionX(slot);
+    this.previousZ[slot] = this.collisionZ(slot);
+    this.previousBaseY[slot] = this.baseY[slot];
     this.active[slot] = 1;
+  }
+  /** Absolute support elevation; compact smooth mounds stay inside prop bounds. */
+  walkHeightAt(x: number, z: number, baseHeight = this.landscape?.heightAt(x, z) ?? 0) {
+    let height = baseHeight;
+    for (let n = 0; n < this.walkableCount; n++) {
+      const i = this.walkables[n];
+      if (!this.active[i]) continue;
+      if (Math.abs(x - this.x[i]) >= this.halfX[i] || Math.abs(z - this.z[i]) >= this.halfZ[i]) continue;
+      const dx = (x - this.x[i]) / this.halfX[i],
+        dz = (z - this.z[i]) / this.halfZ[i],
+        r2 = dx * dx + dz * dz;
+      if (r2 < 1) height = Math.max(height, this.baseY[i] + this.height[i] * (1 - r2) ** 2);
+    }
+    return height;
   }
   collisionX(i: number) {
     return (
@@ -505,6 +535,9 @@ export class WorldSpawner {
     for (let n = 0; n < this.dynamicCount; n++) {
       const i = this.dynamic[n];
       if (!this.active[i]) continue;
+      this.previousX[i] = this.collisionX(i);
+      this.previousZ[i] = this.collisionZ(i);
+      this.previousBaseY[i] = this.baseY[i];
       const dx = this.x[i] - px,
         dz = this.z[i] - pz,
         d2 = dx * dx + dz * dz;
@@ -524,23 +557,28 @@ export class WorldSpawner {
         continue;
       if (this.motion[i] === 0) {
         if (time < this.nextMovingTime) continue;
-        if (d2 > 48 * 48 || d2 < 28 * 28 || dx * sin + dz * cos < 24) continue;
+        if (d2 > 48 * 48 || d2 < 28 * 28 || dx * sin + dz * cos < -1e-9) continue;
         const inv = 1 / Math.sqrt(d2),
           bird = this.kinds[i] === ObjectKind.Bird;
-        this.velocityX[i] = bird ? -dx * inv * 9 : cos * 2.5;
-        this.velocityZ[i] = bird ? -dz * inv * 9 : -sin * 2.5;
-        if(bird){
-          // Aim once at a constant-velocity intercept, never home after launch.
-          const a=speed*speed-81,b=-2*speed*(dx*sin+dz*cos),disc=b*b-4*a*d2;
-          const t=Math.abs(a)<1e-8?-d2/b:disc>=0?(-b-Math.sqrt(disc))/(2*a):-1;
-          if(t>0&&t<6){this.velocityX[i]=(sin*speed*t-dx)/t;this.velocityZ[i]=(cos*speed*t-dz)/t;}
-        }
+        this.velocityX[i] = bird ? -dx * inv * 36 : cos * 7.5;
+        this.velocityZ[i] = bird ? -dz * inv * 36 : -sin * 7.5;
         this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);
         this.motion[i] = 3;
         this.fallStart[i] = time;
         this.nextMovingTime = time + 5;
       }
-      if (this.motion[i] === 3) {
+      if (this.kinds[i] === ObjectKind.Bird && this.motion[i] === 3 && d2 < 0.6 * 0.6)
+        this.motion[i] = 4; // Commit to passing the ducking runner; never reacquire.
+      if (this.motion[i] === 3 || this.motion[i] === 4) {
+        if (this.kinds[i] === ObjectKind.Bird && this.motion[i] === 3) {
+          // Pure pursuit, with enough closing speed even when the runner turns away.
+          const distance = Math.sqrt(d2),
+            velocity = Math.max(Rules.maxSpeed * 1.5, speed * 1.5),
+            factor = distance > 0 ? Math.min(velocity, distance / dt) / distance : 0;
+          this.velocityX[i] = -dx * factor;
+          this.velocityZ[i] = -dz * factor;
+          this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);
+        }
         this.x[i] += this.velocityX[i] * dt;
         this.z[i] += this.velocityZ[i] * dt;
         this.baseY[i] =

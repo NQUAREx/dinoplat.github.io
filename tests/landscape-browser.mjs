@@ -25,7 +25,7 @@ const server = spawn(
 );
 await mkdir("test-results", { recursive: true });
 try {
-  for (const engine of process.argv.includes("--mobile")
+  for (const engine of process.argv.includes("--webkit-only") ? ["webkit"] : process.argv.includes("--mobile")
     ? ["chromium", "webkit"]
     : ["chromium"]) {
     const browser = await (engine === "chromium"
@@ -69,6 +69,15 @@ try {
         await page.evaluate(() => window.__runner.stats().playerOpacity),
         1,
       );
+      // Isolate native gesture/camera controls from the separate live-hazard
+      // checks below. Slow software-GPU round trips must not turn UI waits into
+      // an unattended survival test against continuously homing birds.
+      await page.evaluate(() => {
+        const g = window.__runner.game;
+        g.world.registry.setWeight(0, 0);
+        g.world.active.fill(0);
+        g.landscape.enabled = false;
+      });
       await page.screenshot({ path: `test-results/${engine}-new-home.png` });
       await page.tap("#action");
       await page.waitForFunction(() => window.__runner.game.distance > 1);
@@ -118,6 +127,8 @@ try {
           field = g.landscape,
           places = [];
         r.pause();
+        g.world.registry.setWeight(0, 1);
+        g.landscape.enabled = true;
         for (let biome = 0; biome < 3; biome++) {
           let found;
           for (let z = -300; z <= 300 && !found; z += 12)
@@ -237,6 +248,9 @@ try {
                 g.world.x[i] = g.x;
                 g.world.z[i] = g.z + z;
                 g.world.baseY[i] = g.groundY + (kind === 10 ? 1.05 : 0);
+                g.world.previousX[i] = g.world.x[i];
+                g.world.previousZ[i] = g.world.z[i];
+                g.world.previousBaseY[i] = g.world.baseY[i];
                 g.world.height[i] = 3;
                 g.world.halfX[i] = g.world.halfZ[i] = 0.7;
                 g.world.motion[i] = kind === 10 ? 3 : 0;

@@ -244,8 +244,18 @@ export async function checkShop(context, url, engine) {
       await page.evaluate(() => window.__runner.game.wallet.coins),
       1120,
     );
+    await page.bringToFront();
+    await page.evaluate(() => {
+      const g = window.__runner.game;
+      g.world.registry.setWeight(0, 0);
+      g.world.active.fill(0);
+      g.landscape.enabled = false;
+    });
     await page.tap("#action");
-    await page.waitForFunction(() => window.__runner.audio().musicPlaying);
+    await page.waitForFunction(() => window.__runner.audio().musicPlaying).catch(async error => {
+      error.message += `\nAudio/start state: ${JSON.stringify(await page.evaluate(() => ({audio:window.__runner.audio(), phase:window.__runner.game.phase, hidden:document.hidden})))}`;
+      throw error;
+    });
     await page.evaluate(() => {
       const r = window.__runner;
       r.pause();

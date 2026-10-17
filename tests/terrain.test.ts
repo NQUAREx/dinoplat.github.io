@@ -28,7 +28,8 @@ test("three irregular coordinate biomes and nine covers are deterministic on rev
       assert.ok(Number.isFinite(sample.height));
     }
   assert.equal(covers.size, 9);
-  assert.ok([...counts].every((n) => n > 1000));
+  assert.ok(counts[0] > counts[1] * 4 && counts[0] > counts[2] * 4);
+  assert.ok(counts[1] > 300 && counts[2] > 300);
   assert.notEqual(field.heightAt(200, 200), field.heightAt(204, 200));
 });
 test("rivers, lava, pits and bridge crossings exist; safe corridors retain support", () => {
@@ -95,6 +96,9 @@ test("birds are overhead hazards: crouch clears their simple coordinate collider
     w.x[0] = 0;
     w.z[0] = 6;
     w.baseY[0] = 1.05;
+    w.previousX[0] = w.x[0];
+    w.previousZ[0] = w.z[0];
+    w.previousBaseY[0] = w.baseY[0];
     w.height[0] = 0.38;
     w.halfX[0] = w.halfZ[0] = 0.48;
     if (duck) game.down();

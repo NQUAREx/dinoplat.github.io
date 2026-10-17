@@ -35,6 +35,15 @@ export async function checkPolish(context, url, engine) {
     });
     await page.reload();
     await page.waitForFunction(() => window.__runner?.stats().preview.visible);
+    await page.bringToFront();
+    await page.evaluate(() => {
+      // This fixture measures menu/audio/death animation, not unattended
+      // survival while browser automation waits between UI actions.
+      const g = window.__runner.game;
+      g.landscape.enabled = false;
+      g.world.registry.setWeight(0, 0);
+      g.world.active.fill(0);
+    });
     const tabs = await page
       .locator(".menu-tab")
       .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().top));
@@ -140,12 +149,15 @@ export async function checkPolish(context, url, engine) {
       const r = window.__runner,
         g = r.game,
         w = g.world;
+      if (g.phase !== "running") throw Error(`Impact fixture requires running phase, got ${g.phase}`);
       g.health.lives = 1;
       g.health.immunity = 0;
       g.y = g.previousY = g.velocityY = 0;
       w.active.fill(0);
       w.active[0] = 1;
       w.kinds[0] = 0;
+      w.motion[0] = 0;
+      w.lean[0] = 0;
       w.x[0] = g.x;
       w.z[0] = g.z;
       w.halfX[0] = w.halfZ[0] = 0.4;

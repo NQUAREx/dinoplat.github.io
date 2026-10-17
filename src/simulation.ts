@@ -178,7 +178,9 @@ export class Simulation {
     const midHeading = (this.heading + this.previousHeading) * 0.5;
     this.x -= Math.sin(midHeading) * this.speed * dt;
     this.z += Math.cos(midHeading) * this.speed * dt;
-    const ground = this.landscape.heightAt(this.x, this.z),
+    this.world.update(this.x, this.z);
+    const terrain = this.landscape.heightAt(this.x, this.z),
+      ground = this.world.walkHeightAt(this.x, this.z, terrain),
       surface = this.landscape.surfaceAt(this.x, this.z);
     const support = surface === Surface.Land || surface === Surface.Bridge;
     if (!this.falling) this.groundY = ground;
@@ -201,7 +203,6 @@ export class Simulation {
       this.move(0);
       return;
     }
-    this.world.update(this.x, this.z);
     this.world.step(this.time, dt, this.x, this.z, this.heading,this.speed);
     this.collisions();
     if (!this.hitStopRemaining && this.distance >= this.nextStep) {
@@ -220,37 +221,43 @@ export class Simulation {
       maxZ = Math.max(this.previousZ, this.z);
     for (let i = 0; i < pool.active.length; i++) {
       if (!pool.active[i]) continue;
-      if (pool.kinds[i] === ObjectKind.Bird && pool.motion[i] !== 3) continue;
+      if (pool.kinds[i] === ObjectKind.Bird && pool.motion[i] !== 3 && pool.motion[i] !== 4) continue;
       const obstacleX = pool.collisionX(i),
         obstacleZ = pool.collisionZ(i);
+      const dynamic = pool.motion[i] === 1 || pool.motion[i] === 3 || pool.motion[i] === 4;
+      const oldX = dynamic ? pool.previousX[i] : obstacleX,
+        oldZ = dynamic ? pool.previousZ[i] : obstacleZ,
+        oldBase = dynamic ? pool.previousBaseY[i] : pool.baseY[i];
       // Broad phase uses full render bounds before any registry lookup. The
       // forgiving blocking box below is a subset, never a culling replacement.
       const broadZ = pool.halfZ[i] + Rules.playerRadius;
-      if (obstacleZ < minZ - broadZ || obstacleZ > maxZ + broadZ) continue;
+      if (Math.max(oldZ, obstacleZ) < minZ - broadZ || Math.min(oldZ, obstacleZ) > maxZ + broadZ) continue;
       const definition = pool.registry.get(pool.kinds[i]);
-      if (!definition || (definition.blocking && this.health.immunity > 0))
+      if (!definition || definition.walkable || (definition.blocking && this.health.immunity > 0))
         continue;
       const blocking = definition.blocking;
       const scale = definition.blocking ? Rules.cactusHitScale : 1;
       const radius = blocking ? Rules.blockingRadius : Rules.playerRadius;
       const extentX = pool.halfX[i] * scale + radius,
         extentZ = pool.halfZ[i] * scale + radius;
-      if (obstacleZ < minZ - extentZ || obstacleZ > maxZ + extentZ) continue;
+      if (Math.max(oldZ, obstacleZ) < minZ - extentZ || Math.min(oldZ, obstacleZ) > maxZ + extentZ) continue;
+      const relativeX = this.previousX - oldX, relativeZ = this.previousZ - oldZ,
+        relativeDX = dx - (obstacleX - oldX), relativeDZ = dz - (obstacleZ - oldZ);
       let enter = 0,
         leave = 1;
-      if (Math.abs(dz) < 1e-9) {
-        if (Math.abs(this.previousZ - obstacleZ) >= extentZ) continue;
+      if (Math.abs(relativeDZ) < 1e-9) {
+        if (Math.abs(relativeZ) >= extentZ) continue;
       } else {
-        const a = (obstacleZ - extentZ - this.previousZ) / dz;
-        const b = (obstacleZ + extentZ - this.previousZ) / dz;
+        const a = (-extentZ - relativeZ) / relativeDZ;
+        const b = (extentZ - relativeZ) / relativeDZ;
         enter = Math.max(enter, Math.min(a, b));
         leave = Math.min(leave, Math.max(a, b));
       }
-      if (Math.abs(dx) < 1e-9) {
-        if (Math.abs(this.previousX - obstacleX) >= extentX) continue;
+      if (Math.abs(relativeDX) < 1e-9) {
+        if (Math.abs(relativeX) >= extentX) continue;
       } else {
-        const a = (obstacleX - extentX - this.previousX) / dx,
-          b = (obstacleX + extentX - this.previousX) / dx;
+        const a = (-extentX - relativeX) / relativeDX,
+          b = (extentX - relativeX) / relativeDX;
         enter = Math.max(enter, Math.min(a, b));
         leave = Math.min(leave, Math.max(a, b));
       }
@@ -273,14 +280,16 @@ export class Simulation {
       const bobLeave = animated
         ? this.previousBob + (this.pickupMotion.bob - this.previousBob) * leave
         : 0;
+      const baseEnter = oldBase + (pool.baseY[i] - oldBase) * enter,
+        baseLeave = oldBase + (pool.baseY[i] - oldBase) * leave;
       if (
-        Math.min(yEnter - bobEnter, yLeave - bobLeave) >=
-          pool.baseY[i] + pool.height[i] ||
-        Math.max(topEnter - bobEnter, topLeave - bobLeave) <= pool.baseY[i]
+        Math.min(yEnter - bobEnter - baseEnter, yLeave - bobLeave - baseLeave) >= pool.height[i] ||
+        Math.max(topEnter - bobEnter - baseEnter, topLeave - bobLeave - baseLeave) <= 0
       )
         continue;
       if (definition.blocking) {
         if (this.health.damage()) {
+          if (pool.kinds[i] === ObjectKind.Bird) pool.consume(i);
           this.speed = Rules.startSpeed;
           // Hold the swept contact pose, not a later penetrated/end-of-step pose.
           this.x = this.previousX + dx * enter;

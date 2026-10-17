@@ -327,7 +327,7 @@ export class View {
     this.dinosaurShadow.update(
       this.dinosaur,
       this.lighting,
-      this.ground.surface.heightAt(this.pose.x, this.pose.z),
+      game.world.walkHeightAt(this.pose.x, this.pose.z, this.ground.surface.heightAt(this.pose.x, this.pose.z)),
     );
     const moving =
       game.phase === "running" &&
@@ -411,14 +411,15 @@ export class View {
     );
     for (let i = 0; i < world.active.length; i++) {
       if (!world.active[i]) continue;
-      if (world.kinds[i] === ObjectKind.Bird && world.motion[i] !== 3) continue;
+      if (world.kinds[i] === ObjectKind.Bird && world.motion[i] !== 3 && world.motion[i] !== 4) continue;
       const renderer = this.objectRenderers.get(world.kinds[i]);
       if (!renderer) continue;
-      const x = world.x[i] - this.pose.x,
-        forward = world.z[i] - this.pose.z;
+      const movingObject = world.motion[i] === 3 || world.motion[i] === 4;
+      const x = (movingObject ? world.previousX[i] + (world.x[i] - world.previousX[i]) * alpha : world.x[i]) - this.pose.x,
+        forward = (movingObject ? world.previousZ[i] + (world.z[i] - world.previousZ[i]) * alpha : world.z[i]) - this.pose.z;
       const animated =
         world.registry.get(world.kinds[i])?.animation === "spin-bob";
-      const y = world.baseY[i] + (animated ? this.pickupMotion.bob : 0);
+      const y = (movingObject ? world.previousBaseY[i] + (world.baseY[i] - world.previousBaseY[i]) * alpha : world.baseY[i]) + (animated ? this.pickupMotion.bob : 0);
       const visible = this.visibility.intersects(
         world.collisionX(i) - this.pose.x,
         world.collisionZ(i) - this.pose.z,
@@ -455,7 +456,7 @@ export class View {
         animated ? this.pickupMotion.angle : world.angles[i],
         y + (world.kinds[i] === ObjectKind.Tumbleweed ? 0.45 : 0),
         world.kinds[i] === ObjectKind.Tumbleweed
-          ? game.time * 3
+          ? game.time * 9
           : world.lean[i],
       );
       if (world.kinds[i] === ObjectKind.Bird) {

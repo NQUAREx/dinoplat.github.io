@@ -98,20 +98,19 @@ test("field meshes share the interpolated render origin at negative and million-
         assert.equal(mesh.material.vertexColors, true);
       }
       const positions = ground.surface.geometry.getAttribute("position");
-      const x = positions.getX(0) + ground.surface.anchorX;
-      const z = ground.surface.anchorDistance - positions.getZ(0);
-      const kind = field.surfaceAt(x + 2, z + 2);
-      const drop = positions.getY(0) - field.vertexHeight(x, z);
-      if (kind === Surface.Bridge)
-        assert.ok(Math.abs(drop + 2.4) < 0.00001 || Math.abs(drop + 7) < 0.00001);
-      else
-        assert.ok(Math.abs(drop + (kind === Surface.Pit ? 7 : kind === Surface.Land ? 0 : 2.4)) < 0.00001);
+      const x = (positions.getX(0) + positions.getX(1) + positions.getX(2)) / 3 + ground.surface.anchorX;
+      const z = ground.surface.anchorDistance - (positions.getZ(0) + positions.getZ(1) + positions.getZ(2)) / 3;
+      const kind = field.surfaceAt(x, z);
+      const y = (positions.getY(0) + positions.getY(1) + positions.getY(2)) / 3;
+      const drop = y - field.heightAt(x, z);
+      const depth = kind === Surface.Land ? 0 : field.hazardKindAt(x, z) === Surface.Pit ? 14 : 4.8;
+      assert.ok(Math.abs(drop + depth) < 0.00003);
       assert.equal(ground.mesh.position.y, 0);
     }
   }
   assert.equal(ground.material.isMeshLambertMaterial, true);
   assert.equal(ground.mesh.receiveShadow, true);
-  assert.ok(ground.surface.geometry.index);
+  assert.equal(ground.surface.geometry.index, null, "flat faces need no identity index allocation");
   assert.ok(ground.surface.geometry.drawRange.count / 3 > 56 * 56 * 2);
   ground.dispose();
 });
