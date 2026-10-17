@@ -528,10 +528,14 @@ export class WorldSpawner {
       this.originalHeight[i] * Math.cos(this.lean[i]),
     );
   }
-  step(time: number, dt: number, px: number, pz: number, heading: number, speed=Rules.startSpeed) {
+  step(time: number, dt: number, px: number, pz: number, heading: number, speed=Rules.startSpeed, viewHeading=heading, viewX=px, viewZ=pz) {
     if (!this.landscape?.enabled) return;
     const sin = -Math.sin(heading),
-      cos = Math.cos(heading);
+      cos = Math.cos(heading),
+      facing = Number.isFinite(viewHeading) ? viewHeading : heading,
+      viewSin = -Math.sin(facing), viewCos = Math.cos(facing),
+      cameraX = Number.isFinite(viewX) ? viewX : px,
+      cameraZ = Number.isFinite(viewZ) ? viewZ : pz;
     for (let n = 0; n < this.dynamicCount; n++) {
       const i = this.dynamic[n];
       if (!this.active[i]) continue;
@@ -557,24 +561,52 @@ export class WorldSpawner {
         continue;
       if (this.motion[i] === 0) {
         if (time < this.nextMovingTime) continue;
-        if (d2 > 48 * 48 || d2 < 28 * 28 || dx * sin + dz * cos < -1e-9) continue;
-        const inv = 1 / Math.sqrt(d2),
-          bird = this.kinds[i] === ObjectKind.Bird;
-        this.velocityX[i] = bird ? -dx * inv * 36 : cos * 7.5;
-        this.velocityZ[i] = bird ? -dz * inv * 36 : -sin * 7.5;
+        const bird = this.kinds[i] === ObjectKind.Bird;
+        if (bird) {
+          // 48m gives >1.1s before contact even at 24+18m/s closing speed.
+          if (d2 > 64 * 64 || d2 < 48 * 48) continue;
+          const vx = this.x[i] - cameraX, vz = this.z[i] - cameraZ;
+          const dot = (vx * viewSin + vz * viewCos) / Math.hypot(vx, vz);
+          if (!(dot + Number.EPSILON * 4 >= Math.SQRT1_2)) continue;
+        } else if (d2 > 48 * 48 || d2 < 28 * 28 || dx * sin + dz * cos < -1e-9) continue;
+        const inv = 1 / Math.sqrt(d2);
+        this.velocityX[i] = bird ? -dx * inv * 18 : cos * 7.5;
+        this.velocityZ[i] = bird ? -dz * inv * 18 : -sin * 7.5;
         this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);
         this.motion[i] = 3;
         this.fallStart[i] = time;
         this.nextMovingTime = time + 5;
       }
-      if (this.kinds[i] === ObjectKind.Bird && this.motion[i] === 3 && d2 < 0.6 * 0.6)
-        this.motion[i] = 4; // Commit to passing the ducking runner; never reacquire.
+      if (this.kinds[i] === ObjectKind.Bird && this.motion[i] === 3 && d2 <= 10 * 10) {
+        // Solve |playerVelocity*t - birdOffset| = 18*t once at lock.
+        // Keep the earliest positive intercept within one second; an escaping
+        // runner with no reachable intercept leaves the existing course intact.
+        const vx = sin * speed, vz = cos * speed,
+          a = vx * vx + vz * vz - 18 * 18,
+          b = -2 * (dx * vx + dz * vz),
+          discriminant = b * b - 4 * a * d2;
+        let intercept = Infinity;
+        if (Math.abs(a) < 1e-9) {
+          if (Math.abs(b) > 1e-9 && -d2 / b > 0) intercept = -d2 / b;
+        } else if (discriminant >= 0) {
+          const root = Math.sqrt(discriminant),
+            first = (-b - root) / (2 * a),
+            second = (-b + root) / (2 * a);
+          if (first > 0) intercept = first;
+          if (second > 0 && second < intercept) intercept = second;
+        }
+        if (intercept <= 1) {
+          this.velocityX[i] = vx - dx / intercept;
+          this.velocityZ[i] = vz - dz / intercept;
+          this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);
+        }
+        this.motion[i] = 4; // Fixed fly-through; never reacquire after a dodge.
+      }
       if (this.motion[i] === 3 || this.motion[i] === 4) {
         if (this.kinds[i] === ObjectKind.Bird && this.motion[i] === 3) {
-          // Pure pursuit, with enough closing speed even when the runner turns away.
+          // Track only at range; the last 10m are a dodgeable straight fly-through.
           const distance = Math.sqrt(d2),
-            velocity = Math.max(Rules.maxSpeed * 1.5, speed * 1.5),
-            factor = distance > 0 ? Math.min(velocity, distance / dt) / distance : 0;
+            factor = distance > 0 ? Math.min(18, distance / dt) / distance : 0;
           this.velocityX[i] = -dx * factor;
           this.velocityZ[i] = -dz * factor;
           this.angles[i] = Math.atan2(-this.velocityX[i], this.velocityZ[i]);

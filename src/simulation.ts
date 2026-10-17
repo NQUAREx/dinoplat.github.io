@@ -31,6 +31,9 @@ export class Simulation {
   falling = false;
   fatalCause: Surface = Surface.Land;
   heading = 0;
+  viewHeading = NaN;
+  viewX = NaN;
+  viewZ = NaN;
   previousHeading = 0;
   movingX = 0;
   steering = 0;
@@ -62,6 +65,7 @@ export class Simulation {
     this.x = this.previousX = this.y = this.previousY = 0;
     this.z = this.previousZ = 0;
     this.heading = this.previousHeading = this.movingX = this.steering = 0;
+    this.viewHeading = this.viewX = this.viewZ = NaN;
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
     this.previousTime = this.previousBob = 0;
     this.feedbackTime = this.previousFeedbackTime = this.hitStopRemaining = 0;
@@ -183,6 +187,25 @@ export class Simulation {
       ground = this.world.walkHeightAt(this.x, this.z, terrain),
       surface = this.landscape.surfaceAt(this.x, this.z);
     const support = surface === Surface.Land || surface === Surface.Bridge;
+    // Only authored rocky ledges block climbing. Ordinary hills, regardless of
+    // elevation, remain traversable. Jumping feet above the ramp clear it.
+    if (support && !this.falling && this.health.immunity <= 0) {
+      const travel = Math.hypot(this.x - this.previousX, this.z - this.previousZ),
+        ledge = this.landscape.ledgeHeightAt(this.x, this.z),
+        oldLedge = ledge > 0.12 ? this.landscape.ledgeHeightAt(this.previousX, this.previousZ) : ledge;
+      if (travel > 1e-9 && ledge > 0.12 && ledge - oldLedge > travel * 0.28 &&
+          (!airborne || feet < ground + 0.06) && this.health.damage()) {
+        // Hold the last supported pose, not the top of a face the player failed
+        // to jump. Ordinary hit-stop/immunity/death listeners remain shared.
+        this.x = this.previousX; this.z = this.previousZ;
+        this.distance = this.previousDistance;
+        this.y = this.previousY; this.groundY = this.previousGroundY;
+        this.speed = Rules.startSpeed;
+        this.hitStopRemaining = Rules.hitStopSeconds;
+        this.move(0);
+        return;
+      }
+    }
     if (!this.falling) this.groundY = ground;
     if (!airborne && support) {
       this.y = 0;
@@ -203,7 +226,10 @@ export class Simulation {
       this.move(0);
       return;
     }
-    this.world.step(this.time, dt, this.x, this.z, this.heading,this.speed);
+    this.world.step(this.time, dt, this.x, this.z, this.heading, this.speed,
+      Number.isFinite(this.viewHeading) ? this.viewHeading : this.heading,
+      Number.isFinite(this.viewX) ? this.viewX : this.x,
+      Number.isFinite(this.viewZ) ? this.viewZ : this.z);
     this.collisions();
     if (!this.hitStopRemaining && this.distance >= this.nextStep) {
       this.nextStep += Rules.stepStride;

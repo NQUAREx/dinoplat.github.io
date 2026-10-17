@@ -21,6 +21,9 @@ export interface CameraPose {
   targetZ: number;
   fov: number;
 }
+export interface HeightSampler {
+  heightAt(x: number, z: number): number;
+}
 
 /** Event-driven camera extension point; allocations happen only at construction. */
 export class CameraRig {
@@ -41,6 +44,7 @@ export class CameraRig {
   private shakeAge = 0;
   private walkingBlend = 0;
   heading = 0;
+  terrainPitch = 0;
   get followDelay() {
     return Tuning.camera.followDelay;
   }
@@ -110,6 +114,9 @@ export class CameraRig {
     playerY = 0,
     crouch = 0,
     groundY = 0,
+    terrain?: HeightSampler,
+    worldX = 0,
+    worldZ = 0,
   ) {
     this.heading +=
       (heading - this.heading) *
@@ -166,6 +173,16 @@ export class CameraRig {
         : 0;
     const sin = Math.sin(this.heading),
       cos = Math.cos(this.heading);
+    // Probe actual terrain along the delayed camera direction, not jump/bob
+    // height. Look ahead before climbing, then ease over crests and descents.
+    const ahead = Tuning.camera.slopeAhead, behind = Tuning.camera.slopeBehind;
+    const grade = terrain
+      ? (terrain.heightAt(worldX - sin * ahead, worldZ + cos * ahead) -
+         terrain.heightAt(worldX + sin * behind, worldZ - cos * behind)) / (ahead + behind)
+      : 0;
+    const targetPitch = Math.max(-Tuning.camera.slopeDown, Math.min(Tuning.camera.slopeUp, Math.atan(grade)));
+    this.terrainPitch += (targetPitch - this.terrainPitch) * (1 - Math.exp(-Math.max(0, dt) / Tuning.camera.slopeDelay));
+    const pitchSin = Math.sin(this.terrainPitch), pitchCos = Math.cos(this.terrainPitch);
     const x = p.offsetX + localPlayerX * 0.75;
     const eye =
       Tuning.camera.frontEye +
@@ -177,18 +194,24 @@ export class CameraRig {
       eye,
       -cos * 0.05 - shake * sin * 0.35 * frontFactor,
     );
-    this.look.set(-sin * 10, eye - 0.12, -cos * 10);
+    if (terrain) this.frontPosition.y = Math.max(this.frontPosition.y,
+      terrain.heightAt(worldX + this.frontPosition.x, worldZ - this.frontPosition.z) + 0.2);
+    this.look.set(-sin * 10, eye - 0.12 + Math.tan(this.terrainPitch) * 10, -cos * 10);
     this.rotationMatrix.lookAt(this.frontPosition, this.look, this.camera.up);
     this.frontRotation.setFromRotationMatrix(this.rotationMatrix);
+    const slopeDistance = p.distance * pitchCos + p.height * pitchSin;
     this.rearPosition.set(
-      (x + (bob * 0.25 + shake) * rearFactor) * cos + p.distance * sin,
-      p.height + groundY + bob * rearFactor,
-      p.distance * cos - (x + (bob * 0.25 + shake) * rearFactor) * sin,
+      (x + (bob * 0.25 + shake) * rearFactor) * cos + slopeDistance * sin,
+      p.height * pitchCos - p.distance * pitchSin + groundY + bob * rearFactor,
+      slopeDistance * cos - (x + (bob * 0.25 + shake) * rearFactor) * sin,
     );
+    if (terrain) this.rearPosition.y = Math.max(this.rearPosition.y,
+      terrain.heightAt(worldX + this.rearPosition.x, worldZ - this.rearPosition.z) + Tuning.camera.terrainClearance);
+    const targetDistance = p.targetZ * pitchCos + p.targetY * pitchSin;
     this.look.set(
-      x * cos + p.targetZ * sin,
-      p.targetY + groundY,
-      p.targetZ * cos - x * sin,
+      x * cos + targetDistance * sin,
+      p.targetY * pitchCos - p.targetZ * pitchSin + groundY,
+      targetDistance * cos - x * sin,
     );
     this.rotationMatrix.lookAt(this.rearPosition, this.look, this.camera.up);
     this.rearRotation.setFromRotationMatrix(this.rotationMatrix);
@@ -197,6 +220,8 @@ export class CameraRig {
       this.frontPosition,
       viewBlend,
     );
+    if (terrain) this.camera.position.y = Math.max(this.camera.position.y,
+      terrain.heightAt(worldX + this.camera.position.x, worldZ - this.camera.position.z) + 0.2);
     this.camera.quaternion.slerpQuaternions(
       this.rearRotation,
       this.frontRotation,
@@ -214,6 +239,7 @@ export class CameraRig {
     this.shakeAge = 0;
     this.walkingBlend = 0;
     this.heading = 0;
+    this.terrainPitch = 0;
     this.modeValue = this.modeFrom = this.mode ? 1 : 0;
     this.modeTime = this.transitionSeconds;
     this.setPose(

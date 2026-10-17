@@ -118,6 +118,12 @@ const LIMITS: Record<string, [number, number, number]> = {
   "landscape.biomeSize": [32, 200, 1],
   "landscape.fallChance": [0, .3, .01],
   "landscape.birdChance": [0, .15, .01],
+  "camera.slopeAhead": [4, 30, 1],
+  "camera.slopeBehind": [2, 16, 1],
+  "camera.slopeDelay": [0.1, 1.5, 0.05],
+  "camera.slopeUp": [0, 1.2, 0.05],
+  "camera.slopeDown": [0, 0.9, 0.05],
+  "camera.terrainClearance": [0.3, 4, 0.1],
 };
 
 /** Validated live bindings: no frame-loop reflection and no saved tuning values. */

@@ -70,6 +70,8 @@ test("walking follows actual hills and an unsupported fall is fatal even with im
       if (game.landscape.surfaceAt(x + 2, z + 2) === Surface.Pit) {
         game.x = game.previousX = x + 2;
         game.z = game.previousZ = z + 2;
+        game.groundY = game.previousGroundY = game.landscape.heightAt(game.x, game.z);
+        game.y = game.previousY = game.velocityY = 0;
         found = true;
       }
     }
@@ -110,11 +112,11 @@ test("birds are overhead hazards: crouch clears their simple coordinate collider
 test("incoming birds intercept a running target instead of its old position",()=>{
   const game=new Simulation(1979),w=game.world;
   const i=w.active.findIndex((active,n)=>!!active&&w.kinds[n]===ObjectKind.Bird);
-  assert.ok(i>=0);const px=w.x[i]-3,pz=w.z[i]-40,speed=24;
+  assert.ok(i>=0);const px=w.x[i]-3,pz=w.z[i]-56,speed=24;
   w.active.fill(0);w.active[i]=1;let closest=Infinity;
-  for(let frame=0;frame<240;frame++){
+  for(let frame=0;frame<360;frame++){
     const time=frame/120;w.step(time,STEP,px,pz+speed*time,0,speed);
     closest=Math.min(closest,Math.hypot(w.x[i]-px,w.z[i]-(pz+speed*(time+STEP))));
   }
-  assert.ok(closest<.3,`predicted encounter distance ${closest}`);
+  assert.ok(closest<.48*.65+.22,`encounter must enter the simple collider, distance ${closest}`);
 });

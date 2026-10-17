@@ -183,6 +183,32 @@ try {
           path: `test-results/${engine}-biome-${place.biome}.png`,
         });
       }
+      const uphill = await page.evaluate(() => {
+        const r = window.__runner, g = r.game, f = g.landscape;
+        r.pause();
+        let place;
+        for (let z = -512; z <= 512 && !place; z += 16)
+          for (let x = -512; x <= 512 && !place; x += 16) {
+            const grade = (f.heightAt(x, z + 12) - f.heightAt(x, z - 6)) / 18;
+            if (grade > 0.8 && f.supportAt(x, z) && f.ledgeHeightAt(x, z) < 0.01) place = { x, z, grade };
+          }
+        if (!place) throw Error("No natural uphill camera fixture found");
+        g.x = g.previousX = place.x; g.z = g.previousZ = place.z;
+        g.groundY = g.previousGroundY = f.heightAt(g.x, g.z);
+        g.y = g.previousY = 0; g.heading = g.previousHeading = 0;
+        g.world.active.fill(0); g.phase = "paused";
+        r.camera.firstPerson = false; r.camera.reset();
+        for (let i = 0; i < 180; i++) r.camera.update(g.distance, 0, 1 / 60, false, 0, g.groundY, 0, g.groundY, f, g.x, g.z);
+        r.render();
+        // Pure pitch/forward-Y from quaternion, no THREE object allocation.
+        const q = r.camera.camera.quaternion;
+        return { ...place, pitch: r.camera.terrainPitch, forwardY: 2 * (q.w * q.x - q.y * q.z), viewHeading: g.viewHeading, cameraX: g.viewX, cameraZ: g.viewZ };
+      });
+      assert.ok(uphill.pitch > 0.6);
+      assert.ok(uphill.forwardY > 0, "camera looks up the hill in the actual renderer");
+      assert.ok(Number.isFinite(uphill.viewHeading) && Number.isFinite(uphill.cameraX) && Number.isFinite(uphill.cameraZ));
+      report[`${engine}-uphill-camera`] = uphill;
+      await page.screenshot({path: `test-results/${engine}-uphill-camera.png`});
       const hazards = await page.evaluate(() => {
         const r = window.__runner,
           g = r.game;

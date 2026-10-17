@@ -19,30 +19,49 @@ function moving(kind: ObjectKind) {
   return { world, slot };
 }
 
-test("birds launch across the entire front hemisphere and track a turning runner", () => {
-  for (const angle of [-90, -75, 0, 75, 90]) {
+test("bird launch cone uses actual camera origin and facing, including both 45 degree edges", () => {
+  for (const facing of [0, 1.2, -2.4, 8]) for (const angle of [-180, -90, -45.001, -45, -30, 0, 30, 45, 45.001, 90, 180]) {
     const { world: w, slot: i } = moving(ObjectKind.Bird);
-    w.x[i] = Math.sin(angle * Math.PI / 180) * 40;
-    w.z[i] = Math.cos(angle * Math.PI / 180) * 40;
-    let x = 0, z = 0, closest = Infinity;
-    for (let tick = 0; tick < 720; tick++) {
-      const heading = tick / 120 * 1.6;
-      x -= Math.sin(heading) * 24 / 120;
-      z += Math.cos(heading) * 24 / 120;
-      // Launch at the origin so exactly lateral endpoints are included.
-      w.step(tick / 120, 1 / 120, tick ? x : 0, tick ? z : 0, tick ? heading : 0, 24);
-      assert.ok(w.motion[i] === 3 || w.motion[i] === 4);
-      closest = Math.min(closest, Math.hypot(w.x[i] - x, w.z[i] - z));
-    }
-    const contactRadius = 0.48 * Rules.cactusHitScale + Rules.blockingRadius;
-    assert.ok(closest < contactRadius, `${angle} degrees: ${closest}`);
+    const cameraX = Math.sin(facing) * 12, cameraZ = -Math.cos(facing) * 12;
+    const bearing = facing + angle * Math.PI / 180;
+    const offset = angle * Math.PI / 180;
+    const range = 12 * Math.cos(offset) + Math.sqrt(56 ** 2 - (12 * Math.sin(offset)) ** 2);
+    w.x[i] = cameraX - Math.sin(bearing) * range;
+    w.z[i] = cameraZ + Math.cos(bearing) * range;
+    // Dino faces the candidate even when the camera cannot see it.
+    const heading = Math.atan2(-w.x[i], w.z[i]);
+    w.step(0, STEP, 0, 0, heading, 24, facing, cameraX, cameraZ);
+    assert.equal(w.motion[i], Math.abs(angle) <= 45 ? 3 : 0, `facing=${facing}, angle=${angle}`);
+    if (w.motion[i] === 3)
+      assert.ok(Math.abs(Math.hypot(w.x[i] - w.previousX[i], w.z[i] - w.previousZ[i]) / STEP - 18) < 1e-5);
+  }
+  // A player-relative angle outside 45 degrees is visible from the rear camera.
+  const { world: w, slot: i } = moving(ObjectKind.Bird);
+  w.x[i] = 40; w.z[i] = 35;
+  w.step(0, STEP, 0, 0, Math.PI, 24, 0, 0, -12);
+  assert.equal(w.motion[i], 3);
+});
+
+test("bird launch distance is player-relative and omitted/NaN camera inputs fall back", () => {
+  for (const distance of [47.99, 48, 56, 64, 64.01]) {
+    const { world: w, slot: i } = moving(ObjectKind.Bird);
+    w.x[i] = 0; w.z[i] = distance;
+    w.step(0, STEP, 0, 0, 0, 24, 0, 0, -12);
+    assert.equal(w.motion[i], distance >= 48 && distance <= 64 ? 3 : 0);
+  }
+  for (const invalid of [false, true]) {
+    const { world: w, slot: i } = moving(ObjectKind.Bird);
+    w.x[i] = -56; w.z[i] = 0;
+    if (invalid) w.step(0, STEP, 0, 0, Math.PI / 2, 24, NaN, NaN, NaN);
+    else w.step(0, STEP, 0, 0, Math.PI / 2, 24);
+    assert.equal(w.motion[i], 3);
   }
 });
 
 test("rear birds wait; tumbleweed moves 7.5m/s and records its previous collider", () => {
   const rear = moving(ObjectKind.Bird);
   rear.world.x[rear.slot] = 0;
-  rear.world.z[rear.slot] = -40;
+  rear.world.z[rear.slot] = -56;
   rear.world.step(0, 1 / 120, 0, 0, 0, 24);
   assert.equal(rear.world.motion[rear.slot], 0);
   const { world: w, slot: i } = moving(ObjectKind.Tumbleweed);
@@ -83,16 +102,16 @@ test("rocks/logs offer indexed smooth absolute support without pickup or damage 
 
 test("bird commits full velocity on encounter and never follows after a duck", () => {
   const { world: w, slot: i } = moving(ObjectKind.Bird);
-  w.x[i] = 0; w.z[i] = 40;
+  w.x[i] = 0; w.z[i] = 56;
   w.step(0, 1 / 120, 0, 0, 0, 24);
   w.x[i] = 0; w.z[i] = 0.5;
   w.step(1, 1 / 120, 0, 0, 0, 24);
   assert.equal(w.motion[i], 4);
-  assert.ok(Math.abs(w.z[i] - 0.2) < 1e-6);
+  assert.ok(Math.abs(w.z[i] - 0.35) < 1e-6);
   for (let tick = 1; tick < 120; tick++) w.step(1 + tick / 120, 1 / 120, 10, 10, 0, 24);
   assert.equal(w.motion[i], 4);
   assert.equal(w.x[i], 0);
-  assert.ok(Math.abs(w.z[i] - (0.5 - 36)) < 1e-5);
+  assert.ok(Math.abs(w.z[i] - (0.5 - 18)) < 1e-5);
   w.step(11, 1 / 120, 0, 0, 0, 24);
   assert.equal(w.active[i], 0);
 });
@@ -171,6 +190,7 @@ function flatSimulation(kind: ObjectKind) {
   const game = new Simulation(1979);
   // Keep enabled: world dynamics and previous-collider snapshots still execute.
   game.landscape.vertexHeight = () => 0;
+  if (kind === ObjectKind.Bird) game.landscape.ledgeHeightAt = () => 0;
   game.landscape.hazardAt = () => -1;
   game.reset(1979);
   const w = game.world;
@@ -191,20 +211,20 @@ function flatSimulation(kind: ObjectKind) {
   return { game, w, slot };
 }
 
-test("simulation: natural birds hit standing turning runners and timed ducks clear the full flight", () => {
-  for (const angle of [-80, 80]) for (const duck of [false, true]) {
+test("simulation: natural birds hit standing runners and timed ducks clear the full flight", () => {
+  for (const angle of [-45, 0, 45]) for (const duck of [false, true]) {
     const { game, w, slot: i } = flatSimulation(ObjectKind.Bird);
-    w.x[i] = w.previousX[i] = Math.sin(angle * Math.PI / 180) * 40;
-    w.z[i] = w.previousZ[i] = Math.cos(angle * Math.PI / 180) * 40;
+    w.x[i] = w.previousX[i] = Math.sin(angle * Math.PI / 180) * 56;
+    w.z[i] = w.previousZ[i] = Math.cos(angle * Math.PI / 180) * 56;
     w.baseY[i] = w.previousBaseY[i] = 1.05;
     game.distance = 1500; // Real speed calculation reaches its 24m/s cap.
-    game.move(angle > 0 ? -1 : 1);
+    game.heading = game.previousHeading = -angle * Math.PI / 180;
     let ducked = false, passed = false;
     for (let tick = 0; tick < 1200; tick++) {
       const dx = w.x[i] - game.x, dz = w.z[i] - game.z;
       const distance = Math.hypot(dx, dz);
-      const closingSpeed = 36 + 24 * (-Math.sin(game.heading) * dx + Math.cos(game.heading) * dz) / distance;
-      if (duck && !ducked && w.motion[i] === 3 && distance / closingSpeed < 0.4) {
+      const closingSpeed = 18 + 24 * (-Math.sin(game.heading) * dx + Math.cos(game.heading) * dz) / distance;
+      if (duck && !ducked && (w.motion[i] === 3 || w.motion[i] === 4) && distance / closingSpeed < 0.4) {
         game.down(); ducked = true;
       }
       game.step(STEP);
@@ -227,7 +247,7 @@ test("simulation: natural birds hit standing turning runners and timed ducks cle
 test("simulation: relative bird sweep crosses the runner between disjoint frame endpoints", () => {
   const { game, w, slot: i } = flatSimulation(ObjectKind.Bird);
   // Launch naturally to establish full forward velocity, then exercise a fly-through.
-  w.x[i] = 0; w.z[i] = 40;
+  w.x[i] = 0; w.z[i] = 56;
   w.step(0, STEP, 0, 0, 0, 24);
   w.motion[i] = 4;
   w.x[i] = w.previousX[i] = 0;
@@ -235,12 +255,97 @@ test("simulation: relative bird sweep crosses the runner between disjoint frame 
   w.baseY[i] = w.previousBaseY[i] = 1.05;
   const extent = w.halfZ[i] * Rules.cactusHitScale + Rules.blockingRadius;
   assert.ok(w.z[i] > extent);
-  game.step(1 / 20);
+  // At 18m/s a 100ms sweep still crosses both separated collider endpoints.
+  game.step(1 / 10);
   assert.ok(w.z[i] < -extent, "final collider also lies outside the player endpoint");
   assert.equal(game.health.lives, 2);
   assert.equal(w.active[i], 0);
   assert.equal(game.hitStopRemaining, Rules.hitStopSeconds);
-  assert.ok(game.z > 0 && game.z < Rules.startSpeed / 20, "impact clamps within the tick");
+  assert.ok(game.z > 0 && game.z < Rules.startSpeed / 10, "impact clamps within the tick");
+});
+
+test("simulation: fastest head-on approach gives 1.1–1.6 seconds of warning", (t) => {
+  for (const distance of [48, 64]) {
+    const { game, w, slot: i } = flatSimulation(ObjectKind.Bird);
+    w.x[i] = w.previousX[i] = 0;
+    w.z[i] = w.previousZ[i] = distance;
+    w.baseY[i] = w.previousBaseY[i] = 1.05;
+    game.distance = 1500;
+    // Launch at the exact band edge before the runner's first movement tick.
+    w.step(0, 0, 0, 0, 0, 24);
+    assert.equal(w.motion[i], 3);
+    let ticks = 0;
+    while (game.health.lives === 3 && ticks < 240) {
+      game.step(STEP); ticks++;
+      if (ticks === 1) assert.equal(w.motion[i], 3);
+    }
+    const warning = ticks * STEP;
+    t.diagnostic(`${distance}m: contact after ${warning.toFixed(3)}s`);
+    assert.equal(game.health.lives, 2);
+    assert.ok(warning >= 1.1 && warning <= 1.6, `${distance}m: ${warning}s`);
+  }
+});
+
+test("bird lock predicts a steady 24m/s runner with a 3m lateral launch offset", (t) => {
+  const { world: w, slot: i } = moving(ObjectKind.Bird);
+  w.x[i] = 3; w.z[i] = 56;
+  let closest = Infinity, locked = false, velocityX = 0, velocityZ = 0;
+  for (let tick = 0; tick < 360; tick++) {
+    const z = tick * 24 * STEP;
+    w.step(tick * STEP, STEP, 0, z, 0, 24);
+    closest = Math.min(closest, Math.hypot(w.x[i], w.z[i] - z));
+    if (w.motion[i] === 4) {
+      const vx = (w.x[i] - w.previousX[i]) / STEP;
+      const vz = (w.z[i] - w.previousZ[i]) / STEP;
+      if (!locked) {
+        locked = true; velocityX = vx; velocityZ = vz;
+        assert.ok(Math.abs(Math.hypot(vx, vz) - 18) < 1e-5);
+      }
+      assert.ok(Math.abs(vx - velocityX) < 1e-8);
+      assert.ok(Math.abs(vz - velocityZ) < 1e-8);
+    }
+  }
+  assert.ok(locked);
+  const contactRadius = 0.48 * Rules.cactusHitScale + Rules.blockingRadius;
+  t.diagnostic(`3m offset: closest=${closest.toFixed(3)}m, collider=${contactRadius.toFixed(3)}m`);
+  assert.ok(closest < contactRadius);
+
+  const { game, w: world, slot } = flatSimulation(ObjectKind.Bird);
+  world.x[slot] = world.previousX[slot] = game.x + 3;
+  world.z[slot] = world.previousZ[slot] = game.z + 56;
+  world.baseY[slot] = world.previousBaseY[slot] = 1.05;
+  game.distance = 1500;
+  for (let tick = 0; tick < 360 && game.health.lives === 3; tick++) game.step(STEP);
+  assert.equal(game.health.lives, 2, "steady standing runner must take the bird hit");
+  assert.equal(world.active[slot], 0);
+});
+
+test("simulation: a late legal turn sidesteps a locked bird without ducking", () => {
+  for (const direction of [-1, 1]) {
+    const { game, w, slot: i } = flatSimulation(ObjectKind.Bird);
+    w.x[i] = w.previousX[i] = 0;
+    w.z[i] = w.previousZ[i] = 56;
+    w.baseY[i] = w.previousBaseY[i] = 1.05;
+    game.distance = 1500;
+    let locked = false, lockZ = 0, lockTime = 0;
+    for (let tick = 0; tick < 1200; tick++) {
+      game.step(STEP);
+      if (!locked && w.motion[i] === 4) {
+        locked = true; lockZ = w.z[i]; lockTime = game.time;
+        assert.ok(Math.hypot(w.x[i] - game.x, w.z[i] - game.z) > 9);
+        game.move(direction);
+      }
+      if (locked && w.active[i]) {
+        assert.equal(w.motion[i], 4);
+        assert.equal(w.x[i], 0, "locked flight cannot chase lateral movement");
+        assert.ok(Math.abs(w.z[i] - (lockZ - 18 * (game.time - lockTime))) < 1e-5);
+      }
+      assert.equal(game.health.lives, 3);
+    }
+    assert.ok(locked);
+    assert.equal(game.crouch, 0);
+    assert.equal(w.active[i], 0, "complete flight expires without reacquiring");
+  }
 });
 
 test("simulation: cached natural rock supports a smooth walk-over without gameplay rewards or damage", () => {

@@ -51,6 +51,7 @@ export class View {
     "(prefers-reduced-motion: reduce)",
   ).matches;
   private readonly feedbackAnchor = new THREE.Vector3();
+  private readonly cameraForward = new THREE.Vector3();
   private readonly cactusMaterial = new THREE.MeshLambertMaterial({
     vertexColors: true,
   });
@@ -349,6 +350,9 @@ export class View {
       this.dinosaur.mesh.position.y,
       game.previousCrouch + (game.crouch - game.previousCrouch) * alpha,
       game.previousGroundY + (game.groundY - game.previousGroundY) * alpha,
+      game.landscape,
+      this.pose.x,
+      this.pose.z,
     );
     this.dinosaur.mesh.visible = this.rig.avatarVisible;
     if (!this.rig.avatarVisible) this.dinosaurShadow.mesh.visible = false;
@@ -357,13 +361,10 @@ export class View {
       game.previousGroundY + (game.groundY - game.previousGroundY) * alpha;
     this.lighting.key.position.y += groundY;
     this.lighting.key.target.position.y += groundY;
-    const minCameraY =
-      game.landscape.heightAt(
-        this.pose.x + this.rig.camera.position.x,
-        this.pose.z - this.rig.camera.position.z,
-      ) + 1.2;
-    if (this.rig.camera.position.y < minCameraY)
-      this.rig.camera.position.y = minCameraY;
+    this.rig.camera.getWorldDirection(this.cameraForward);
+    game.viewHeading = Math.atan2(-this.cameraForward.x, -this.cameraForward.z);
+    game.viewX = this.pose.x + this.rig.camera.position.x;
+    game.viewZ = this.pose.z - this.rig.camera.position.z;
     this.feedbackAnchor
       .set(0, this.dinosaur.mesh.position.y + 1.95 - game.crouch * 0.55, 0)
       .project(this.rig.camera);
