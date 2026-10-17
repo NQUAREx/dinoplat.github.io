@@ -73,6 +73,24 @@ test("rear birds wait; tumbleweed moves 7.5m/s and records its previous collider
   assert.ok(Math.abs(w.x[i] - 7.5 / 120) < 1e-8);
 });
 
+test("committed bird wings clear crouched runners on steep uphill and downhill passes", () => {
+  for (const grade of [-1.6, -0.6, 0.6, 1.6]) {
+    const { world: w, slot: i } = moving(ObjectKind.Bird);
+    w.landscape!.heightAt = (_x, z) => grade * z;
+    w.x[i] = 0; w.z[i] = 8; w.motion[i] = 3;
+    w.fallStart[i] = 0;
+    w.step(0, STEP, 0, 0, 0, 24);
+    w.z[i] = -0.9;
+    w.previousX[i] = 0; w.previousZ[i] = -0.9;
+    w.step(1, STEP, 0, 0, 0, 24);
+    assert.ok(w.baseY[i] >= Rules.duckBodyHeight + 0.39, `grade ${grade}`);
+    assert.equal(w.motion[i], 4, "clearance does not reacquire horizontal target");
+    assert.ok(Math.abs((w.z[i] + 0.9) / STEP + 18) < 1e-8);
+    if (grade > 0)
+      assert.ok(w.baseY[i] < Rules.playerBodyHeight, "standing uphill runner still meets bird");
+  }
+});
+
 test("rocks/logs offer indexed smooth absolute support without pickup or damage metadata", () => {
   const w = new WorldSpawner(undefined, undefined, new LandscapeField(1979));
   w.reset(1979); w.update(0, 0);

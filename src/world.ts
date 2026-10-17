@@ -613,9 +613,14 @@ export class WorldSpawner {
         }
         this.x[i] += this.velocityX[i] * dt;
         this.z[i] += this.velocityZ[i] * dt;
-        this.baseY[i] =
-          this.landscape.heightAt(this.x[i], this.z[i]) +
-          (this.kinds[i] === ObjectKind.Bird ? 1.05 : 0);
+        let ground = this.landscape.heightAt(this.x[i], this.z[i]);
+        // The wing box reaches behind the bird's centre. On an uphill pass,
+        // sampling only that centre lets its rear wing sweep into a crouching
+        // runner. Clear the runner's supported ground throughout the encounter;
+        // jumps do not raise this envelope and horizontal flight stays committed.
+        if (this.kinds[i] === ObjectKind.Bird && d2 < 3 * 3)
+          ground = Math.max(ground, this.walkHeightAt(px, pz, this.landscape.heightAt(px, pz)));
+        this.baseY[i] = ground + (this.kinds[i] === ObjectKind.Bird ? 1.05 : 0);
         if (time - this.fallStart[i] > 9 || d2 > 75 * 75) this.active[i] = 0;
       }
     }
