@@ -116,7 +116,7 @@ const LIMITS: Record<string, [number, number, number]> = {
   "audio.effects": [0, 1.5, 0.01],
   "landscape.heightScale": [0.2, 2, 0.1],
   "landscape.biomeSize": [32, 200, 1],
-  "landscape.fallChance": [0, .3, .01],
+  "landscape.fallChance": [0, .6, .01],
   "landscape.birdChance": [0, .15, .01],
   "camera.slopeAhead": [4, 30, 1],
   "camera.slopeBehind": [2, 16, 1],

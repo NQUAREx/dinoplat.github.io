@@ -304,6 +304,30 @@ try {
       assert.ok(memory.after.textures <= 4);
       report[`${engine}-memory`] = memory;
       assert.deepEqual(errors, []);
+      const dayPage = await context.newPage();
+      try {
+        // No ?time=9: production defaults must advance without a debug freeze.
+        await dayPage.goto(`${url}/?debug`);
+        await dayPage.waitForFunction(() => window.__runner && document.querySelector("#app").dataset.phase === "ready");
+        await dayPage.evaluate(() => {
+          const g = window.__runner.game;
+          g.landscape.enabled = false; g.world.registry.setWeight(0, 0); g.world.active.fill(0);
+        });
+        await dayPage.tap("#action");
+        await dayPage.waitForFunction(() => window.__runner.game.time > 0.4 && window.__runner.lighting.cycle.hours > 9.01);
+        const day = await dayPage.evaluate(() => {
+          const r = window.__runner, l = r.lighting;
+          r.pause();
+          const activeHours = l.cycle.hours, time = r.game.time, before = l.fogColour.getHex();
+          l.update(180); const night = l.fogColour.getHex(), source = l.source;
+          l.update(360); const wrapped = l.fogColour.getHex();
+          return {activeHours, time, automatic:l.cycle.automatic, seconds:l.cycle.cycleSeconds, before, night, source, wrapped};
+        });
+        assert.equal(day.automatic, true); assert.equal(day.seconds, 360);
+        assert.ok(day.activeHours > 9); assert.notEqual(day.before, day.night);
+        assert.equal(day.source, "moon");
+        report[`${engine}-automatic-day`] = day;
+      } finally { await dayPage.close(); }
       report[`${engine}-expansion`] = await checkExpansion(
         browser,
         url,

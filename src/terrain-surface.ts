@@ -223,6 +223,7 @@ export class TerrainSurface {
         this.ground.wall(this.hazard, a, b, 0, depth, tint, pit ? 1 : 0);
     }
     if (!pit) (kind === Surface.Lava ? this.lava : this.water).polygon(this.hazard, hazardCount, -0.9, kind === Surface.Lava ? 10 : 9);
+    if (pit) return; // Dry ravines have no support deck: jump or go around.
     const deckCount = clip(this.hazard, hazardCount, this.deck, 4, 1);
     if (deckCount < 3) return;
     // Plank direction follows the crossing, not the terrain's storage axes.

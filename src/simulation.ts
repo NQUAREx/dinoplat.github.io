@@ -38,6 +38,8 @@ export class Simulation {
   movingX = 0;
   steering = 0;
   velocityY = 0;
+  private groundVelocity = 0;
+  private jumpActive = false;
   diving = false;
   crouch = 0;
   previousCrouch = 0;
@@ -67,6 +69,8 @@ export class Simulation {
     this.heading = this.previousHeading = this.movingX = this.steering = 0;
     this.viewHeading = this.viewX = this.viewZ = NaN;
     this.velocityY = this.distance = this.previousDistance = this.time = 0;
+    this.groundVelocity = 0;
+    this.jumpActive = false;
     this.previousTime = this.previousBob = 0;
     this.feedbackTime = this.previousFeedbackTime = this.hitStopRemaining = 0;
     this.deathTime = this.previousDeathTime = 0;
@@ -96,10 +100,14 @@ export class Simulation {
       this.phase !== "running" ||
       this.hitStopRemaining ||
       this.y !== 0 ||
+      this.jumpActive ||
       this.falling
     )
       return;
-    this.velocityY = Rules.jumpSpeed;
+    // Running uphill already has vertical momentum. Preserve it at take-off,
+    // otherwise the rising surface catches the feet immediately after a jump.
+    this.velocityY = Rules.jumpSpeed + this.groundVelocity;
+    this.jumpActive = true;
     this.diving = false;
     this.crouch = this.previousCrouch = this.crouchRemaining = 0;
     this.events.emit(GameEvent.Jump);
@@ -112,7 +120,7 @@ export class Simulation {
   }
   down() {
     if (this.phase !== "running" || this.hitStopRemaining) return;
-    if (this.y > 0 || this.velocityY > 0) {
+    if (this.y > 0 || this.velocityY > 0 || this.jumpActive) {
       this.velocityY = Math.min(this.velocityY, -Rules.diveSpeed);
       if (!this.diving) this.events.emit(GameEvent.Dive);
       this.diving = true;
@@ -165,7 +173,7 @@ export class Simulation {
     this.heading -= this.steering * Rules.turnSpeed * dt;
     this.movingX = -Math.sin(this.heading);
     const airborne =
-      this.y > 0 || this.velocityY > 0 || this.diving || this.falling;
+      this.y > 0 || this.velocityY > 0 || this.jumpActive || this.diving || this.falling;
     let feet = this.groundY + this.y;
     if (airborne) {
       feet += this.velocityY * dt - (Rules.gravity * dt * dt) / 2;
@@ -201,6 +209,7 @@ export class Simulation {
         this.distance = this.previousDistance;
         this.y = this.previousY; this.groundY = this.previousGroundY;
         this.speed = Rules.startSpeed;
+        this.groundVelocity = 0;
         this.hitStopRemaining = Rules.hitStopSeconds;
         this.move(0);
         return;
@@ -209,11 +218,14 @@ export class Simulation {
     if (!this.falling) this.groundY = ground;
     if (!airborne && support) {
       this.y = 0;
+      this.groundVelocity = dt > 0 ? (this.groundY - this.previousGroundY) / dt : 0;
     } else {
+      this.groundVelocity = 0;
       this.y = feet - this.groundY;
       if (support && this.y <= 0 && !this.falling) {
         this.y = 0;
         this.velocityY = 0;
+        this.jumpActive = false;
         this.diving = false;
         this.events.emit(GameEvent.Land);
       }
@@ -317,6 +329,7 @@ export class Simulation {
         if (this.health.damage()) {
           if (pool.kinds[i] === ObjectKind.Bird) pool.consume(i);
           this.speed = Rules.startSpeed;
+          this.groundVelocity = 0;
           // Hold the swept contact pose, not a later penetrated/end-of-step pose.
           this.x = this.previousX + dx * enter;
           this.z = this.previousZ + dz * enter;

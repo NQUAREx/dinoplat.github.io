@@ -187,11 +187,26 @@ export class LandscapeField {
     }
     return mask;
   }
-  /** Two separate equal-density ravine families; family zero is the old field. */
+  /** Two equal-density macro families. Relocate whole holes, never clip them
+   * against a route mask (which would cut artificial causeways through pits). */
   pitMaskAt(x: number, z: number, family = 0) {
-    if (family === 1) { const oldX = x; x = z + 73; z = -oldX + 91; }
-    const across = x + 11 * Math.sin(z / 53);
-    return Math.min(4 - Math.abs(across - 150 * Math.round(across / 150)), 14 - Math.abs(z - 180 * Math.round(z / 180)));
+    const u = family === 1 ? z + 73 : x, v = family === 1 ? -x + 91 : z;
+    const row = Math.round(v / 180), column = Math.round((u + 11 * Math.sin(v / 53)) / 150);
+    const originalZ = row * 180, originalX = column * 150 - 11 * Math.sin(originalZ / 53);
+    let cx = family === 1 ? 91 - originalZ : originalX;
+    let cz = family === 1 ? originalX - 73 : originalZ;
+    // Transverse routes repeat every 64m. The 28m length plus an 8m guard
+    // fits in a gap. Both families use the narrow world-X orientation so the
+    // entire AABB also fits between the more closely spaced curved routes.
+    cz = Math.floor(cz / 64) * 64 + 32;
+    const route = this.routeX(cz);
+    cx = route + (Math.floor((cx - route) / 32) + 0.5) * 32;
+    // AABB half width <=4+10*sin(14/53)=6.611m. Add route derivative
+    // padding (3/48+2/110)*14 and 8m: total <16m, half the route spacing.
+    // Centre relocation is bounded (<60m), so nearest macro lookup cannot
+    // miss any positive footprint, even after the second family's transform.
+    const dz = z - cz;
+    return Math.min(4 - Math.abs(x - cx + 10 * Math.sin(dz / 53)), 14 - Math.abs(dz));
   }
   /** Integer lattice indices; radial displacement < 0.85m, no cache. */
   gridX(ix: number, iz: number) {
@@ -275,7 +290,7 @@ export class LandscapeField {
     return Math.min(mask, Math.hypot(x, z) - 42);
   }
   private rawKindAt(x: number, z: number): Surface {
-    if (Math.max(this.pitMaskAt(x, z), this.pitMaskAt(x, z, 1)) > -1) return Surface.Pit;
+    if (Math.max(this.pitMaskAt(x, z), this.pitMaskAt(x, z, 1)) > 0) return Surface.Pit;
     return this.biomeAt(x, z) === Biome.Lava ? Surface.Lava : Surface.Water;
   }
   /** Constant underlying kind per warped triangle, including beneath bridges. */
@@ -323,7 +338,8 @@ export class LandscapeField {
   }
   surfaceAt(x: number, z: number): Surface {
     if (!this.enabled || this.triangleValue(x, z, 1) <= 0) return Surface.Land;
-    return this.triangleValue(x, z, 2) > 0 ? Surface.Bridge : this.hazardKindAt(x, z);
+    const kind = this.hazardKindAt(x, z);
+    return kind === Surface.Pit ? Surface.Pit : this.triangleValue(x, z, 2) > 0 ? Surface.Bridge : kind;
   }
   supportAt(x: number, z: number) {
     const surface = this.surfaceAt(x, z);

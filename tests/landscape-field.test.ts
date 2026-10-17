@@ -65,7 +65,7 @@ test("seed-rotated bridge curves cover all heading sectors with matching tangent
       const n = 96 + 9 * Math.sin(along / 83);
       const x = c * n - s * along, z = s * n + c * along;
       assert.ok(field.bridgeMaskAt(x, z) >= 3.6 - 1e-10);
-      assert.equal(field.supportAt(x, z), true, `seed ${seed}, along ${along}`);
+      assert.equal(field.supportAt(x, z), field.surfaceAt(x, z) !== Surface.Pit, `seed ${seed}, along ${along}`);
       assert.equal(field.supportAt(field.routeX(z), z), true);
       const d = x - field.routeX(z), route = 4.1 - Math.abs(d - Math.round(d / 32) * 32);
       if (route >= 3.59) continue; // At intersections the dominant route owns heading.
@@ -103,7 +103,8 @@ test("warped triangles interpolate heights and clipping scalars at both diagonal
         const bridge = points.reduce((s, p, i) => s + field.bridgeMaskAt(p[0], p[1]) * weights[i], 0);
         if (weights.every(w => w > 0)) {
           assert.equal(field.hazardKindAt(x, z), field.hazardKindAt(cx, cz));
-          assert.equal(field.surfaceAt(x, z), hazard <= 0 ? Surface.Land : bridge > 0 ? Surface.Bridge : field.hazardKindAt(cx, cz));
+          const kind = field.hazardKindAt(cx, cz);
+          assert.equal(field.surfaceAt(x, z), hazard <= 0 ? Surface.Land : kind === Surface.Pit ? Surface.Pit : bridge > 0 ? Surface.Bridge : kind);
         }
       }
     }
@@ -210,22 +211,79 @@ test("second ravine family doubles generated footprints rather than widening old
   let oldFootprints = 0, newFootprints = 0;
   for (let row = -10; row <= 10; row++) for (let column = -10; column <= 10; column++) {
     const z = row * 180, x = column * 150 - 11 * Math.sin(z / 53);
-    assert.ok(Math.abs(field.pitMaskAt(x, z) - 4) < 1e-10); oldFootprints++;
-    // Invert the second family's rigid transform: independent centres, same size.
-    assert.ok(Math.abs(field.pitMaskAt(91 - z, x - 73, 1) - 4) < 1e-10); newFootprints++;
+    for (const family of [0, 1]) {
+      const originalX = family ? 91 - z : x, originalZ = family ? x - 73 : z;
+      const cz = Math.floor(originalZ / 64) * 64 + 32;
+      const route = field.routeX(cz), cx = route + (Math.floor((originalX - route) / 32) + 0.5) * 32;
+      assert.ok(Math.abs(field.pitMaskAt(cx, cz, family) - 4) < 1e-10);
+      // The complete bent rectangle survives relocation, with no route cuts.
+      for (const dz of [-13.9, 0, 13.9]) for (const dx of [-3.9, 0, 3.9]) {
+        const px = cx + dx - 10 * Math.sin(dz / 53), pz = cz + dz;
+        assert.ok(field.pitMaskAt(px, pz, family) > 0);
+        assert.equal(field.safeAt(px, pz, 8), false);
+      }
+      if (family) newFootprints++; else oldFootprints++;
+    }
   }
   assert.equal(oldFootprints + newFootprints, oldFootprints * 2);
   let old = 0, second = 0, union = 0, newOnly = 0;
   for (let z = -1800; z < 1800; z += 2.71) for (let x = -1500; x < 1500; x += 3.17) {
-    const across = x + 11 * Math.sin(z / 53);
-    const baseline = Math.min(4 - Math.abs(across - 150 * Math.round(across / 150)), 14 - Math.abs(z - 180 * Math.round(z / 180)));
-    assert.equal(field.pitMaskAt(x, z), baseline);
+    const baseline = field.pitMaskAt(x, z);
     const a = baseline > 0, b = field.pitMaskAt(x, z, 1) > 0;
     old += +a; second += +b; union += +(a || b); newOnly += +(!a && b);
   }
   t.diagnostic(`old pit samples ${old}; second ${second}; union ${(union / old).toFixed(3)}x; new-only ${newOnly}`);
   assert.ok(second / old > 0.95 && second / old < 1.05);
   assert.ok(union / old > 1.93 && union / old < 2.05);
+});
+
+test("dry pits survive every seed and world sign, reject bridge masks, and leave routes supported", (t) => {
+  const field = new LandscapeField(), sample = {} as LandscapeSample;
+  let maskedPits = 0, pits = 0;
+  for (let seed = 1; seed <= 100; seed++) {
+    field.reset(seed);
+    for (const origin of [-1000000, -500, 1000000]) {
+      let found = 0;
+      for (let i = 0; i < 1000; i++) {
+        const x = origin + (i % 40) * 4.7, z = origin + Math.floor(i / 40) * 7.3;
+        const kind = field.hazardKindAt(x, z);
+        if (kind !== Surface.Pit || field.surfaceAt(x, z) === Surface.Land) continue;
+        found++; pits++;
+        assert.equal(field.surfaceAt(x, z), Surface.Pit);
+        assert.equal(field.supportAt(x, z), false);
+        field.sample(x, z, sample);
+        assert.equal(sample.floor, sample.height - 14);
+        if (field.bridgeMaskAt(x, z) > 0) maskedPits++;
+      }
+      assert.ok(found > 0, `dry pits seed ${seed}, origin ${origin}`);
+      for (let i = 0; i < 120; i++) {
+        const z = origin + i * 2.3;
+        for (const corridor of [-31250, -3, 0, 3, 31250])
+          assert.equal(field.supportAt(field.routeX(z, corridor), z), true, `route seed ${seed}, z ${z}`);
+      }
+    }
+  }
+  t.diagnostic(`${pits} dry pit samples, ${maskedPits} with positive bridge masks; 180000 route centres supported`);
+  assert.ok(maskedPits > 100, "rotated bridge masks still cross pits, but never supply support");
+});
+
+test("raw pit kind has no negative-mask band beside a river", () => {
+  class RiverField extends LandscapeField {
+    mask = -0.5;
+    override pitMaskAt() { return this.mask; }
+    override biomeAt() { return Biome.Meadow; }
+    override hazardAt() { return 2; }
+    override bridgeMaskAt() { return 2; }
+  }
+  const field = new RiverField();
+  assert.equal(field.hazardKindAt(100, 100), Surface.Water);
+  assert.equal(field.surfaceAt(100, 100), Surface.Bridge);
+  field.mask = 0;
+  assert.equal(field.hazardKindAt(100, 100), Surface.Water);
+  field.mask = 0.01;
+  assert.equal(field.hazardKindAt(100, 100), Surface.Pit);
+  assert.equal(field.surfaceAt(100, 100), Surface.Pit);
+  assert.equal(field.supportAt(100, 100), false);
 });
 
 test("hill distribution substantially exceeds the exact old macro baseline", (t) => {
